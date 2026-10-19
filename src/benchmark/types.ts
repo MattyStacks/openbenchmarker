@@ -49,5 +49,7 @@ export interface BenchResult {
   loopBusy: number;
   valid: boolean;
   invalidReason: string;
+  /** Run on a phone or tablet. Saved and exported locally, but not submittable (yet). */
+  mobile?: boolean;
   system: SystemInfo;
 }

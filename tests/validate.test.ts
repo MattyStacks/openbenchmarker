@@ -46,6 +46,11 @@ describe("validateSubmission", () => {
     expect(validateSubmission(withSys({ gpuId: GPU, os: "linux", distro: "Fedora", mesa: "24.2.5" }))).toEqual([]);
   });
 
+  it("mobile runs are blocked even when otherwise complete", () => {
+    const errs = validateSubmission(withSys({ gpuId: GPU, os: "windows" }, { mobile: true }));
+    expect(missingLabels(errs)).toEqual(["Device"]);
+  });
+
   it("NOT_LISTED is blocked and points upstream", () => {
     const errs = validateSubmission(withSys({ gpuId: NOT_LISTED, os: "windows" }));
     expect(errs).toHaveLength(1);

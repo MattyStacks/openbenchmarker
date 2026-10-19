@@ -163,6 +163,13 @@ function stageMessage(html: string | null): void {
   el.innerHTML = html ?? "";
 }
 
+/** Phones and tablets, including iPadOS Safari, which reports a desktop Mac user agent. */
+function isMobileDevice(): boolean {
+  const ua = navigator.userAgent;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+const MOBILE = isMobileDevice();
+
 function fitCanvas(canvas: HTMLCanvasElement, w: number, h: number): void {
   const host = $("#canvas-host");
   const s = Math.min(host.clientWidth / w, host.clientHeight / h);
@@ -179,6 +186,7 @@ async function startRun(cfg: RunConfig): Promise<void> {
   const resolution = resolutionLabel(res.id, width, height);
 
   // 1) Show the run view FIRST, 2) measure the stage, 3) only then create the WebGL context.
+  window.scrollTo(0, 0);
   showView("run");
   $("#hud-phase").textContent = "Building city…";
   $("#hud-bar").style.width = "0%";
@@ -239,16 +247,22 @@ async function startRun(cfg: RunConfig): Promise<void> {
     if (!done) finish(reason);
   };
   const onVisibility = () => document.visibilityState === "hidden" && invalidate("Tab hidden during run");
-  const onResize = () => invalidate("Window resized during run");
+  // The render size is fixed and CSS only scales the display, so a resize just refits the canvas.
+  // It invalidates only once timing has started, and on mobile only when the width changes (rotation):
+  // mobile browsers resize the viewport height whenever their address bar or toolbar shows or hides.
+  let timedViewportW = 0;
+  const onSizeChange = (reason: string) => {
+    fitCanvas(canvas, width, height);
+    if (phase === "warmup") return;
+    if (MOBILE && Math.abs(window.innerWidth - timedViewportW) < 2) return;
+    invalidate(reason);
+  };
+  const onResize = () => onSizeChange("Window resized during run");
   const onLost = (e: Event) => {
     e.preventDefault();
     invalidate("WebGL context lost during run");
   };
-  let firstObserve = true;
-  const ro = new ResizeObserver(() => {
-    if (firstObserve) return void (firstObserve = false);
-    invalidate("Stage resized during run");
-  });
+  const ro = new ResizeObserver(() => onSizeChange("Stage resized during run"));
   const onAbort = () => invalidate("Aborted by user");
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("resize", onResize);
@@ -300,6 +314,7 @@ async function startRun(cfg: RunConfig): Promise<void> {
       loopBusy: wallMs > 0 ? Math.min(1, st.totalMs / wallMs) : 0,
       valid: reason === "" && st.frames > 0,
       invalidReason: reason || (st.frames > 0 ? "" : "No timed frames recorded"),
+      mobile: MOBILE,
       system: emptySystem(),
     };
     upsertResult(result);
@@ -385,6 +400,7 @@ async function startRun(cfg: RunConfig): Promise<void> {
           if (t1 - runStart >= WARMUP_SECONDS * 1000) {
             phase = "timed";
             timedStart = performance.now();
+            timedViewportW = window.innerWidth;
           }
         } else {
           timed.push(t1 - t0);
@@ -463,6 +479,7 @@ function renderResults(r: BenchResult): void {
       <p class="muted">${esc(r.date)} ${esc(r.time)} · v${esc(r.benchmarkVersion)}</p>
     </div>
     ${r.valid ? "" : `<div class="banner-invalid" role="alert"><b>INVALID RUN:</b> ${esc(r.invalidReason)}. Saved locally; it can never be submitted.</div>`}
+    ${r.mobile ? `<p class="muted">Mobile run: saved locally and exportable as JSON/CSV. Submissions from phones and tablets aren't accepted yet.</p>` : ""}
     <div class="score-cards">
       <div class="score"><span>Average FPS</span><b id="res-avg">${round1(r.avgFps).toFixed(1)}</b></div>
       <div class="score"><span>1% Low FPS</span><b id="res-p1">${round1(r.p1Low).toFixed(1)}</b></div>
