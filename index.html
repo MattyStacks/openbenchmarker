@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>OpenGPU Benchmarker: Free Browser GPU Benchmark</title>
+    <meta name="description" content="Free, open-source GPU benchmark that runs in your browser. Run the Neon Flythrough at 1080p, 1440p or 4K, get Average FPS and 1% Low FPS, and submit results to Open GPU Benchmarks." />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://opengpubenchmarker.com/" />
+    <meta name="theme-color" content="#0b0820" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="author" content="MattyStacks" />
+
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="license" href="https://github.com/MattyStacks/openbenchmarker/blob/main/LICENSE" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="OpenGPU Benchmarker" />
+    <meta property="og:title" content="OpenGPU Benchmarker: Free Browser GPU Benchmark" />
+    <meta property="og:description" content="Fly through a neon 1980s city at 1080p, 1440p or 4K. Uncapped, timed to GPU completion, with Average FPS and 1% Low results you can submit to Open GPU Benchmarks." />
+    <meta property="og:url" content="https://opengpubenchmarker.com/" />
+    <meta property="og:image" content="https://opengpubenchmarker.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Neon Flythrough benchmark: a rainy neon city at night with glowing light trails" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="OpenGPU Benchmarker: Free Browser GPU Benchmark" />
+    <meta name="twitter:description" content="Free, open-source GPU benchmark in your browser. Average FPS and 1% Low at 1080p, 1440p or 4K." />
+    <meta name="twitter:image" content="https://opengpubenchmarker.com/og-image.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "OpenGPU Benchmarker",
+        "url": "https://opengpubenchmarker.com/",
+        "description": "Free, open-source GPU benchmark that runs in the browser on WebGL2. Runs the Neon Flythrough and reports Average FPS and 1% Low FPS.",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Windows, Linux",
+        "browserRequirements": "Requires WebGL2",
+        "image": "https://opengpubenchmarker.com/og-image.png",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "license": "https://opensource.org/license/mit",
+        "author": { "@type": "Person", "name": "MattyStacks", "url": "https://github.com/MattyStacks" },
+        "sameAs": ["https://github.com/MattyStacks/openbenchmarker"]
+      }
+    </script>
+  </head>
+  <body>
+    <header class="banner" id="banner">
+      <a class="brand" href="#/"><span class="brand-mark" aria-hidden="true"></span>OpenGPU <b>Benchmarker</b></a>
+      <nav class="nav">
+        <a href="#/" data-nav="home">Benchmark</a>
+        <a href="#/history" data-nav="history">My Results</a>
+        <a href="https://opengpubenchmarks.com/" target="_blank" rel="noopener">Open GPU Benchmarks ↗</a>
+      </nav>
+    </header>
+
+    <main id="app">
+      <!-- Home: the single benchmark + its run configuration, visible immediately -->
+      <noscript>
+        <p class="noscript">OpenGPU Benchmarker needs JavaScript and WebGL2 to run the benchmark. Turn on JavaScript and reload the page.</p>
+      </noscript>
+      <section class="view" id="view-home">
+        <article class="bench-card">
+          <div class="bench-art" aria-hidden="true"><div class="art-sun"></div><div class="art-grid"></div><div class="art-city"></div></div>
+          <div class="bench-body">
+            <h1>Neon Flythrough</h1>
+            <p class="lede">A fixed-path cinematic flight through a rain-soaked, neon-lit 1980s-movie city: instanced towers, signs, flying traffic with light trails, drones, holograms, searchlights, bloom and wet-street reflections. Runs uncapped (not limited to your monitor's refresh rate) and times every frame to GPU completion.</p>
+
+            <form id="config" class="config" autocomplete="off">
+              <label class="field">
+                <span>Resolution</span>
+                <select name="resolution" id="cfg-resolution"></select>
+              </label>
+              <fieldset class="field">
+                <legend>Graphics preset</legend>
+                <div class="seg" id="cfg-preset"></div>
+              </fieldset>
+              <fieldset class="field">
+                <legend>Duration</legend>
+                <div class="seg" id="cfg-duration"></div>
+              </fieldset>
+              <p class="config-note">Plus a 3 s warm-up that is never counted. Settings are locked during the run. Keep this tab visible and don't resize the window, or the run is marked invalid.</p>
+              <button type="submit" class="btn btn-primary btn-start" id="start">Start benchmark</button>
+            </form>
+          </div>
+        </article>
+        <aside class="about">
+          <h2>Honest results</h2>
+          <ul>
+            <li><b>Measured by the run:</b> Avg FPS, 1% Low, 5% Low, worst frame, frame count, resolution, preset, date, graphics API.</li>
+            <li><b>Provided by you:</b> GPU (from the official catalog), OS and any optional system details. Nothing is guessed or auto-filled.</li>
+            <li>Results stay in this browser unless you choose to export or submit them to <a href="https://opengpubenchmarks.com/" target="_blank" rel="noopener">opengpubenchmarks.com</a>.</li>
+          </ul>
+        </aside>
+      </section>
+
+      <!-- Run: HUD lives inside the stage, which sits below the in-flow banner -->
+      <section class="view view-run" id="view-run" hidden>
+        <div class="stage" id="stage">
+          <div class="canvas-host" id="canvas-host"></div>
+          <div class="hud">
+            <div class="hud-panel hud-status">
+              <div class="hud-title">NEON FLYTHROUGH</div>
+              <div class="hud-phase" id="hud-phase">Preparing…</div>
+              <div class="hud-progress"><div id="hud-bar"></div></div>
+              <div class="hud-settings" id="hud-settings"></div>
+            </div>
+            <div class="hud-panel hud-fps">
+              <div class="hud-big"><span id="hud-fps">0</span><small>FPS</small></div>
+              <div class="hud-unlimited">UNLIMITED · uncapped</div>
+              <dl class="hud-stats">
+                <dt>Avg</dt><dd id="hud-avg">–</dd>
+                <dt>1% low</dt><dd id="hud-p1">–</dd>
+                <dt>Frames</dt><dd id="hud-frames">0</dd>
+              </dl>
+            </div>
+            <div class="hud-panel hud-graph">
+              <div class="hud-graph-label">Frame time (ms) · line = 60 FPS</div>
+              <canvas id="hud-graph" width="300" height="80"></canvas>
+            </div>
+            <button type="button" class="btn btn-abort" id="abort">Abort</button>
+          </div>
+          <div class="stage-msg" id="stage-msg" hidden></div>
+        </div>
+      </section>
+
+      <!-- Results -->
+      <section class="view" id="view-results" hidden></section>
+
+      <!-- Local history -->
+      <section class="view" id="view-history" hidden></section>
+    </main>
+
+    <footer class="site-footer" id="footer">
+      <div class="footer-inner">
+        <div class="footer-col footer-about">
+          <a class="brand" href="#/"><span class="brand-mark" aria-hidden="true"></span>OpenGPU <b>Benchmarker</b></a>
+          <p>A free, open-source GPU benchmark that runs in your browser. Results stay in this browser unless you export or submit them. No accounts, no cookies, no tracking scripts.</p>
+        </div>
+        <nav class="footer-col" aria-label="Site">
+          <h2>Benchmark</h2>
+          <a href="#/">Neon Flythrough</a>
+          <a href="#/history">My Results</a>
+          <a href="https://opengpubenchmarks.com/" target="_blank" rel="noopener">Open GPU Benchmarks ↗</a>
+        </nav>
+        <nav class="footer-col" aria-label="Project">
+          <h2>Project</h2>
+          <a href="https://github.com/MattyStacks/openbenchmarker" target="_blank" rel="noopener">Source code ↗</a>
+          <a href="https://github.com/MattyStacks/openbenchmarker/issues" target="_blank" rel="noopener">Report an issue ↗</a>
+          <a href="https://github.com/MattyStacks/open-gpu-benchmarks" target="_blank" rel="noopener">Results dataset ↗</a>
+        </nav>
+        <div class="footer-col">
+          <h2>License</h2>
+          <p>Code: <a href="https://github.com/MattyStacks/openbenchmarker/blob/main/LICENSE" target="_blank" rel="noopener license">MIT License</a>.</p>
+          <p>Submitted results: <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.</p>
+          <p>Built with <a href="https://threejs.org/" target="_blank" rel="noopener">three.js</a> (MIT).</p>
+        </div>
+      </div>
+      <p class="footer-legal">© 2026 MattyStacks. GPU and CPU names are trademarks of their respective owners. Scores from this benchmark are not comparable with other benchmarks.</p>
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "name": "opengpu-benchmarker",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Open-source browser GPU benchmark (Neon Flythrough) for opengpubenchmarks.com",
+  "license": "MIT",
+  "author": "MattyStacks",
+  "homepage": "https://opengpubenchmarker.com/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MattyStacks/openbenchmarker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MattyStacks/openbenchmarker/issues"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "deploy": "npm run build && wrangler deploy",
+    "refresh-catalog": "node scripts/refresh-catalog.mjs"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.4",
+    "vitest": "5.0.5",
+    "wrangler": "4.151.2"
+  }
+}

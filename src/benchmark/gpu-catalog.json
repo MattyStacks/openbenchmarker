@@ -1,0 +1,12 @@
+{
+  "snapshotDate": "2026-10-19",
+  "source": "https://github.com/MattyStacks/open-gpu-benchmarks/tree/1b3f1098401316dc57350a1643d2067c47f9ab10/data/gpus",
+  "gpus": [
+    {
+      "id": "rtx_5080_16gb_fe",
+      "name": "GeForce RTX 5080 Founders Edition",
+      "vendor": "nvidia",
+      "formFactor": "desktop"
+    }
+  ]
+}

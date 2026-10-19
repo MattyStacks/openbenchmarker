@@ -1,0 +1,8 @@
+# Cloudflare Workers Static Assets (same setup as opengpubenchmarks.com).
+# Attach the custom domain opengpubenchmarker.com in the Cloudflare dashboard.
+name = "opengpu-benchmarker"
+compatibility_date = "2026-10-01"
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
