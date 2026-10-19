@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 const REPO = "MattyStacks/open-gpu-benchmarks";
 const OUT = fileURLToPath(new URL("../src/benchmark/gpu-catalog.json", import.meta.url));
-const headers = { "User-Agent": "opengpu-benchmarker-refresh", Accept: "application/vnd.github+json" };
+const headers = { "User-Agent": "openbenchmarker-refresh", Accept: "application/vnd.github+json" };
 if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
 
 async function get(url, json = true) {

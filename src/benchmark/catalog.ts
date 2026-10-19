@@ -21,7 +21,7 @@ export const UPSTREAM_REPO = "https://github.com/MattyStacks/open-gpu-benchmarks
 export const UPSTREAM_ISSUES = `${UPSTREAM_REPO}/issues/new/choose`;
 export const UPSTREAM_TEMPLATES = `${UPSTREAM_REPO}/tree/main/templates`;
 
-export const BENCHMARKS = [{ gameId: "opengpu_neon_flythrough", name: "OpenGPU Neon Flythrough" }] as const;
+export const BENCHMARKS = [{ gameId: "openbenchmarker_neon_flythrough", name: "OpenBenchmarker Neon Flythrough" }] as const;
 export const BENCHMARK = BENCHMARKS[0];
 export const BENCHMARK_VERSION = "1.0.0";
 

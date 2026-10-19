@@ -1,11 +1,11 @@
 {
-  "name": "opengpu-benchmarker",
+  "name": "openbenchmarker",
   "private": true,
   "version": "1.0.0",
   "description": "Open-source browser GPU benchmark (Neon Flythrough) for opengpubenchmarks.com",
   "license": "MIT",
   "author": "MattyStacks",
-  "homepage": "https://opengpubenchmarker.com/",
+  "homepage": "https://openbenchmarker.com/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MattyStacks/openbenchmarker.git"

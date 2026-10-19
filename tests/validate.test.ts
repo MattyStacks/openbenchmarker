@@ -94,7 +94,7 @@ describe("exports", () => {
   it("YAML has measured fields, no invented hardware, blank optionals omitted, graphics_api emitted", () => {
     const y = toYaml(withSys({ gpuId: GPU, os: "windows" }));
     expect(y).toMatch(/^gpu_id: rtx_5080_16gb_fe$/m);
-    expect(y).toMatch(/^game_id: opengpu_neon_flythrough$/m);
+    expect(y).toMatch(/^game_id: openbenchmarker_neon_flythrough$/m);
     expect(y).toMatch(/^date: "2026-10-19"$/m);
     expect(y).toMatch(/^ {2}- resolution: "1080p"$/m);
     expect(y).toMatch(/^ {4}graphics_preset: "Ultra"$/m);
@@ -120,7 +120,7 @@ describe("exports", () => {
   });
 
   it("file name follows result_YYYYMMDD_<game_id>.yaml", () => {
-    expect(suggestedFileName(result(), "yaml")).toBe("result_20261019_opengpu_neon_flythrough.yaml");
+    expect(suggestedFileName(result(), "yaml")).toBe("result_20261019_openbenchmarker_neon_flythrough.yaml");
   });
 
   it("JSON and CSV are always available and say when incomplete", () => {

@@ -73,10 +73,10 @@ type View = "home" | "run" | "results" | "history";
 let running = false;
 
 const TITLES: Record<View, string> = {
-  home: "OpenGPU Benchmarker: Free Browser GPU Benchmark",
-  run: "Running Neon Flythrough · OpenGPU Benchmarker",
-  results: "Result · OpenGPU Benchmarker",
-  history: "My Results · OpenGPU Benchmarker",
+  home: "OpenBenchmarker: Free Browser GPU Benchmark",
+  run: "Running Neon Flythrough · OpenBenchmarker",
+  results: "Result · OpenBenchmarker",
+  history: "My Results · OpenBenchmarker",
 };
 
 function showView(v: View): void {
@@ -640,7 +640,7 @@ function renderHistory(): void {
             .join("")}</tbody></table></div>`
         : `<p>No runs yet. <a href="#/">Run the benchmark</a>.</p>`
     }`;
-  view.querySelector("#hist-csv")?.addEventListener("click", () => download("opengpu_results.csv", toCsv(history), "text/csv"));
+  view.querySelector("#hist-csv")?.addEventListener("click", () => download("openbenchmarker_results.csv", toCsv(history), "text/csv"));
   view.querySelectorAll<HTMLButtonElement>("[data-del]").forEach((b) =>
     b.addEventListener("click", () => {
       if (!confirm("Delete this result from this browser?")) return;

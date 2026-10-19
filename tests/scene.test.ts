@@ -34,7 +34,7 @@ describe("flight corridor", () => {
 
   it("there is exactly one benchmark", () => {
     expect(BENCHMARKS).toHaveLength(1);
-    expect(BENCHMARKS[0].gameId).toBe("opengpu_neon_flythrough");
+    expect(BENCHMARKS[0].gameId).toBe("openbenchmarker_neon_flythrough");
   });
 });
 
