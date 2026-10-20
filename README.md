@@ -90,6 +90,12 @@ page flow (never fixed or sticky), so the HUD can't end up hidden under it.
   under the biggest signs.
 - Every field is non-decreasing from Low to Extreme (a test enforces it).
 
+The streets are drawn procedurally on the ground plane on every preset, at no extra draw
+calls (`src/engine/ground.ts`). They have wet asphalt with puddles, neon lane markings that
+line up with the traffic lanes, pulsing holographic crosswalks, a guide grid over each
+junction, glowing curb strips with light spilling onto the road, paved sidewalks with
+floor lights, and drain grates.
+
 Presets with bloom also add a grade pass (chromatic aberration, scanlines, grain,
 vignette). On Ultra and Extreme, a `Reflector` re-renders the whole scene mirrored every
 frame to make the wet-street reflections.

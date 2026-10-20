@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { BuildCtx } from "../ctx";
+import { makeGroundMaterial } from "../ground";
 import { CITY_HALF } from "../world";
 
 /** Overcast night sky dome, lights (the high cool key light casts the shadows), wet ground. */
@@ -69,16 +70,11 @@ export function buildSky(ctx: BuildCtx): void {
     key.shadow.bias = -0.0008;
   }
 
-  // Wet asphalt. With planar reflections (Ultra+) it is partly see-through to the mirror below.
-  const groundMat = track(
-    new THREE.MeshStandardMaterial({
-      color: 0x0d0b18,
-      roughness: preset.reflections > 0 ? 0.16 : 0.3,
-      metalness: 0.65,
-      transparent: preset.reflections > 0,
-      opacity: preset.reflections > 0 ? 0.55 : 1,
-    }),
-  );
+  // Wet neon streets. With planar reflections (Ultra+) the asphalt is partly see-through to the
+  // mirror below; paint, curbs and sidewalks stay opaque.
+  const groundTime = { value: 0 };
+  ctx.onUpdate((t) => void (groundTime.value = t));
+  const groundMat = track(makeGroundMaterial(preset.reflections > 0, groundTime));
   const ground = new THREE.Mesh(track(new THREE.PlaneGeometry(8000, 8000)), groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = 0.05;
