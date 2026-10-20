@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://openbenchmarker.com/sitemap.xml
+Sitemap: https://opengpubenchmarker.com/sitemap.xml

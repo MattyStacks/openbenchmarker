@@ -5,7 +5,7 @@
   "description": "Open-source browser GPU benchmark (Neon Flythrough) for opengpubenchmarks.com",
   "license": "MIT",
   "author": "MattyStacks",
-  "homepage": "https://openbenchmarker.com/",
+  "homepage": "https://opengpubenchmarker.com/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MattyStacks/openbenchmarker.git"

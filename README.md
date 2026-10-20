@@ -1,9 +1,9 @@
-# OpenBenchmarker
+# Open GPU Benchmarker
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-ff2bd6.svg)](LICENSE)
 
 An open-source GPU benchmark that runs in the browser with nothing to install
-(openbenchmarker.com). It runs one benchmark, **Neon Flythrough**: a fixed-path
+(opengpubenchmarker.com). It runs one benchmark, **Neon Flythrough**: a fixed-path
 flight through a rainy, neon-lit 1980s-movie city. It reports **Average FPS** and
 **1% Low FPS**. You can keep results in your browser or submit them to
 [Open GPU Benchmarks](https://opengpubenchmarks.com/).
@@ -25,7 +25,7 @@ npm run deploy     # build + wrangler deploy
 
 To deploy, run `npx wrangler login` once, then `npm run deploy`. `wrangler.toml`
 serves `./dist` with an SPA fallback. Attach the custom domain
-`openbenchmarker.com` in the Cloudflare dashboard (Workers → openbenchmarker →
+`opengpubenchmarker.com` in the Cloudflare dashboard (Workers → openbenchmarker →
 Settings → Domains).
 
 ## How a run works
@@ -115,7 +115,7 @@ The first PR that uses this benchmark must also add it to upstream `data/games.y
     name: OpenBenchmarker Neon Flythrough
     type: synthetic
     year: 2026
-    url: https://openbenchmarker.com/
+    url: https://opengpubenchmarker.com/
 ```
 
 Submitted data is public under **CC BY 4.0** and can't be taken back.
@@ -136,7 +136,7 @@ The script refuses to overwrite the snapshot with an empty list.
 
 Everything Google Search and link previews need ships from `index.html` and `public/`:
 
-- `<title>`, meta description, `robots`, and a canonical link to `https://openbenchmarker.com/`.
+- `<title>`, meta description, `robots`, and a canonical link to `https://opengpubenchmarker.com/`.
   The app uses hash routes (`#/history`, `#/result/…`), which search engines treat as the
   same page, so there is one indexable URL.
 - Open Graph and Twitter card tags, with `public/og-image.png` (1200×630, a real frame of the
@@ -152,7 +152,7 @@ After the first deploy:
 
 1. Add the domain in [Google Search Console](https://search.google.com/search-console). The
    **Domain** property type verifies through a DNS TXT record; add it under Cloudflare → DNS.
-2. Submit `https://openbenchmarker.com/sitemap.xml` under **Sitemaps**.
+2. Submit `https://opengpubenchmarker.com/sitemap.xml` under **Sitemaps**.
 3. Use **URL Inspection** on the home page and request indexing.
 4. Optional: check the structured data with the
    [Rich Results Test](https://search.google.com/test/rich-results).

@@ -23,7 +23,7 @@ export function toYaml(r: BenchResult): string {
   if (errors.length) throw new Error(`Not submittable: ${errors.join("; ")}`);
   const s = r.system;
   const lines = [
-    `# Captured by OpenBenchmarker ${r.benchmarkVersion} (https://openbenchmarker.com/), benchmark "${BENCHMARK.name}".`,
+    `# Captured by Open GPU Benchmarker ${r.benchmarkVersion} (https://opengpubenchmarker.com/), benchmark "${BENCHMARK.name}".`,
     `# Timed in the browser: Avg FPS = frames / wall-clock; lows from ${r.timing === "gpu-timer" ? "GPU timer queries" : "per-batch frame times"}. Hardware fields were entered by the submitter.`,
     `# Save as data/community/${s.gpuId}/${suggestedFileName(r, "yaml")} in a PR to ${UPSTREAM_REPO}`,
     `# Submitted data is public under CC BY 4.0 (data/LICENSE) and cannot be taken back.`,
@@ -50,7 +50,7 @@ export function toYaml(r: BenchResult): string {
     if (key === "cpu" && s.memoryGb.trim()) lines.push(`  memory_gb: ${Number(s.memoryGb.trim())}`);
   }
   lines.push(`  graphics_api: ${r.graphicsApi} # recorded from the WebGL context the run used`);
-  lines.push(`proof:`, `  method: ${PROOF_METHOD} # captured by OpenBenchmarker (in-browser per-frame timing)`);
+  lines.push(`proof:`, `  method: ${PROOF_METHOD} # captured by Open GPU Benchmarker (in-browser per-frame timing)`);
   return lines.join("\n") + "\n";
 }
 
@@ -61,7 +61,7 @@ export function gamesYamlEntry(year: number): string {
     `    name: ${BENCHMARK.name}`,
     `    type: synthetic`,
     `    year: ${year}`,
-    `    url: https://openbenchmarker.com/`,
+    `    url: https://opengpubenchmarker.com/`,
     `    notes: Browser WebGL2 benchmark; fixed-path neon city flythrough with per-frame timing.`,
   ].join("\n");
 }

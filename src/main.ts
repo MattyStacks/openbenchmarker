@@ -73,10 +73,10 @@ type View = "home" | "run" | "results" | "history";
 let running = false;
 
 const TITLES: Record<View, string> = {
-  home: "OpenBenchmarker: Free Browser GPU Benchmark",
-  run: "Running Neon Flythrough · OpenBenchmarker",
-  results: "Result · OpenBenchmarker",
-  history: "My Results · OpenBenchmarker",
+  home: "Open GPU Benchmarker: Free Browser GPU Benchmark",
+  run: "Running Neon Flythrough · Open GPU Benchmarker",
+  results: "Result · Open GPU Benchmarker",
+  history: "My Results · Open GPU Benchmarker",
 };
 
 function showView(v: View): void {

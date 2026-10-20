@@ -1,6 +1,6 @@
 {
-  "name": "OpenBenchmarker",
-  "short_name": "OpenBenchmarker",
+  "name": "Open GPU Benchmarker",
+  "short_name": "Open GPU Bench",
   "description": "Free, open-source GPU benchmark that runs in your browser.",
   "start_url": "/",
   "display": "standalone",
