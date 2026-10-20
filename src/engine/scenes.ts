@@ -6,7 +6,8 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { Reflector } from "three/addons/objects/Reflector.js";
 import type { Preset } from "../benchmark/presets";
-import { FLIGHT_CURVE, HALF, LOOP_SECONDS, buildCity } from "./city";
+import { buildCity } from "./city";
+import { FLIGHT, HALF } from "./world";
 
 const GradeShader = {
   uniforms: {
@@ -117,15 +118,13 @@ export function makeFlythrough(renderer: THREE.WebGLRenderer, preset: Preset, w:
     }
   }
 
-  const pos = new THREE.Vector3();
-  const ahead = new THREE.Vector3();
+  const look = new THREE.Vector3();
   const render = (t: number) => {
-    const u = (((t / LOOP_SECONDS) % 1) + 1) % 1;
-    FLIGHT_CURVE.getPointAt(u, pos);
-    FLIGHT_CURVE.getPointAt((u + 0.012) % 1, ahead);
-    camera.position.copy(pos);
-    ahead.y -= 2.5;
-    camera.lookAt(ahead);
+    const roll = FLIGHT.pose(t, camera.position, look);
+    camera.up.set(0, 1, 0);
+    camera.lookAt(look);
+    camera.rotateZ(roll);
+    camera.updateMatrixWorld();
     city.update(t, camera);
     if (composer) {
       grade!.uniforms.uTime.value = t;
