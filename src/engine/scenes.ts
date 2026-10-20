@@ -75,7 +75,7 @@ export function makeFlythrough(renderer: THREE.WebGLRenderer, preset: Preset, w:
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const camera = new THREE.PerspectiveCamera(68, w / h, 0.5, 4200);
-  const city = buildCity(preset);
+  const city = buildCity(preset, { w, h });
   scene.add(city.group);
 
   let mirror: Reflector | null = null;

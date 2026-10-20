@@ -72,6 +72,7 @@ export function buildSigns(ctx: BuildCtx): void {
     obj.scale.set(sw, sh, 1);
     obj.updateMatrix();
     v.mats.push(obj.matrix.clone());
+    ctx.lights.push({ x: x + nx * 2, y, z: z + nz * 2, r: 10 + Math.max(sw, sh), color: v.mat.color.clone().multiplyScalar(1 / 2.2) });
     i++;
   }
   const plane = track(new THREE.PlaneGeometry(1, 1));

@@ -18,19 +18,21 @@ export interface City {
 }
 
 /** Assemble every scene system for a preset. Deterministic: seeded streams, motion from t only. */
-export function buildCity(preset: Preset, seed = SEED): City {
+export function buildCity(preset: Preset, size: { w: number; h: number }, seed = SEED): City {
   const group = new THREE.Group();
   const disposables: { dispose(): void }[] = [];
   const updaters: ((t: number, camera: THREE.Camera) => void)[] = [];
   const ctx: BuildCtx = {
     preset,
     seed,
+    size,
     group,
     shadows: preset.shadowMap > 0,
     track: (x) => (disposables.push(x), x),
     onUpdate: (fn) => void updaters.push(fn),
     counts: {},
     spots: [],
+    lights: [],
   };
   buildSky(ctx);
   ctx.spots = buildTowers(ctx);

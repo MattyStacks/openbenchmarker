@@ -6,6 +6,8 @@ import type { BuildingSpot } from "./layout";
 export interface BuildCtx {
   preset: Preset;
   seed: number;
+  /** Render size in pixels (fixed for the whole run). */
+  size: { w: number; h: number };
   group: THREE.Group;
   shadows: boolean;
   /** Register a GPU resource for disposal; returns it. */
@@ -15,6 +17,17 @@ export interface BuildCtx {
   counts: Record<string, number>;
   /** Tower footprints, filled by the towers system for later systems to anchor to. */
   spots: BuildingSpot[];
+  /** Bright neon sources (signs etc.) that rain and haze can pick up colour from. */
+  lights: GlowLight[];
+}
+
+export interface GlowLight {
+  x: number;
+  y: number;
+  z: number;
+  /** Reach in world units. */
+  r: number;
+  color: THREE.Color;
 }
 
 export const NEON = [0xff2bd6, 0x22e6ff, 0xff4f6a, 0x9b5cff, 0x3dffb0, 0xffb02e];
