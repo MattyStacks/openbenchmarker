@@ -1,4 +1,4 @@
-export type ResolutionId = "1080p" | "1440p" | "4K" | "native";
+export type ResolutionId = "720p" | "1080p" | "1440p" | "4K" | "native";
 
 export interface Resolution {
   id: ResolutionId;
@@ -8,10 +8,11 @@ export interface Resolution {
 }
 
 /**
- * Fixed render sizes, named the way upstream records them (1080p, 1440p, 4K).
+ * Fixed render sizes, named the way upstream records them (720p, 1080p, 1440p, 4K).
  * "native" is resolved at run time from the display.
  */
 export const RESOLUTIONS: Resolution[] = [
+  { id: "720p", label: "720p (1280×720)", width: 1280, height: 720 },
   { id: "1080p", label: "1080p (1920×1080)", width: 1920, height: 1080 },
   { id: "1440p", label: "1440p (2560×1440)", width: 2560, height: 1440 },
   { id: "4K", label: "4K (3840×2160)", width: 3840, height: 2160 },
@@ -66,7 +67,7 @@ export function nativeSize(screenW: number, screenH: number, dpr: number): { wid
 }
 
 /**
- * The resolution string recorded in the result. Upstream writes 1920x1080 as 1080p, 2560x1440 as
+ * The resolution string recorded in the result. Upstream writes 1280x720 as 720p, 1920x1080 as 1080p, 2560x1440 as
  * 1440p and 3840x2160 as 4K, and any other size as WIDTHxHEIGHT, so a Native run that lands on one
  * of the standard sizes gets the standard name.
  */

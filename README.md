@@ -30,8 +30,9 @@ Settings → Domains).
 
 ## How a run works
 
-1. Before the run you choose a **resolution**: 1080p, 1440p, 4K (3840×2160), or Native
-   (the display's physical pixels). Results use upstream's names: `1080p`, `1440p`, `4K`,
+1. Before the run you choose a **resolution**: 720p (1280×720, a lighter option for
+   lower-end GPUs), 1080p, 1440p, 4K (3840×2160), or Native (the display's physical
+   pixels). Results use upstream's names: `720p`, `1080p`, `1440p`, `4K`,
    and `WIDTHxHEIGHT` for any other Native size. The scene renders at exactly that size with
    `setPixelRatio(1)`, and CSS only scales it to fit on screen. You also choose a
    **preset** (Low to Extreme) and a **duration** (30/60/90 s). These settings
