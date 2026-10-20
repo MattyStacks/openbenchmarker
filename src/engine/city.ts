@@ -37,15 +37,23 @@ export function buildCity(preset: Preset, size: { w: number; h: number }, seed =
     lights: [],
     solids: new SolidIndex(),
   };
-  buildSky(ctx);
-  buildAtmosphere(ctx);
-  const plan = buildTowers(ctx);
+  // Each system builds into its own named group (dev captures can time them one by one).
+  const sub = <T>(name: string, build: () => T): T => {
+    const g = new THREE.Group();
+    g.name = name;
+    group.add(g);
+    ctx.group = g;
+    return build();
+  };
+  sub("sky", () => buildSky(ctx));
+  sub("atmosphere", () => buildAtmosphere(ctx));
+  const plan = sub("towers", () => buildTowers(ctx));
   ctx.spots = plan.towers;
-  buildSigns(ctx, plan);
-  buildRain(ctx);
-  buildTraffic(ctx);
-  buildDrones(ctx);
-  buildFx(ctx);
+  sub("signs", () => buildSigns(ctx, plan));
+  sub("rain", () => buildRain(ctx));
+  sub("traffic", () => buildTraffic(ctx));
+  sub("drones", () => buildDrones(ctx));
+  sub("fx", () => buildFx(ctx));
   return {
     group,
     counts: ctx.counts,

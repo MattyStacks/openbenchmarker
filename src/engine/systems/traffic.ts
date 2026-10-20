@@ -126,7 +126,8 @@ export function buildTraffic(ctx: BuildCtx): void {
   const lights = makeGlow(ctx, { count: n * 5, color: lcol, params: lpar, minPx: 1.2 });
 
   // Holographic lane markers: faint dots along each sky-lane, every `step` units.
-  const sky = lanes.filter((l) => l.level > 0 && l.dir === 1);
+  // Markers from three lane levels up (Medium+): denser with more levels.
+  const sky = preset.skyLanes >= 3 ? lanes.filter((l) => l.level > 0 && l.dir === 1) : [];
   const step = preset.skyLanes >= 5 ? 24 : preset.skyLanes >= 4 ? 32 : 44;
   const markers: number[] = [];
   for (const l of sky)

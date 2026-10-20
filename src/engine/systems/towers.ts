@@ -35,8 +35,9 @@ export function buildTowers(ctx: BuildCtx): CityPlan {
   };
   // Bloom presets glow more on their own, so windows are a little dimmer there.
   const gain = preset.bloom > 0 ? 0.55 : 0.85;
-  const winBox = track(makeWindowMaterial(false, uTime, gain));
-  const winRound = track(makeWindowMaterial(true, uTime, gain));
+  const simple = preset.towerDetail === 0;
+  const winBox = track(makeWindowMaterial(false, uTime, gain, simple));
+  const winRound = track(makeWindowMaterial(true, uTime, gain, simple));
   const metal = track(new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.6, roughness: 0.55 }));
   const glowMat = track(new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }));
   const mats: Record<Kind, THREE.Material> = {

@@ -85,7 +85,7 @@ export function buildRain(ctx: BuildCtx): void {
           vSide = corner.y;
           vAlong = corner.x;
           float far = 1.0 - smoothstep(0.45, 1.0, depth / (uBox.x * 0.5));
-          vAlpha = 0.34 * pow(clamp(px, 0.0, 1.0), 0.6) * far;
+          vAlpha = 0.24 * pow(clamp(px, 0.0, 1.0), 0.6) * far;
           vec3 lit = vec3(0.30, 0.36, 0.55);
           for (int i = 0; i < ${MAX_LIGHTS}; i++) {
             vec3 dl = p - uLightPos[i].xyz;

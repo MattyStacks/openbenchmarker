@@ -12,10 +12,12 @@ import * as THREE from "three";
  *
  * Instances carry `aWin` = (seed, palette 0..3, occupancy, style). Roofs (|normal.y| > 0.5) stay dark.
  */
-export function makeWindowMaterial(round: boolean, uTime: { value: number }, gain: number): THREE.MeshStandardMaterial {
+export function makeWindowMaterial(round: boolean, uTime: { value: number }, gain: number, simple: boolean): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ color: 0x15141f, metalness: 0.55, roughness: 0.42 });
-  // Both variants share onBeforeCompile source text; without a key three.js would reuse one program.
-  mat.customProgramCacheKey = () => (round ? "ogb-windows-round" : "ogb-windows-box");
+  // The variants share onBeforeCompile source text; without a key three.js would reuse one program.
+  mat.customProgramCacheKey = () => `ogb-windows-${round ? "round" : "box"}-${simple ? "simple" : "full"}`;
+  // Simple (lowest detail): same grid and colours, no interior parallax or flicker.
+  if (simple) mat.defines = { OGB_SIMPLE_WINDOWS: 1 };
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uTime;
     shader.uniforms.uGain = { value: gain };
@@ -89,27 +91,34 @@ export function makeWindowMaterial(round: boolean, uTime: { value: number }, gai
           float occ = vWin.z;
           float lit = step(rr, occ) * step(0.16, fr);
           if (fr > 0.93) lit = 1.0;
-          float fh = h21(id * 1.7 + seed);
-          if (fh > 0.986) lit *= step(0.35, h21(vec2(floor(uTime * (5.0 + fh * 9.0)), fh * 100.0)));
+          #ifndef OGB_SIMPLE_WINDOWS
+            float fh = h21(id * 1.7 + seed);
+            if (fh > 0.986) lit *= step(0.35, h21(vec2(floor(uTime * (5.0 + fh * 9.0)), fh * 100.0)));
+          #endif
           vec2 wmin = vWin.w > 0.5 ? vec2(0.06, 0.3) : vec2(0.2, 0.28);
           vec2 wmax = vWin.w > 0.5 ? vec2(0.94, 0.74) : vec2(0.8, 0.76);
           vec2 fw = max(fwidth(f), vec2(1e-4));
           vec2 w2 = smoothstep(wmin - fw, wmin + fw, g) * (1.0 - smoothstep(wmax - fw, wmax + fw, g));
           float inside = w2.x * w2.y;
-          // Interior hint: the room's back wall shifts with the view direction (parallax).
-          vec3 n = vec3(vWN.x, 0.0, vWN.z);
-          float nl = length(n);
-          n = nl > 1e-4 ? n / nl : vec3(0.0, 0.0, 1.0);
-          vec3 tng = vec3(-n.z, 0.0, n.x);
-          vec3 V = vWP - cameraPosition;
-          float vl = length(V);
-          V = vl > 1e-4 ? V / vl : vec3(0.0, 0.0, -1.0);
-          float vz = max(0.25, abs(dot(V, n)));
           vec2 rg = (g - wmin) / (wmax - wmin);
-          vec2 back = rg + vec2(dot(V, tng), V.y) / vz * 0.22;
-          float onBack = step(0.0, back.x) * step(back.x, 1.0) * step(0.0, back.y) * step(back.y, 1.0);
-          float ceil = clamp(back.y, 0.0, 1.0);
-          float shade = mix(0.68, 1.0, onBack) * (0.6 + 0.55 * ceil * ceil);
+          #ifdef OGB_SIMPLE_WINDOWS
+            float ceil = clamp(rg.y, 0.0, 1.0);
+            float shade = 0.85 * (0.6 + 0.55 * ceil * ceil);
+          #else
+            // Interior hint: the room's back wall shifts with the view direction (parallax).
+            vec3 n = vec3(vWN.x, 0.0, vWN.z);
+            float nl = length(n);
+            n = nl > 1e-4 ? n / nl : vec3(0.0, 0.0, 1.0);
+            vec3 tng = vec3(-n.z, 0.0, n.x);
+            vec3 V = vWP - cameraPosition;
+            float vl = length(V);
+            V = vl > 1e-4 ? V / vl : vec3(0.0, 0.0, -1.0);
+            float vz = max(0.25, abs(dot(V, n)));
+            vec2 back = rg + vec2(dot(V, tng), V.y) / vz * 0.22;
+            float onBack = step(0.0, back.x) * step(back.x, 1.0) * step(0.0, back.y) * step(back.y, 1.0);
+            float ceil = clamp(back.y, 0.0, 1.0);
+            float shade = mix(0.68, 1.0, onBack) * (0.6 + 0.55 * ceil * ceil);
+          #endif
           vec3 wc = winColor(vWin.y, h21(id + 7.7));
           float bright = (0.75 + 1.25 * h21(id + 3.3)) * (fr > 0.93 ? 1.25 : 1.0);
           vec3 em = wc * bright * lit * inside * shade;

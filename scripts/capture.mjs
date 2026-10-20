@@ -54,10 +54,22 @@ try {
   } else if (opt("timing")) {
     const t = Number(opt("t", 20));
     const w = Number(opt("w", 1280)), h = Number(opt("h", 720));
-    for (const p of PRESETS) {
+    const presets = opt("presets") ? String(opt("presets")).split(",") : PRESETS;
+    // --breakdown: also time the frame with each system hidden (its cost = full - without).
+    const systems = opt("breakdown") ? ["sky", "atmosphere", "towers", "signs", "rain", "traffic", "drones", "fx"] : [];
+    for (const p of presets) {
       const page = await open(p, w, h);
       const ms = await page.evaluate((t) => window.__cap.timeAt(t, 8), t);
       console.log(`${p.padEnd(8)} ${ms.toFixed(1)} ms/frame (software GL, relative only)`);
+      for (const s of systems) {
+        const without = await page.evaluate(([t, s]) => {
+          window.__cap.setVisible(s, false);
+          const v = window.__cap.timeAt(t, 8);
+          window.__cap.setVisible(s, true);
+          return v;
+        }, [t, s]);
+        console.log(`  ${s.padEnd(11)} ${(ms - without).toFixed(1)} ms`);
+      }
       await page.close();
     }
   } else if (opt("probe")) {

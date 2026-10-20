@@ -12,6 +12,8 @@ export interface CaptureApi {
   renderAt(t: number, view?: { pos: [number, number, number]; look: [number, number, number] }): Record<string, number>;
   /** Relative cost only (software GL in headless runs): ms per frame over `frames` frames at t. */
   timeAt(t: number, frames: number): number;
+  /** Show or hide one scene system group (sky, atmosphere, towers, signs, rain, traffic, drones, fx). */
+  setVisible(name: string, on: boolean): void;
 }
 
 export function runCapture(): void {
@@ -42,6 +44,10 @@ export function runCapture(): void {
       const out = { calls: r.calls, triangles: r.triangles, points: r.points, lines: r.lines, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, programs: renderer.info.programs?.length ?? 0 };
       renderer.info.autoReset = true;
       return out;
+    },
+    setVisible(name, on) {
+      const o = fly.scene.getObjectByName(name);
+      if (o) o.visible = on;
     },
     timeAt(t, frames) {
       fly.render(t);
