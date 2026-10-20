@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { BENCHMARKS } from "../src/benchmark/catalog";
 import { PRESETS, getPreset } from "../src/benchmark/presets";
-import { SolidIndex, layoutDrones, layoutSwarm, orbitAt, orbitBox, type Box } from "../src/engine/layout";
+import { SolidIndex, laneBox, layoutDrones, layoutSwarm, layoutTraffic, orbitAt, orbitBox, type Box } from "../src/engine/layout";
 import { mulberry32 } from "../src/engine/rng";
 import { layoutLanternStrings, layoutSigns, signBox } from "../src/engine/signlayout";
 import { partBox, planCity } from "../src/engine/towergen";
@@ -111,6 +111,25 @@ describe("camera clearance", () => {
       for (const o of drones) {
         expectClear(orbitBox(o), CLEAR_MOVING, `${preset.id} drone`);
         expect(solids.hits(orbitBox(o))).toBe(false);
+      }
+    }
+  });
+
+  it("every traffic lane (and level-change column) keeps CLEAR_MOVING from the path and out of solids", () => {
+    for (const preset of PRESETS) {
+      const solids = solidsFor(preset.id);
+      const { lanes, cars } = layoutTraffic(preset.skyLanes, preset.cars, 1984, solids);
+      expect(cars.length).toBe(preset.cars);
+      expect(new Set(lanes.map((l) => l.level)).size).toBe(preset.skyLanes);
+      for (const l of lanes) {
+        expectClear(laneBox(l, l.y, l.y), CLEAR_MOVING, `${preset.id} lane`);
+        expect(solids.hits(laneBox(l, l.y, l.y))).toBe(false);
+      }
+      for (const c of cars.filter((c) => c.lane2 >= 0)) {
+        const a = lanes[c.lane], b = lanes[c.lane2];
+        const col = laneBox(a, Math.min(a.y, b.y), Math.max(a.y, b.y));
+        expectClear(col, CLEAR_MOVING, `${preset.id} level changer`);
+        expect(solids.hits(col)).toBe(false);
       }
     }
   });

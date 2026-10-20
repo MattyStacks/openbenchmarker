@@ -123,6 +123,104 @@ export function layoutDrones(count: number, seed: number, solids: SolidIndex): O
   return out;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Traffic: stacked two-way lanes along the streets
+// ---------------------------------------------------------------------------------------------
+/** Lane altitudes, in the order presets add them: street, 50, 25, 80, 120. */
+export const LANE_LEVELS = [0.8, 50, 25, 80, 120] as const;
+/** Cross-street (z-running) lanes sit this much higher so crossing traffic never collides. */
+export const CROSS_LIFT = 3;
+export const LANE_OFFSET = 3;
+
+export interface Lane {
+  /** 0: runs along x at z = c; 1: runs along z at x = c. */
+  axis: 0 | 1;
+  c: number;
+  y: number;
+  dir: 1 | -1;
+  speed: number;
+  level: number;
+}
+
+export interface Car {
+  lane: number;
+  /** Position along the lane at t = 0, in [-HALF, HALF). */
+  phase: number;
+  /** Level changers: the lane whose altitude it swings to, and the swing period (s). */
+  lane2: number;
+  period: number;
+  tint: number;
+  glow: number;
+}
+
+/** The volume a car can occupy on a lane (whole street length), from altitude y0 to y1. */
+export function laneBox(l: Pick<Lane, "axis" | "c">, y0: number, y1: number): Box {
+  return l.axis === 0 ? box(-HALF, y0 - 0.9, l.c - 1.4, HALF, y1 + 1.5, l.c + 1.4) : box(l.c - 1.4, y0 - 0.9, -HALF, l.c + 1.4, y1 + 1.5, HALF);
+}
+
+export function carPos(lane: Lane, phase: number, t: number): number {
+  const span = HALF * 2;
+  return ((((phase + HALF + lane.dir * lane.speed * t) % span) + span) % span) - HALF;
+}
+
+/** Altitude of a car at t (level changers swing smoothly between their two lanes). */
+export function carY(car: Car, lanes: Lane[], t: number): number {
+  const a = lanes[car.lane].y;
+  if (car.lane2 < 0) return a;
+  const b = lanes[car.lane2].y;
+  const ph = (((t / car.period + car.phase / 997) % 1) + 1) % 1;
+  const tri = ph < 0.5 ? ph * 2 : 2 - ph * 2;
+  const s = Math.min(1, Math.max(0, (tri - 0.2) / 0.6));
+  return a + (b - a) * s * s * (3 - 2 * s);
+}
+
+/**
+ * Lanes on `levels` altitude levels over every street of the central city, each whole lane kept
+ * CLEAR_MOVING from the camera path and out of every solid (a lane that would cross a sky bridge
+ * or the flight is left empty). Cars spread over the lanes, favouring lanes the flight passes,
+ * at least 9 units apart; a few swing between two levels where the whole column is clear.
+ */
+export function layoutTraffic(levels: number, cars: number, seed: number, solids: SolidIndex): { lanes: Lane[]; cars: Car[] } {
+  const rnd = stream(seed, 40);
+  const lanes: Lane[] = [];
+  const blocks = Math.round(HALF / 64);
+  for (let lv = 0; lv < Math.min(levels, LANE_LEVELS.length); lv++)
+    for (const axis of [0, 1] as const)
+      for (let k = -blocks + 1; k < blocks; k++)
+        for (const dir of [1, -1] as const) {
+          const c = k * 64 + (axis === 0 ? -dir : dir) * LANE_OFFSET;
+          const y = LANE_LEVELS[lv] + (lv > 0 && axis === 1 ? CROSS_LIFT : 0);
+          const b = laneBox({ axis, c }, y, y);
+          if (!boxClear(b, CLEAR_MOVING) || solids.hits(b)) continue;
+          lanes.push({ axis, c, y, dir, speed: lv === 0 ? 20 + rnd() * 10 : 42 + rnd() * 34, level: lv });
+        }
+  const weight = lanes.map((l) => {
+    const b = laneBox(l, l.y, l.y);
+    return FLIGHT.index.distToBox(b.minX, b.minY, b.minZ, b.maxX, b.maxY, b.maxZ, 120) < 120 ? 1 : 0.35;
+  });
+  const total = weight.reduce((a, b) => a + b, 0);
+  const taken = lanes.map(() => [] as number[]);
+  const out: Car[] = [];
+  for (let tries = 0; out.length < cars && lanes.length && tries < cars * 30; tries++) {
+    let r = rnd() * total, li = 0;
+    while (li < lanes.length - 1 && (r -= weight[li]) > 0) li++;
+    const phase = (rnd() * 2 - 1) * HALF;
+    if (taken[li].some((p) => Math.abs(p - phase) < 9 || Math.abs(Math.abs(p - phase) - HALF * 2) < 9)) continue;
+    taken[li].push(phase);
+    const L = lanes[li];
+    let lane2 = -1;
+    if (L.level > 0 && rnd() < 0.07) {
+      const j = lanes.findIndex((m) => m !== L && m.axis === L.axis && m.c === L.c && m.dir === L.dir && m.level > 0 && Math.abs(m.y - L.y) <= 32);
+      if (j >= 0) {
+        const b = laneBox(L, Math.min(L.y, lanes[j].y), Math.max(L.y, lanes[j].y));
+        if (boxClear(b, CLEAR_MOVING) && !solids.hits(b)) lane2 = j;
+      }
+    }
+    out.push({ lane: li, phase, lane2, period: 9 + rnd() * 8, tint: Math.floor(rnd() * 6), glow: Math.floor(rnd() * 4) });
+  }
+  return { lanes, cars: out };
+}
+
 /** Closest approach of the camera path to a horizontal circle (radius r, at altitude y ± bob). */
 export function pathDistToRing(cx: number, cz: number, y: number, r: number, bob: number, cap: number): number {
   let best = cap;

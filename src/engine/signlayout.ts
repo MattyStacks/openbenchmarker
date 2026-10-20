@@ -127,7 +127,8 @@ export function layoutSigns(faces: Face[], count: number, seed: number): Sign[] 
       const h = Math.min(f.y1 - f.y0 - 3, 10 + rnd() * 22), w = h / 4;
       if (h > 4) place(fi, "v", w, h, (rnd() - 0.5) * (f.w - w), yIn(h), false, colA, colB);
     } else if (r < 0.72) {
-      const h = Math.min(f.y1 - f.y0 - 3, 8 + rnd() * 20), w = h / 4;
+      // Blades stay narrow (<= 4.5 out from the wall) so they never reach the traffic lanes.
+      const h = Math.min(f.y1 - f.y0 - 3, 8 + rnd() * 10), w = h / 4;
       const u = (rnd() < 0.5 ? -1 : 1) * (f.w / 2 - 1.2 - rnd() * 2);
       if (h > 4) place(fi, "v", w, h, u, yIn(h), true, colA, colB);
     } else if (r < 0.86) {
@@ -137,7 +138,7 @@ export function layoutSigns(faces: Face[], count: number, seed: number): Sign[] 
       let y = Math.max(f.y0, 4.6) + rnd() * Math.max(0, (f.y1 - f.y0) * 0.4);
       for (let k = 0; k < n && out.length < count; k++) {
         const vert = rnd() < 0.5;
-        const h = vert ? 6 + rnd() * 7 : 1.8 + rnd() * 1.6, w = vert ? h / 4 : h * 4;
+        const h = vert ? 6 + rnd() * 10 : 1.8 + rnd() * 1.6, w = vert ? h / 4 : h * 4;
         if (blade && !vert) continue;
         if (!place(fi, vert ? "v" : "h", w, h, u, y + h / 2, blade, color(), color())) break;
         y += h + 0.9;
