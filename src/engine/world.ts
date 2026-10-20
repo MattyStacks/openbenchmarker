@@ -3,8 +3,10 @@ import { FlightPath, type FlightKey } from "./path";
 /** City grid: street centre lines every BLOCK units, buildings inside blocks. */
 export const BLOCK = 64;
 export const STREET = 18;
-/** Half-extent of the detailed city (11 blocks each side). */
+/** Half-extent of the central city (11 blocks each side): traffic, drones, flight. */
 export const HALF = 704;
+/** Half-extent of the tower lot grid (16 blocks each side); outer lots only fill on high presets. */
+export const CITY_HALF = 1024;
 
 /** Nothing solid (towers, parts, bridges, signs) comes closer than this to the camera path. */
 export const CLEAR_SOLID = 14;

@@ -1,89 +1,121 @@
 import * as THREE from "three";
-import { NEON, canvasTexture, type BuildCtx } from "../ctx";
+import type { BuildCtx } from "../ctx";
+import { makeGlow } from "../glow";
 import { stream } from "../rng";
-import { clearOfPath } from "../world";
+import { ATLAS, cellRect, makeSignAtlas } from "../signatlas";
+import { layoutLanternStrings, layoutSigns } from "../signlayout";
+import type { CityPlan } from "../towergen";
 
-const SIGN_WORDS = ["NEON", "HOTEL", "BAR", "NOODLE", "CLUB", "OPEN 24H", "DATA", "ARCADE"];
+/**
+ * Every neon sign in one instanced draw: quads sampling the sign atlas, coloured per instance
+ * (lettering + frame), with dark panels, a white-hot tube core, and per-sign flicker modes
+ * (steady, broken tube, slow blink) as pure functions of uTime. Blade signs are double-sided and
+ * read correctly from both sides. Also the lantern strings across streets.
+ */
+export function buildSigns(ctx: BuildCtx, plan: CityPlan): void {
+  const { group, track, preset } = ctx;
+  const signs = layoutSigns(plan.faces, preset.signs, ctx.seed);
+  const n = signs.length;
+  const atlas = track(makeSignAtlas(ctx.seed));
 
-function signTexture(word: string, color: string, vertical: boolean): THREE.CanvasTexture {
-  const W = vertical ? 96 : 384, H = vertical ? 384 : 128;
-  return canvasTexture(W, H, (c) => {
-    c.clearRect(0, 0, W, H);
-    c.strokeStyle = color;
-    c.lineWidth = 6;
-    c.shadowColor = color;
-    c.shadowBlur = 14;
-    c.strokeRect(8, 8, W - 16, H - 16);
-    c.fillStyle = "#ffffff";
-    c.font = `bold ${vertical ? 56 : 72}px "Arial Black", Arial, sans-serif`;
-    c.textAlign = "center";
-    c.textBaseline = "middle";
-    if (vertical) {
-      const letters = word.replace(/\s/g, "").slice(0, 5).split("");
-      letters.forEach((ch, i) => c.fillText(ch, W / 2, ((i + 0.5) * (H - 24)) / letters.length + 12));
-    } else {
-      c.fillText(word, W / 2, H / 2 + 4, W - 36);
-    }
-  });
-}
+  const geo = track(new THREE.PlaneGeometry(1, 1));
+  const aUv = new Float32Array(n * 4), aColA = new Float32Array(n * 3), aColB = new Float32Array(n * 3), aFx = new Float32Array(n * 2);
+  const mat = track(
+    new THREE.ShaderMaterial({
+      side: THREE.DoubleSide,
+      fog: true,
+      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uAtlas: { value: null }, uTime: { value: 0 } }]),
+      vertexShader: /* glsl */ `
+        attribute vec4 aUv;
+        attribute vec3 aColA, aColB;
+        attribute vec2 aFx;
+        uniform float uTime;
+        varying vec2 vLocal;
+        varying vec4 vRect;
+        varying vec3 vA, vB;
+        varying float vOn;
+        #include <fog_pars_vertex>
+        float h11(float p) { p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }
+        void main() {
+          vLocal = uv;
+          vRect = aUv;
+          vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          float on = 1.0;
+          if (aFx.y > 0.5 && aFx.y < 1.5) on = h11(floor(uTime * 13.0) + aFx.x * 977.0) > 0.25 ? 1.0 : 0.12;
+          else if (aFx.y > 1.5) on = fract(uTime * 0.45 + aFx.x) < 0.78 ? 1.0 : 0.08;
+          vOn = on;
+          vA = aColA;
+          vB = aColB;
+          #include <fog_vertex>
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D uAtlas;
+        varying vec2 vLocal;
+        varying vec4 vRect;
+        varying vec3 vA, vB;
+        varying float vOn;
+        #include <fog_pars_fragment>
+        void main() {
+          vec2 l = vLocal;
+          if (!gl_FrontFacing) l.x = 1.0 - l.x;
+          vec4 s = texture2D(uAtlas, vRect.xy + l * vRect.zw);
+          if (s.a < 0.5) discard;
+          vec3 col = vec3(0.012, 0.009, 0.024) + vB * s.b * 0.3;
+          col += (vA * s.r + vB * s.g) * 2.7 * vOn;
+          col += vec3(1.0) * smoothstep(0.78, 1.0, max(s.r, s.g)) * 0.9 * vOn;
+          gl_FragColor = vec4(col, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+          #include <fog_fragment>
+        }`,
+    }),
+  );
+  mat.uniforms.uAtlas.value = atlas;
+  ctx.onUpdate((t) => void (mat.uniforms.uTime.value = t));
 
-/** Neon signs on tower faces. */
-export function buildSigns(ctx: BuildCtx): void {
-  const { group, track, preset, spots } = ctx;
-  const rnd = stream(ctx.seed, 3);
-  const variants = SIGN_WORDS.map((word, i) => {
-    const vertical = i % 2 === 0;
-    const hex = "#" + new THREE.Color(NEON[i % NEON.length]).getHexString();
-    return {
-      vertical,
-      mat: track(
-        new THREE.MeshBasicMaterial({
-          map: track(signTexture(word, hex, vertical)),
-          color: new THREE.Color(NEON[i % NEON.length]).multiplyScalar(2.2),
-          transparent: true,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-          toneMapped: false,
-        }),
-      ),
-      mats: [] as THREE.Matrix4[],
-    };
-  });
-  const candidates = spots.filter((s) => s.h > 40);
+  const mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, n));
+  mesh.count = n;
   const obj = new THREE.Object3D();
-  for (let i = 0, tries = 0; i < preset.signs && candidates.length && tries < preset.signs * 30; tries++) {
-    const s = candidates[Math.floor(rnd() * candidates.length)];
-    const v = variants[Math.floor(rnd() * variants.length)];
-    const face = Math.floor(rnd() * 4);
-    const nx = face === 0 ? 1 : face === 1 ? -1 : 0;
-    const nz = face === 2 ? 1 : face === 3 ? -1 : 0;
-    const sw = v.vertical ? 5 + rnd() * 4 : 14 + rnd() * 12;
-    const sh = v.vertical ? sw * 4 : sw / 3;
-    const along = nx !== 0 ? s.d : s.w;
-    if (sw > along * 0.9) continue;
-    const x = s.x + nx * (s.w / 2 + 0.6) + (nz !== 0 ? (rnd() - 0.5) * (s.w - sw) : 0);
-    const z = s.z + nz * (s.d / 2 + 0.6) + (nx !== 0 ? (rnd() - 0.5) * (s.d - sw) : 0);
-    const y = 12 + rnd() * Math.max(1, s.h - sh - 16) + sh / 2;
-    const hx = nx !== 0 ? 0.1 : sw / 2, hz = nz !== 0 ? 0.1 : sw / 2;
-    if (!clearOfPath(x - hx, y - sh / 2, z - hz, x + hx, y + sh / 2, z + hz)) continue;
-    obj.position.set(x, y, z);
-    obj.rotation.set(0, Math.atan2(nx, nz), 0);
-    obj.scale.set(sw, sh, 1);
+  const col = new THREE.Color();
+  signs.forEach((s, i) => {
+    obj.position.set(s.x, s.y, s.z);
+    obj.rotation.set(0, Math.atan2(s.nx, s.nz), 0);
+    obj.scale.set(s.w, s.h, 1);
     obj.updateMatrix();
-    v.mats.push(obj.matrix.clone());
-    ctx.lights.push({ x: x + nx * 2, y, z: z + nz * 2, r: 10 + Math.max(sw, sh), color: v.mat.color.clone().multiplyScalar(1 / 2.2) });
-    i++;
+    mesh.setMatrixAt(i, obj.matrix);
+    const [x, y, w, h] = cellRect(s.kind, s.cell);
+    aUv.set([x / ATLAS, (y + h) / ATLAS, w / ATLAS, -h / ATLAS], i * 4);
+    col.set(s.colA);
+    aColA.set([col.r, col.g, col.b], i * 3);
+    const lr = col.r, lg = col.g, lb = col.b;
+    col.set(s.colB);
+    aColB.set([col.r, col.g, col.b], i * 3);
+    aFx.set(s.fx, i * 2);
+    // Signs light the rain around them.
+    ctx.lights.push({ x: s.x + (s.blade ? 0 : s.nx * 2), y: s.y, z: s.z + (s.blade ? 0 : s.nz * 2), r: 8 + Math.max(s.w, s.h) * 0.9, color: new THREE.Color(lr, lg, lb) });
+  });
+  geo.setAttribute("aUv", new THREE.InstancedBufferAttribute(aUv, 4));
+  geo.setAttribute("aColA", new THREE.InstancedBufferAttribute(aColA, 3));
+  geo.setAttribute("aColB", new THREE.InstancedBufferAttribute(aColB, 3));
+  geo.setAttribute("aFx", new THREE.InstancedBufferAttribute(aFx, 2));
+  mesh.computeBoundingSphere();
+  group.add(mesh);
+
+  // Lantern strings across the streets.
+  const strings = layoutLanternStrings(plan.towers, Math.round(preset.signs / 10), ctx.seed);
+  const pts = strings.flatMap((s) => s.pts.map((p) => ({ p, c: s.color })));
+  if (pts.length) {
+    const rnd = stream(ctx.seed, 33);
+    const color = new Float32Array(pts.length * 3), params = new Float32Array(pts.length * 4);
+    pts.forEach((q, i) => {
+      color.set(q.c === 0 ? [3.4, 0.55, 0.3] : [3, 1.7, 0.4], i * 3);
+      params.set([0.45, rnd() < 0.05 ? 3 : 0, rnd(), 0.7], i * 4);
+    });
+    const g = makeGlow(ctx, { count: pts.length, color, params, minPx: 1.2 });
+    pts.forEach((q, i) => g.pos.set(q.p, i * 3));
+    g.markDirty();
   }
-  const plane = track(new THREE.PlaneGeometry(1, 1));
-  let count = 0;
-  for (const v of variants) {
-    if (!v.mats.length) continue;
-    const mesh = new THREE.InstancedMesh(plane, v.mat, v.mats.length);
-    v.mats.forEach((m, i) => mesh.setMatrixAt(i, m));
-    mesh.computeBoundingSphere();
-    count += v.mats.length;
-    group.add(mesh);
-  }
-  ctx.counts.signs = count;
+  ctx.counts.signs = n;
+  ctx.counts.lanternStrings = strings.length;
 }

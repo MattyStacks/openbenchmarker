@@ -2,7 +2,7 @@
 // and every moving thing against the camera path.
 import * as THREE from "three";
 import { stream } from "./rng";
-import { BLOCK, CLEAR_MOVING, FLIGHT, HALF, JOURNEY_SECONDS, STREET, clearOfPath } from "./world";
+import { CLEAR_MOVING, FLIGHT, HALF, JOURNEY_SECONDS, clearOfPath } from "./world";
 
 /** An axis-aligned box. */
 export interface Box {
@@ -53,39 +53,13 @@ export class SolidIndex {
   }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Towers (v1 footprints until the tower stage)
-// ---------------------------------------------------------------------------------------------
+/** A tower footprint (x, z centre; w, d size; h height). */
 export interface BuildingSpot {
   x: number;
   z: number;
   w: number;
   d: number;
   h: number;
-}
-
-export const spotBox = (s: BuildingSpot): Box => box(s.x - s.w / 2, 0, s.z - s.d / 2, s.x + s.w / 2, s.h, s.z + s.d / 2);
-
-/** Seeded, path-respecting building layout. */
-export function layoutBuildings(count: number, seed: number): BuildingSpot[] {
-  const rnd = stream(seed, 1);
-  const blocks = Math.round(HALF / BLOCK);
-  const interior = (BLOCK - STREET) / 2;
-  const out: BuildingSpot[] = [];
-  for (let attempt = 0; out.length < count && attempt < count * 80; attempt++) {
-    const bx = Math.floor(rnd() * blocks * 2) - blocks;
-    const bz = Math.floor(rnd() * blocks * 2) - blocks;
-    const w = 12 + rnd() * (interior * 2 - 14);
-    const d = 12 + rnd() * (interior * 2 - 14);
-    const x = (bx + 0.5) * BLOCK + (rnd() * 2 - 1) * (interior - w / 2);
-    const z = (bz + 0.5) * BLOCK + (rnd() * 2 - 1) * (interior - d / 2);
-    const centre = 1 - Math.min(1, Math.hypot(x, z) / (HALF * 1.1));
-    const h = 24 + Math.pow(rnd(), 1.8) * (90 + 180 * centre);
-    const s = { x, z, w, d, h };
-    if (!boxClear(spotBox(s))) continue;
-    out.push(s);
-  }
-  return out;
 }
 
 // ---------------------------------------------------------------------------------------------

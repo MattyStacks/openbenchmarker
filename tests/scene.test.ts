@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { BENCHMARKS } from "../src/benchmark/catalog";
 import { PRESETS, getPreset } from "../src/benchmark/presets";
-import { SolidIndex, layoutBuildings, layoutDrones, layoutSwarm, orbitAt, orbitBox, spotBox, type Box } from "../src/engine/layout";
+import { SolidIndex, layoutDrones, layoutSwarm, orbitAt, orbitBox, type Box } from "../src/engine/layout";
 import { mulberry32 } from "../src/engine/rng";
+import { layoutLanternStrings, layoutSigns, signBox } from "../src/engine/signlayout";
+import { partBox, planCity } from "../src/engine/towergen";
 import { CLEAR_MOVING, CLEAR_SOLID, FLIGHT, JOURNEY_SECONDS, pathDistToBox } from "../src/engine/world";
 
 /** Brute force: closest approach of the dense path to a box. */
@@ -65,23 +67,45 @@ describe("flight path", () => {
   });
 });
 
+const plans = new Map(PRESETS.map((p) => [p.id, planCity(p.buildings, p.towerDetail, 1984)]));
+const solidsFor = (id: (typeof PRESETS)[number]["id"]) => {
+  const s = new SolidIndex();
+  for (const p of plans.get(id)!.parts) s.add(partBox(p));
+  return s;
+};
+
 describe("camera clearance", () => {
-  it("no building intrudes within CLEAR_SOLID of the path, at any preset", () => {
+  it("every tower part, bridge and light bar keeps CLEAR_SOLID from the path, at any preset", () => {
     for (const preset of PRESETS) {
-      const spots = layoutBuildings(preset.buildings, 1984);
-      expect(spots.length).toBe(preset.buildings);
-      for (const s of spots) expectClear(spotBox(s), CLEAR_SOLID, `${preset.id} building`);
+      const plan = plans.get(preset.id)!;
+      expect(plan.towers.length).toBe(preset.buildings);
+      for (const p of plan.parts) expectClear(partBox(p), CLEAR_SOLID, `${preset.id} part kind ${p.k}`);
     }
   });
 
-  it("layout is deterministic for a seed", () => {
-    expect(layoutBuildings(50, 7)).toEqual(layoutBuildings(50, 7));
+  it("every sign and lantern string keeps CLEAR_SOLID from the path, at any preset", () => {
+    for (const preset of PRESETS) {
+      const plan = plans.get(preset.id)!;
+      const signs = layoutSigns(plan.faces, preset.signs, 1984);
+      expect(signs.length).toBeGreaterThanOrEqual(preset.signs * 0.9);
+      for (const s of signs) expectClear(signBox(s), CLEAR_SOLID, `${preset.id} sign`);
+      for (const l of layoutLanternStrings(plan.towers, Math.round(preset.signs / 10), 1984))
+        for (const [x, y, z] of l.pts) expectClear({ minX: x, minY: y, minZ: z, maxX: x, maxY: y, maxZ: z }, CLEAR_SOLID, `${preset.id} lantern`);
+    }
   });
 
-  it("near drones keep CLEAR_MOVING from the path and stay out of buildings, at any preset", () => {
+  it("the city is deterministic for a seed, and higher presets add detail", () => {
+    expect(planCity(80, 2, 7)).toEqual(planCity(80, 2, 7));
+    const low = plans.get("Low")!, ultra = plans.get("Ultra")!;
+    expect(ultra.parts.length).toBeGreaterThan(low.parts.length * 6);
+    expect(ultra.bridges).toBeGreaterThan(0);
+    const arches = new Set(ultra.towers.map((t) => t.arche));
+    expect([...arches].sort()).toEqual(["mega", "podium", "round", "slab", "tiered"]);
+  });
+
+  it("near drones keep CLEAR_MOVING from the path and stay out of solids, at any preset", () => {
     for (const preset of PRESETS) {
-      const solids = new SolidIndex();
-      for (const s of layoutBuildings(preset.buildings, 1984)) solids.add(spotBox(s));
+      const solids = solidsFor(preset.id);
       const drones = layoutDrones(preset.drones, 1984, solids);
       expect(drones.length).toBe(preset.drones);
       for (const o of drones) {
@@ -116,7 +140,8 @@ describe("preset scaling", () => {
   it("Extreme is far heavier than Low", () => {
     expect(extreme.cars).toBeGreaterThanOrEqual(low.cars * 10);
     expect(extreme.rain).toBeGreaterThanOrEqual(low.rain * 50);
-    expect(extreme.buildings).toBeGreaterThanOrEqual(low.buildings * 10);
+    expect(extreme.buildings).toBeGreaterThanOrEqual(low.buildings * 8);
+    expect(extreme.towerDetail).toBeGreaterThan(low.towerDetail);
     expect(extreme.reflections).toBeGreaterThan(low.reflections);
   });
   it("only Ultra and Extreme have reflections", () => {

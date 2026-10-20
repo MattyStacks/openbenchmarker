@@ -37,8 +37,9 @@ export function buildCity(preset: Preset, size: { w: number; h: number }, seed =
     solids: new SolidIndex(),
   };
   buildSky(ctx);
-  ctx.spots = buildTowers(ctx);
-  buildSigns(ctx);
+  const plan = buildTowers(ctx);
+  ctx.spots = plan.towers;
+  buildSigns(ctx, plan);
   buildRain(ctx);
   buildTraffic(ctx);
   buildDrones(ctx);

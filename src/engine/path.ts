@@ -158,6 +158,22 @@ export class PathIndex {
   distToPoint(x: number, y: number, z: number, cap: number): number {
     return this.distToBox(x, y, z, x, y, z, cap);
   }
+  /** Nearest path sample within `cap` of the point (written to out), or null. */
+  nearest(x: number, y: number, z: number, cap: number, out: { x: number; y: number; z: number }): typeof out | null {
+    let best = cap * cap, found = false;
+    this.someIn(x - cap, y - cap, z - cap, x + cap, y + cap, z + cap, (px, py, pz) => {
+      const d = (px - x) ** 2 + (py - y) ** 2 + (pz - z) ** 2;
+      if (d < best) {
+        best = d;
+        out.x = px;
+        out.y = py;
+        out.z = pz;
+        found = true;
+      }
+      return false;
+    });
+    return found ? out : null;
+  }
   /** Calls fn(x, y, z) for every path sample inside the box; stops early if fn returns true. */
   someIn(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, fn: (x: number, y: number, z: number) => boolean): boolean {
     const C = PathIndex.CELL, p = this.pts;

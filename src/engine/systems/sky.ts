@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { radialTexture, type BuildCtx } from "../ctx";
-import { HALF } from "../world";
+import { CITY_HALF } from "../world";
 
 /** Sky dome, moon, lights (moon light casts the shadows), and the ground plane. */
 export function buildSky(ctx: BuildCtx): void {
@@ -65,8 +65,8 @@ export function buildSky(ctx: BuildCtx): void {
     moonLight.castShadow = true;
     moonLight.shadow.mapSize.set(preset.shadowMap, preset.shadowMap);
     const cam = moonLight.shadow.camera;
-    cam.left = cam.bottom = -HALF;
-    cam.right = cam.top = HALF;
+    cam.left = cam.bottom = -CITY_HALF;
+    cam.right = cam.top = CITY_HALF;
     cam.near = 10;
     cam.far = 2400;
     moonLight.shadow.bias = -0.0008;
@@ -81,7 +81,7 @@ export function buildSky(ctx: BuildCtx): void {
       opacity: preset.reflections > 0 ? 0.62 : 1,
     }),
   );
-  const ground = new THREE.Mesh(track(new THREE.PlaneGeometry(HALF * 2 + 800, HALF * 2 + 800)), groundMat);
+  const ground = new THREE.Mesh(track(new THREE.PlaneGeometry(CITY_HALF * 2 + 800, CITY_HALF * 2 + 800)), groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = 0.05;
   ground.receiveShadow = shadows;

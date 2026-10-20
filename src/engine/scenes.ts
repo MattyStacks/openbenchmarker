@@ -7,7 +7,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { Reflector } from "three/addons/objects/Reflector.js";
 import type { Preset } from "../benchmark/presets";
 import { buildCity } from "./city";
-import { FLIGHT, HALF } from "./world";
+import { CITY_HALF, FLIGHT } from "./world";
 
 const GradeShader = {
   uniforms: {
@@ -83,7 +83,7 @@ export function makeFlythrough(renderer: THREE.WebGLRenderer, preset: Preset, w:
 
   let mirror: Reflector | null = null;
   if (preset.reflections > 0) {
-    mirror = new Reflector(new THREE.PlaneGeometry(HALF * 2 + 800, HALF * 2 + 800), {
+    mirror = new Reflector(new THREE.PlaneGeometry(CITY_HALF * 2 + 800, CITY_HALF * 2 + 800), {
       textureWidth: Math.round(w * preset.reflections),
       textureHeight: Math.round(h * preset.reflections),
       color: 0x8a8fa8,

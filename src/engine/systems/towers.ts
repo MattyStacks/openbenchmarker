@@ -1,91 +1,102 @@
 import * as THREE from "three";
-import { canvasTexture, type BuildCtx } from "../ctx";
-import { layoutBuildings, spotBox, type BuildingSpot } from "../layout";
-import { stream } from "../rng";
+import type { BuildCtx } from "../ctx";
+import { makeGlow } from "../glow";
+import { K, partBox, planCity, type CityPlan, type Kind, type Part } from "../towergen";
+import { makeWindowMaterial } from "../windows";
 
-/** 256x512 = 32x64 world units; 16x32 window cells; pixel (0..2, 0..2) is always dark wall. */
-function windowTexture(rnd: () => number, palette: string[]): THREE.CanvasTexture {
-  const tex = canvasTexture(256, 512, (c) => {
-    c.fillStyle = "#07060f";
-    c.fillRect(0, 0, 256, 512);
-    for (let row = 0; row < 32; row++) {
-      const floorLit = rnd() < 0.85;
-      for (let col = 0; col < 16; col++) {
-        if (!floorLit || rnd() < 0.42) continue;
-        const color = palette[Math.floor(rnd() * palette.length)];
-        c.globalAlpha = 0.45 + rnd() * 0.55;
-        c.fillStyle = color;
-        c.fillRect(col * 16 + 4, row * 16 + 5, 9, 8);
-      }
-    }
-    c.globalAlpha = 1;
-  });
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  return tex;
-}
-
-function patchBuildingMaterial(mat: THREE.MeshStandardMaterial): void {
-  mat.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader.replace(
-      "#include <uv_vertex>",
-      `#include <uv_vertex>
-#if defined(USE_EMISSIVEMAP) && defined(USE_INSTANCING)
-  vec3 bsc = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
-  float bhz = abs(normal.x) > 0.5 ? bsc.z : bsc.x;
-  vEmissiveMapUv = abs(normal.y) > 0.5 ? vec2(0.002) : uv * vec2(bhz, bsc.y) / vec2(32.0, 64.0);
-#endif`,
-    );
-  };
-}
-
-/** Instanced towers (one box per footprint) and rooftop beacons. */
-export function buildTowers(ctx: BuildCtx): BuildingSpot[] {
+/**
+ * Towers from the procedural city plan: one InstancedMesh per part kind (three window-shaded
+ * shells, three dark-metal detail kinds, emissive light bars), plus rooftop beacons and
+ * street-level shop lanterns as glow sprites.
+ */
+export function buildTowers(ctx: BuildCtx): CityPlan {
   const { group, track, preset, shadows } = ctx;
-  const rnd = stream(ctx.seed, 2);
-  const spots = layoutBuildings(preset.buildings, ctx.seed);
-  for (const s of spots) ctx.solids.add(spotBox(s));
-  const palettes = [
-    ["#ffd59a", "#ffb35c", "#fff1c9"],
-    ["#7fe9ff", "#3fc8ff", "#d6f7ff"],
-    ["#ff7ad9", "#c46bff", "#ffd0f4"],
-  ];
-  const box = track(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0));
-  const mats = palettes.map((pal) => {
-    const mat = track(
-      new THREE.MeshStandardMaterial({
-        color: 0x272840,
-        roughness: 0.45,
-        metalness: 0.7,
-        emissive: 0xffffff,
-        emissiveMap: track(windowTexture(rnd, pal)),
-        emissiveIntensity: 1.5,
-      }),
-    );
-    patchBuildingMaterial(mat);
-    return mat;
-  });
-  const perMat: BuildingSpot[][] = palettes.map(() => []);
-  spots.forEach((s, i) => perMat[i % palettes.length].push(s));
+  const plan = planCity(preset.buildings, preset.towerDetail, ctx.seed);
+  for (const p of plan.parts) if (p.k !== K.LightBar) ctx.solids.add(partBox(p));
+
+  const byKind = new Map<Kind, Part[]>();
+  for (const p of plan.parts) {
+    let l = byKind.get(p.k);
+    if (!l) byKind.set(p.k, (l = []));
+    l.push(p);
+  }
+  const uTime = { value: 0 };
+  ctx.onUpdate((t) => void (uTime.value = t));
+
+  const base = <T extends THREE.BufferGeometry>(g: T) => track(g.translate(0, 0.5, 0));
+  const geos: Record<Kind, THREE.BufferGeometry> = {
+    [K.ShellBox]: base(new THREE.BoxGeometry(1, 1, 1)),
+    [K.ShellRound]: base(new THREE.CylinderGeometry(0.5, 0.5, 1, 16)),
+    [K.ShellOct]: base(new THREE.CylinderGeometry(0.5, 0.5, 1, 8)),
+    [K.DetBox]: base(new THREE.BoxGeometry(1, 1, 1)),
+    [K.DetCyl]: base(new THREE.CylinderGeometry(0.5, 0.5, 1, 8)),
+    [K.DetCone]: base(new THREE.ConeGeometry(0.5, 1, 6)),
+    [K.LightBar]: base(new THREE.BoxGeometry(1, 1, 1)),
+  };
+  // Bloom presets glow more on their own, so windows are a little dimmer there.
+  const gain = preset.bloom > 0 ? 0.55 : 0.85;
+  const winBox = track(makeWindowMaterial(false, uTime, gain));
+  const winRound = track(makeWindowMaterial(true, uTime, gain));
+  const metal = track(new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.6, roughness: 0.55 }));
+  const glowMat = track(new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }));
+  const mats: Record<Kind, THREE.Material> = {
+    [K.ShellBox]: winBox,
+    [K.ShellRound]: winRound,
+    [K.ShellOct]: winRound,
+    [K.DetBox]: metal,
+    [K.DetCyl]: metal,
+    [K.DetCone]: metal,
+    [K.LightBar]: glowMat,
+  };
+
   const m4 = new THREE.Matrix4();
-  perMat.forEach((list, mi) => {
-    const mesh = new THREE.InstancedMesh(box, mats[mi], Math.max(1, list.length));
-    mesh.count = list.length;
-    list.forEach((s, i) => mesh.setMatrixAt(i, m4.makeScale(s.w, s.h, s.d).setPosition(s.x, 0, s.z)));
-    mesh.castShadow = mesh.receiveShadow = shadows;
+  const col = new THREE.Color();
+  for (const [k, list] of byKind) {
+    const shell = k === K.ShellBox || k === K.ShellRound || k === K.ShellOct;
+    // Shells need their own geometry copy for the per-instance window attribute.
+    const geo = shell ? track(geos[k].clone()) : geos[k];
+    const mesh = new THREE.InstancedMesh(geo, mats[k], list.length);
+    const win = shell ? new Float32Array(list.length * 4) : null;
+    list.forEach((p, i) => {
+      mesh.setMatrixAt(i, m4.makeScale(p.sx, p.sy, p.sz).setPosition(p.x, p.y, p.z));
+      if (win) win.set(p.win!, i * 4);
+      else if (k === K.LightBar) mesh.setColorAt(i, col.set(p.c).multiplyScalar(p.i ?? 1));
+      else mesh.setColorAt(i, col.set(p.c));
+    });
+    if (win) geo.setAttribute("aWin", new THREE.InstancedBufferAttribute(win, 4));
+    mesh.castShadow = shadows && k !== K.LightBar;
+    mesh.receiveShadow = shadows && k !== K.LightBar;
     mesh.computeBoundingSphere();
     group.add(mesh);
-  });
-
-  const tall = spots.filter((s) => s.h > 110);
-  if (tall.length) {
-    const beacons = new THREE.InstancedMesh(
-      track(new THREE.SphereGeometry(1.1, 8, 6)),
-      track(new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 0.4, 0.5), toneMapped: false })),
-      tall.length,
-    );
-    tall.forEach((s, i) => beacons.setMatrixAt(i, m4.makeTranslation(s.x, s.h + 1.5, s.z)));
-    group.add(beacons);
   }
-  ctx.counts.buildings = spots.length;
-  return spots;
+
+  // Rooftop beacons: slow red blink. Shop lanterns: steady red and amber.
+  const nb = plan.beacons.length;
+  if (nb) {
+    const color = new Float32Array(nb * 3), params = new Float32Array(nb * 4);
+    for (let i = 0; i < nb; i++) {
+      color.set([4, 0.35, 0.3], i * 3);
+      params.set([0.7, 0.55 + ((i * 0.37) % 0.5), (i * 0.618) % 1, 0.5], i * 4);
+    }
+    const g = makeGlow(ctx, { count: nb, color, params, minPx: 1.5 });
+    plan.beacons.forEach((b, i) => g.pos.set(b, i * 3));
+    g.markDirty();
+  }
+  const nl = plan.lanterns.length;
+  if (nl) {
+    const color = new Float32Array(nl * 3), params = new Float32Array(nl * 4);
+    plan.lanterns.forEach((l, i) => {
+      color.set(l[3] === 0 ? [3.2, 0.7, 0.3] : [3, 1.8, 0.45], i * 3);
+      params.set([0.5, 0, 0, 1], i * 4);
+    });
+    const g = makeGlow(ctx, { count: nl, color, params, minPx: 1.2 });
+    plan.lanterns.forEach((l, i) => g.pos.set([l[0], l[1], l[2]], i * 3));
+    g.markDirty();
+  }
+
+  ctx.counts.buildings = plan.towers.length;
+  ctx.counts.towerParts = plan.parts.length;
+  ctx.counts.bridges = plan.bridges;
+  ctx.counts.lanterns = nl;
+  return plan;
 }
