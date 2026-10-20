@@ -70,6 +70,22 @@ export function buildTowers(ctx: BuildCtx): CityPlan {
     group.add(mesh);
   }
 
+  // Outer filler boxes: same facade shader, no shadow casting (they are far from the flight).
+  if (plan.filler.length) {
+    const geo = track(geos[K.ShellBox].clone());
+    const mesh = new THREE.InstancedMesh(geo, winBox, plan.filler.length);
+    const win = new Float32Array(plan.filler.length * 4);
+    plan.filler.forEach((p, i) => {
+      mesh.setMatrixAt(i, m4.makeScale(p.sx, p.sy, p.sz).setPosition(p.x, p.y, p.z));
+      win.set(p.win!, i * 4);
+      ctx.solids.add(partBox(p));
+    });
+    geo.setAttribute("aWin", new THREE.InstancedBufferAttribute(win, 4));
+    mesh.receiveShadow = shadows;
+    mesh.computeBoundingSphere();
+    group.add(mesh);
+  }
+
   // Rooftop beacons: slow red blink. Shop lanterns: steady red and amber.
   const nb = plan.beacons.length;
   if (nb) {
@@ -96,6 +112,7 @@ export function buildTowers(ctx: BuildCtx): CityPlan {
 
   ctx.counts.buildings = plan.towers.length;
   ctx.counts.towerParts = plan.parts.length;
+  ctx.counts.fillerTowers = plan.filler.length;
   ctx.counts.bridges = plan.bridges;
   ctx.counts.lanterns = nl;
   return plan;

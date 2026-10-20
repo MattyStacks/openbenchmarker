@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { BuildCtx } from "../ctx";
+import { FOG_DENSITY, FOG_FN } from "../fog";
 import { makeGlow } from "../glow";
 import { stream } from "../rng";
 import { ATLAS, cellRect, makeSignAtlas } from "../signatlas";
@@ -101,6 +102,64 @@ export function buildSigns(ctx: BuildCtx, plan: CityPlan): void {
   geo.setAttribute("aFx", new THREE.InstancedBufferAttribute(aFx, 2));
   mesh.computeBoundingSphere();
   group.add(mesh);
+
+  // Light spilling down through the rain beneath the biggest flat signs near the flight.
+  const spill = signs
+    .filter((s) => !s.blade && s.y - s.h / 2 > 14)
+    .map((s) => ({ s, k: s.w * s.h }))
+    .sort((a, b) => b.k - a.k)
+    .slice(0, preset.lightShafts * 3)
+    .map((o) => o.s);
+  if (spill.length) {
+    const L = 24;
+    const shaftMat = track(
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        uniforms: { uTime: { value: 0 }, uFogDensity: { value: FOG_DENSITY } },
+        vertexShader: /* glsl */ `
+          uniform float uFogDensity;
+          varying vec2 vUv;
+          varying vec3 vCol;
+          ${FOG_FN}
+          void main() {
+            vUv = uv;
+            vCol = vec3(1.0);
+            #ifdef USE_INSTANCING_COLOR
+              vCol = instanceColor;
+            #endif
+            vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
+            vCol *= 1.0 - 0.9 * ogbFogAmount(cameraPosition, wp.xyz, uFogDensity);
+            gl_Position = projectionMatrix * viewMatrix * wp;
+          }`,
+        fragmentShader: /* glsl */ `
+          uniform float uTime;
+          varying vec2 vUv;
+          varying vec3 vCol;
+          void main() {
+            float edge = smoothstep(0.0, 0.25, vUv.x) * smoothstep(1.0, 0.75, vUv.x);
+            float streak = 0.65 + 0.35 * sin(vUv.x * 61.0 + sin(vUv.x * 13.0) * 3.0 + vUv.y * 4.0 - uTime * 1.3);
+            float a = pow(vUv.y, 1.6) * edge * streak * 0.2;
+            gl_FragColor = vec4(vCol * a, 1.0);
+          }`,
+      }),
+    );
+    ctx.onUpdate((t) => void (shaftMat.uniforms.uTime.value = t));
+    const shafts = new THREE.InstancedMesh(track(new THREE.PlaneGeometry(1, 1)), shaftMat, spill.length);
+    spill.forEach((s, i) => {
+      obj.position.set(s.x + s.nx * 1.8, s.y - s.h / 2 - L / 2 + 0.5, s.z + s.nz * 1.8);
+      obj.rotation.set(0, Math.atan2(s.nx, s.nz), 0);
+      obj.scale.set(s.w * 1.15, L, 1);
+      obj.updateMatrix();
+      shafts.setMatrixAt(i, obj.matrix);
+      shafts.setColorAt(i, col.set(s.colA));
+    });
+    shafts.computeBoundingSphere();
+    shafts.renderOrder = 3;
+    group.add(shafts);
+  }
 
   // Lantern strings across the streets.
   const strings = layoutLanternStrings(plan.towers, Math.round(preset.signs / 10), ctx.seed);

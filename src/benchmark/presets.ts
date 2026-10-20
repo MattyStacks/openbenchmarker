@@ -43,14 +43,20 @@ export interface Preset {
   towerDetail: number;
   /** Traffic altitude levels in use: street, then sky-lanes at 50, 25, 80 and 120. */
   skyLanes: number;
+  /** Far skyline rings out to the horizon (0-4). */
+  skylineLayers: number;
+  /** Low cloud layers lit from below (0-3). */
+  cloudLayers: number;
+  /** Rooftop searchlight beams; 3x as many light spills under the biggest signs. */
+  lightShafts: number;
 }
 
 export const PRESETS: Preset[] = [
-  { id: "Low", buildings: 260, rain: 800, signs: 120, cars: 90, drones: 8, holos: 2, bloom: 0, shadowMap: 0, msaa: 0, reflections: 0, farDrones: 120, towerDetail: 0, skyLanes: 2 },
-  { id: "Medium", buildings: 520, rain: 2500, signs: 260, cars: 200, drones: 16, holos: 4, bloom: 0.55, shadowMap: 1024, msaa: 0, reflections: 0, farDrones: 300, towerDetail: 1, skyLanes: 3 },
-  { id: "High", buildings: 900, rain: 5000, signs: 500, cars: 400, drones: 28, holos: 6, bloom: 0.85, shadowMap: 2048, msaa: 4, reflections: 0, farDrones: 700, towerDetail: 2, skyLanes: 4 },
-  { id: "Ultra", buildings: 1600, rain: 24000, signs: 1100, cars: 900, drones: 70, holos: 14, bloom: 1.15, shadowMap: 2048, msaa: 4, reflections: 0.75, farDrones: 2000, towerDetail: 3, skyLanes: 5 },
-  { id: "Extreme", buildings: 2700, rain: 110000, signs: 2600, cars: 2200, drones: 260, holos: 40, bloom: 1.45, shadowMap: 4096, msaa: 8, reflections: 1, farDrones: 6000, towerDetail: 3, skyLanes: 5 },
+  { id: "Low", buildings: 260, rain: 800, signs: 120, cars: 90, drones: 8, holos: 2, bloom: 0, shadowMap: 0, msaa: 0, reflections: 0, farDrones: 120, towerDetail: 0, skyLanes: 2, skylineLayers: 1, cloudLayers: 1, lightShafts: 2 },
+  { id: "Medium", buildings: 520, rain: 2500, signs: 260, cars: 200, drones: 16, holos: 4, bloom: 0.55, shadowMap: 1024, msaa: 0, reflections: 0, farDrones: 300, towerDetail: 1, skyLanes: 3, skylineLayers: 2, cloudLayers: 1, lightShafts: 4 },
+  { id: "High", buildings: 900, rain: 5000, signs: 500, cars: 400, drones: 28, holos: 6, bloom: 0.85, shadowMap: 2048, msaa: 4, reflections: 0, farDrones: 700, towerDetail: 2, skyLanes: 4, skylineLayers: 3, cloudLayers: 2, lightShafts: 8 },
+  { id: "Ultra", buildings: 1600, rain: 24000, signs: 1100, cars: 900, drones: 70, holos: 14, bloom: 1.15, shadowMap: 2048, msaa: 4, reflections: 0.75, farDrones: 2000, towerDetail: 3, skyLanes: 5, skylineLayers: 4, cloudLayers: 3, lightShafts: 14 },
+  { id: "Extreme", buildings: 2700, rain: 110000, signs: 2600, cars: 2200, drones: 260, holos: 40, bloom: 1.45, shadowMap: 4096, msaa: 8, reflections: 1, farDrones: 6000, towerDetail: 3, skyLanes: 5, skylineLayers: 4, cloudLayers: 3, lightShafts: 24 },
 ];
 
 export const DURATIONS = [30, 60, 90] as const;

@@ -74,6 +74,8 @@ export interface Tower {
 export interface CityPlan {
   towers: Tower[];
   parts: Part[];
+  /** Plain boxes on the lots beyond the preset's tower count (no details). */
+  filler: Part[];
   faces: Face[];
   /** Rooftop beacons / antenna tips. */
   beacons: [number, number, number][];
@@ -384,10 +386,13 @@ function genTower(L: Lot, w: number, d: number, hMax: number, detail: number): G
  * shrinks the footprint (or the lot is left as a plaza), and failing details are dropped.
  */
 export function planCity(count: number, detail: number, seed: number): CityPlan {
-  const plan: CityPlan = { towers: [], parts: [], faces: [], beacons: [], lanterns: [], bridges: 0 };
+  const plan: CityPlan = { towers: [], parts: [], filler: [], faces: [], beacons: [], lanterns: [], bridges: 0 };
   const lots = planLots(seed);
   for (const L of lots) {
-    if (plan.towers.length >= count) break;
+    if (plan.towers.length >= count) {
+      addFiller(plan, L);
+      continue;
+    }
     let g: Gen | null = null;
     for (const shrink of [1, 0.78, 0.6]) {
       const w = L.w * shrink, d = L.d * shrink;
@@ -416,6 +421,24 @@ export function planCity(count: number, detail: number, seed: number): CityPlan 
   addLandmarkBridges(plan);
   addBridges(plan, detail, seed);
   return plan;
+}
+
+/**
+ * A lot beyond the preset's tower count still gets a plain window-shaded box (no details), so
+ * every preset has a city all the way out to the skyline rings; it is lowered until it clears.
+ */
+function addFiller(plan: CityPlan, L: Lot): void {
+  const rnd = mulberry32(L.seed ^ 0x5bd1e995);
+  let h = snap(L.h * (0.75 + rnd() * 0.2));
+  const win: [number, number, number, number] = [rnd(), L.pal, 0.22 + rnd() * 0.45, rnd() < 0.5 ? 0 : 1];
+  while (h >= FLOOR * 2) {
+    const p: Part = { k: K.ShellBox, x: L.x, y: 0, z: L.z, sx: L.w, sy: h, sz: L.d, c: 0, win };
+    if (partClear(p)) {
+      plan.filler.push(p);
+      return;
+    }
+    h = Math.floor((h * 0.6) / FLOOR) * FLOOR;
+  }
 }
 
 /** The sky bridges the flight passes under, between the forced towers across their street. */

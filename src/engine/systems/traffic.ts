@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { BuildCtx } from "../ctx";
+import { FOG_DENSITY, FOG_FN } from "../fog";
 import { makeGlow } from "../glow";
 import { carPos, carY, layoutTraffic } from "../layout";
 import { stream } from "../rng";
@@ -69,16 +70,21 @@ export function buildTraffic(ctx: BuildCtx): void {
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
+      uniforms: { uFogDensity: { value: FOG_DENSITY } },
       vertexShader: /* glsl */ `
+        uniform float uFogDensity;
         varying float vFade;
         varying vec3 vCol;
+        ${FOG_FN}
         void main() {
           vFade = 1.0 + position.z;
           vCol = vec3(1.0);
           #ifdef USE_INSTANCING_COLOR
             vCol = instanceColor;
           #endif
-          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+          vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
+          vCol *= 1.0 - 0.9 * ogbFogAmount(cameraPosition, wp.xyz, uFogDensity);
+          gl_Position = projectionMatrix * viewMatrix * wp;
         }`,
       fragmentShader: /* glsl */ `
         varying float vFade;

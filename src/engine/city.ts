@@ -3,6 +3,7 @@ import type { Preset } from "../benchmark/presets";
 import type { BuildCtx } from "./ctx";
 import { SolidIndex } from "./layout";
 import { SEED } from "./rng";
+import { buildAtmosphere } from "./systems/atmosphere";
 import { buildDrones } from "./systems/drones";
 import { buildFx } from "./systems/fx";
 import { buildRain } from "./systems/rain";
@@ -37,6 +38,7 @@ export function buildCity(preset: Preset, size: { w: number; h: number }, seed =
     solids: new SolidIndex(),
   };
   buildSky(ctx);
+  buildAtmosphere(ctx);
   const plan = buildTowers(ctx);
   ctx.spots = plan.towers;
   buildSigns(ctx, plan);

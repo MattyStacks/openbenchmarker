@@ -7,7 +7,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { Reflector } from "three/addons/objects/Reflector.js";
 import type { Preset } from "../benchmark/presets";
 import { buildCity } from "./city";
-import { CITY_HALF, FLIGHT } from "./world";
+import { FOG_COLOR, FOG_DENSITY, installHeightFog } from "./fog";
+import { FLIGHT } from "./world";
 
 const GradeShader = {
   uniforms: {
@@ -67,8 +68,9 @@ export interface Flythrough {
  * Renders one frame immediately so failures surface before timing starts.
  */
 export function makeFlythrough(renderer: THREE.WebGLRenderer, preset: Preset, w: number, h: number): Flythrough {
+  installHeightFog();
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x2a1250, 0.0019);
+  scene.fog = new THREE.FogExp2(FOG_COLOR, FOG_DENSITY);
   scene.background = new THREE.Color(0x0a0620);
 
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -83,7 +85,7 @@ export function makeFlythrough(renderer: THREE.WebGLRenderer, preset: Preset, w:
 
   let mirror: Reflector | null = null;
   if (preset.reflections > 0) {
-    mirror = new Reflector(new THREE.PlaneGeometry(CITY_HALF * 2 + 800, CITY_HALF * 2 + 800), {
+    mirror = new Reflector(new THREE.PlaneGeometry(8000, 8000), {
       textureWidth: Math.round(w * preset.reflections),
       textureHeight: Math.round(h * preset.reflections),
       color: 0x8a8fa8,

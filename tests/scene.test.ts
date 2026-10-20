@@ -107,7 +107,8 @@ describe("flight path", () => {
 const plans = new Map(PRESETS.map((p) => [p.id, planCity(p.buildings, p.towerDetail, 1984)]));
 const solidsFor = (id: (typeof PRESETS)[number]["id"]) => {
   const s = new SolidIndex();
-  for (const p of plans.get(id)!.parts) s.add(partBox(p));
+  for (const p of plans.get(id)!.parts) if (p.k !== K.LightBar) s.add(partBox(p));
+  for (const p of plans.get(id)!.filler) s.add(partBox(p));
   return s;
 };
 
@@ -117,6 +118,7 @@ describe("camera clearance", () => {
       const plan = plans.get(preset.id)!;
       expect(plan.towers.length).toBe(preset.buildings);
       for (const p of plan.parts) expectClear(partBox(p), CLEAR_SOLID, `${preset.id} part kind ${p.k}`);
+      for (const p of plan.filler) expectClear(partBox(p), CLEAR_SOLID, `${preset.id} filler`);
     }
   });
 

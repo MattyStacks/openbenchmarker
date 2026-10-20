@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { NEON, canvasTexture, type BuildCtx } from "../ctx";
+import { FOG_DENSITY, FOG_FN } from "../fog";
 import { stream } from "../rng";
 import { HALF, clearOfPath } from "../world";
 
@@ -81,43 +82,72 @@ export function buildFx(ctx: BuildCtx): void {
     }
   });
 
-  const coneGeo = track(new THREE.ConeGeometry(30, 320, 32, 1, true).translate(0, -160, 0).rotateX(Math.PI));
+  // --- Searchlights: thin sweeping beams from tall rooftops, dusty with rain -----------------
+  // Unit cone, apex at the origin, opening up to radius 1 at y = 1 (scaled per beam).
+  const coneGeo = track(new THREE.ConeGeometry(1, 1, 24, 1, true).rotateX(Math.PI).translate(0, 0.5, 0));
   const coneMat = track(
     new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
-      uniforms: { uColor: { value: new THREE.Color(0.55, 0.6, 1.0) } },
-      vertexShader: `varying float vH; varying vec3 vN; varying vec3 vV; void main(){
-        vH = position.y / 320.0;
-        vec4 mv = modelViewMatrix * vec4(position, 1.0);
-        vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
-        gl_Position = projectionMatrix * mv; }`,
-      fragmentShader: `uniform vec3 uColor; varying float vH; varying vec3 vN; varying vec3 vV; void main(){
-        // Clamp: rounding can push |dot| past 1, and pow() of a negative base is NaN on many GPUs.
-        float edge = pow(clamp(1.0 - abs(dot(normalize(vN), normalize(vV))), 0.0, 1.0), 1.5);
-        float a = (1.0 - vH) * (0.25 + 0.5 * (1.0 - edge)) * 0.32;
-        gl_FragColor = vec4(uColor * a, 1.0);
-      }`,
+      uniforms: { uTime: { value: 0 }, uFogDensity: { value: FOG_DENSITY } },
+      vertexShader: /* glsl */ `
+        uniform float uFogDensity;
+        varying float vH, vFog;
+        varying vec3 vN, vV, vCol;
+        ${FOG_FN}
+        void main() {
+          vH = position.y;
+          vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
+          vec4 mv = viewMatrix * wp;
+          vN = normalize(normalMatrix * mat3(instanceMatrix) * normal);
+          vV = normalize(-mv.xyz);
+          vCol = vec3(1.0);
+          #ifdef USE_INSTANCING_COLOR
+            vCol = instanceColor;
+          #endif
+          vFog = ogbFogAmount(cameraPosition, wp.xyz, uFogDensity);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform float uTime;
+        varying float vH, vFog;
+        varying vec3 vN, vV, vCol;
+        float h11(float p) { p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }
+        void main() {
+          // Clamp: rounding can push |dot| past 1, and pow() of a negative base is NaN on many GPUs.
+          float facing = clamp(abs(dot(normalize(vN), normalize(vV))), 0.0, 1.0);
+          float core = pow(facing, 1.6);
+          float k = vH * 60.0 - uTime * 0.6;
+          float dust = 0.75 + 0.25 * mix(h11(floor(k)), h11(floor(k) + 1.0), fract(k));
+          float a = pow(clamp(1.0 - vH, 0.0, 1.0), 1.3) * core * dust * 0.16 * (1.0 - 0.85 * vFog);
+          gl_FragColor = vec4(vCol * a, 1.0);
+        }`,
     }),
   );
-  const cones: THREE.Mesh[] = [];
-  const coneCount = Math.max(2, Math.round(preset.holos * 2));
-  for (let i = 0; i < coneCount; i++) {
-    const [x, z] = clearSpot(rnd, 30, 4);
-    const cone = new THREE.Mesh(coneGeo, coneMat);
-    cone.position.set(x, 1, z);
-    cone.userData = { p: rnd() * 6.28, w: 0.25 + rnd() * 0.35 };
-    cones.push(cone);
-    group.add(cone);
+  const tall = spots.filter((s) => s.h > 100);
+  const beams: { x: number; y: number; z: number; p: number; w: number; tilt: number }[] = [];
+  for (let i = 0; i < tall.length && beams.length < preset.lightShafts; i += 2) {
+    const s = tall[i];
+    beams.push({ x: s.x, y: s.h + 1, z: s.z, p: rnd() * 6.28, w: 0.12 + rnd() * 0.22, tilt: 0.12 + rnd() * 0.3 });
   }
+  const cones = new THREE.InstancedMesh(coneGeo, coneMat, Math.max(1, beams.length));
+  cones.count = beams.length;
+  const bc = new THREE.Color();
+  beams.forEach((_, i) => cones.setColorAt(i, rnd() < 0.6 ? bc.setRGB(0.75, 0.78, 1.0) : rnd() < 0.5 ? bc.setRGB(1.0, 0.4, 0.9) : bc.setRGB(0.4, 0.9, 1.0)));
+  cones.frustumCulled = false;
+  group.add(cones);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), pos = new THREE.Vector3(), scl = new THREE.Vector3(16, 560, 16);
   ctx.onUpdate((t) => {
-    for (const c of cones) {
-      c.rotation.z = Math.sin(t * c.userData.w + c.userData.p) * 0.45;
-      c.rotation.x = Math.cos(t * c.userData.w * 0.7 + c.userData.p) * 0.3;
-    }
+    coneMat.uniforms.uTime.value = t;
+    beams.forEach((b, i) => {
+      e.set(Math.cos(t * b.w * 0.7 + b.p) * b.tilt, 0, Math.sin(t * b.w + b.p) * (b.tilt + 0.12));
+      q.setFromEuler(e);
+      cones.setMatrixAt(i, m4.compose(pos.set(b.x, b.y, b.z), q, scl));
+    });
+    cones.instanceMatrix.needsUpdate = true;
   });
   ctx.counts.holos = holos.length;
-  ctx.counts.searchlights = cones.length;
+  ctx.counts.searchlights = beams.length;
 }

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { BuildCtx } from "./ctx";
+import { FOG_DENSITY, FOG_FN } from "./fog";
 
 /**
  * Instanced glowing light sprites: camera-facing quads with a soft radial core, additive. Used for
@@ -62,6 +63,7 @@ export function makeGlow(ctx: BuildCtx, spec: GlowSpec): Glow {
         uTime: { value: 0 },
         uFocal: { value: 600 },
         uMinPx: { value: spec.minPx ?? 1.6 },
+        uFogDensity: { value: FOG_DENSITY },
         uHalfRes: { value: new THREE.Vector2(ctx.size.w / 2, ctx.size.h / 2) },
       },
       vertexShader: /* glsl */ `
@@ -72,10 +74,11 @@ export function makeGlow(ctx: BuildCtx, spec: GlowSpec): Glow {
         #endif
         attribute vec3 aColor;
         attribute vec4 aParams;
-        uniform float uTime, uFocal, uMinPx;
+        uniform float uTime, uFocal, uMinPx, uFogDensity;
         uniform vec2 uHalfRes;
         varying vec2 vUv;
         varying vec3 vCol;
+        ${FOG_FN}
         void main() {
           #ifdef ORBIT
             float ang = aOrbitB.z + aOrbitA.w * uTime;
@@ -91,7 +94,7 @@ export function makeGlow(ctx: BuildCtx, spec: GlowSpec): Glow {
           float k = max(1.0, uMinPx / max(px, 1e-4));
           float on = 1.0;
           if (aParams.y > 0.0) on = fract(uTime * aParams.y + aParams.z) < aParams.w ? 1.0 : 0.06;
-          vCol = aColor * on / (k * k);
+          vCol = aColor * on / (k * k) * (1.0 - 0.9 * ogbFogAmount(cameraPosition, wp, uFogDensity));
           vUv = position.xy;
           vec4 clip = projectionMatrix * mv;
           // Expand in screen space so the sprite is round and its pixel size exact.
