@@ -47,6 +47,19 @@ describe("validateSubmission", () => {
     expect(validateSubmission(withSys({ gpuId: GPU, os: "linux", distro: "Fedora", mesa: "24.2.5" }))).toEqual([]);
   });
 
+  it("only the four standard resolutions can be submitted", () => {
+    for (const [resolution, width, height] of [["720p", 1280, 720], ["1440p", 2560, 1440], ["4K", 3840, 2160]] as const)
+      expect(validateSubmission(withSys({ gpuId: GPU, os: "windows" }, { resolutionId: resolution, resolution, width, height }))).toEqual([]);
+    // An old Native result at a non-standard size stays local only.
+    const errs = validateSubmission(withSys({ gpuId: GPU, os: "windows" }, { resolution: "3440x1440", width: 3440, height: 1440 }));
+    expect(missingLabels(errs)).toEqual(["Resolution"]);
+    expect(errs[0]).toMatch(/720p, 1080p, 1440p, 4K/);
+    // An old Native result that happened to be exactly 1920x1080 is a real 1080p run.
+    expect(validateSubmission(withSys({ gpuId: GPU, os: "windows" }, { resolution: "1080p", width: 1920, height: 1080 }))).toEqual([]);
+    // A name that doesn't match the pixel size is rejected.
+    expect(missingLabels(validateSubmission(withSys({ gpuId: GPU, os: "windows" }, { resolution: "1080p", width: 2560, height: 1440 })))).toEqual(["Resolution"]);
+  });
+
   it("mobile runs are blocked even when otherwise complete", () => {
     const errs = validateSubmission(withSys({ gpuId: GPU, os: "windows" }, { mobile: true }));
     expect(missingLabels(errs)).toEqual(["Device"]);

@@ -1,22 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { RESOLUTIONS, getResolution, normalizeResolution, resolutionLabel } from "../src/benchmark/presets";
+import { RESOLUTIONS, getResolution, normalizeResolution, standardResolution } from "../src/benchmark/presets";
 
 describe("resolutions", () => {
-  it("offers 720p, 1080p, 1440p, 4K and Native, in that order", () => {
-    expect(RESOLUTIONS.map((r) => r.id)).toEqual(["720p", "1080p", "1440p", "4K", "native"]);
+  it("offers exactly 720p, 1080p, 1440p and 4K, in that order (no Native)", () => {
+    expect(RESOLUTIONS.map((r) => r.id)).toEqual(["720p", "1080p", "1440p", "4K"]);
+    expect(getResolution("720p")).toMatchObject({ width: 1280, height: 720 });
     expect(getResolution("4K")).toMatchObject({ width: 3840, height: 2160 });
     expect(getResolution("2160p")).toBeUndefined();
-    expect(getResolution("720p")).toMatchObject({ width: 1280, height: 720 });
+    expect(getResolution("native")).toBeUndefined();
   });
 
-  it("records upstream names", () => {
-    expect(resolutionLabel("4K", 3840, 2160)).toBe("4K");
-    expect(resolutionLabel("1080p", 1920, 1080)).toBe("1080p");
-    expect(resolutionLabel("native", 3840, 2160)).toBe("4K");
-    expect(resolutionLabel("native", 2560, 1440)).toBe("1440p");
-    expect(resolutionLabel("native", 1280, 720)).toBe("720p");
-    expect(resolutionLabel("720p", 1280, 720)).toBe("720p");
-    expect(resolutionLabel("native", 3440, 1440)).toBe("3440x1440");
+  it("recognises a standard resolution only when name and pixel size match", () => {
+    expect(standardResolution("1080p", 1920, 1080)?.id).toBe("1080p");
+    expect(standardResolution("4K", 3840, 2160)?.id).toBe("4K");
+    expect(standardResolution("2160p", 3840, 2160)?.id).toBe("4K");
+    expect(standardResolution("3440x1440", 3440, 1440)).toBeUndefined();
+    expect(standardResolution("1080p", 2560, 1440)).toBeUndefined();
   });
 
   it("maps old 2160p results to 4K", () => {

@@ -34,7 +34,7 @@ export interface BenchResult {
   date: string;
   time: string;
   resolutionId: ResolutionId;
-  /** Recorded verbatim: "1080p", or "WIDTHxHEIGHT" for Native. */
+  /** Recorded verbatim: "720p", "1080p", "1440p" or "4K" ("WIDTHxHEIGHT" on old Native results). */
   resolution: string;
   width: number;
   height: number;

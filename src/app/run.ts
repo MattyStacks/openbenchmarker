@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import { BENCHMARK, BENCHMARK_VERSION } from "../benchmark/catalog";
 import { computeRunStats, liveBatchFps, nextBatchFrames, type TimedBatch } from "../benchmark/metrics";
-import { WARMUP_SECONDS, getPreset, getResolution, resolutionLabel } from "../benchmark/presets";
+import { WARMUP_SECONDS, getPreset, getResolution } from "../benchmark/presets";
 import { emptySystem, type BenchResult, type GraphicsApi } from "../benchmark/types";
 import { makeFlythrough, type Flythrough } from "../engine/scenes";
 import { $, esc, nextFrame } from "./dom";
-import { BATCH_MS, MOBILE, native } from "./env";
+import { BATCH_MS, MOBILE } from "./env";
 import { drawGraph } from "./hud";
 import { route } from "./router";
 import { app, showView } from "./shell";
@@ -34,9 +34,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   app.running = true;
   const preset = getPreset(cfg.preset)!;
   const res = getResolution(cfg.resolution)!;
-  const width = res.id === "native" ? native.width : res.width;
-  const height = res.id === "native" ? native.height : res.height;
-  const resolution = resolutionLabel(res.id, width, height);
+  const { width, height, id: resolution } = res;
 
   // 1) Show the run view FIRST, 2) measure the stage, 3) only then create the WebGL context.
   window.scrollTo(0, 0);

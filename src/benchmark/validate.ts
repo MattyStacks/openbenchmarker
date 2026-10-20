@@ -1,5 +1,5 @@
 import { BENCHMARKS, NOT_LISTED, UPSTREAM_ISSUES, findGpu } from "./catalog";
-import { getPreset } from "./presets";
+import { RESOLUTIONS, getPreset, standardResolution } from "./presets";
 import { LINUX_ONLY_FIELDS, type BenchResult } from "./types";
 
 /** Mirrors upstream proof.method for this tool. */
@@ -34,6 +34,8 @@ export function validateSubmission(r: BenchResult | null | undefined): string[] 
   if (!BENCHMARKS.some((b) => b.gameId === r.gameId)) errors.push(`Benchmark: game_id '${r.gameId}' is not this tool's benchmark`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date ?? "")) errors.push("Date: run date missing or not YYYY-MM-DD");
   if (!(r.resolution ?? "").trim()) errors.push("Resolution: missing");
+  else if (!standardResolution(r.resolution, r.width, r.height))
+    errors.push(`Resolution: '${r.resolution}' (${r.width}×${r.height}) isn't one of ${RESOLUTIONS.map((x) => x.id).join(", ")}; only these can be submitted`);
   if (!getPreset(r.preset)) errors.push(`Preset: '${r.preset}' is not a known graphics preset`);
   if (!finitePositive(r.avgFps)) errors.push("Avg FPS: missing or not a positive number");
   if (!finitePositive(r.p1Low)) errors.push("1% Low: missing or not a positive number (this tool times every frame, so it is required)");

@@ -1,4 +1,4 @@
-export type ResolutionId = "720p" | "1080p" | "1440p" | "4K" | "native";
+export type ResolutionId = "720p" | "1080p" | "1440p" | "4K";
 
 export interface Resolution {
   id: ResolutionId;
@@ -8,15 +8,14 @@ export interface Resolution {
 }
 
 /**
- * Fixed render sizes, named the way upstream records them (720p, 1080p, 1440p, 4K).
- * "native" is resolved at run time from the display.
+ * The only render sizes, named the way upstream records them. The id is also the resolution
+ * string recorded in results; only these four can be submitted.
  */
 export const RESOLUTIONS: Resolution[] = [
   { id: "720p", label: "720p (1280×720)", width: 1280, height: 720 },
   { id: "1080p", label: "1080p (1920×1080)", width: 1920, height: 1080 },
   { id: "1440p", label: "1440p (2560×1440)", width: 2560, height: 1440 },
   { id: "4K", label: "4K (3840×2160)", width: 3840, height: 2160 },
-  { id: "native", label: "Native", width: 0, height: 0 },
 ];
 
 export type PresetId = "Low" | "Medium" | "High" | "Ultra" | "Extreme";
@@ -71,20 +70,14 @@ export function getResolution(id: string): Resolution | undefined {
   return RESOLUTIONS.find((r) => r.id === id);
 }
 
-/** Physical pixel size of the display, used for the "Native" option. */
-export function nativeSize(screenW: number, screenH: number, dpr: number): { width: number; height: number } {
-  return { width: Math.max(1, Math.round(screenW * dpr)), height: Math.max(1, Math.round(screenH * dpr)) };
-}
-
 /**
- * The resolution string recorded in the result. Upstream writes 1280x720 as 720p, 1920x1080 as 1080p, 2560x1440 as
- * 1440p and 3840x2160 as 4K, and any other size as WIDTHxHEIGHT, so a Native run that lands on one
- * of the standard sizes gets the standard name.
+ * The standard resolution a result was rendered at: its recorded name must be one of the four
+ * and its pixel size must match that name exactly. Older results from the removed "Native" option
+ * qualify only if the display happened to be one of these sizes.
  */
-export function resolutionLabel(id: ResolutionId, width: number, height: number): string {
-  if (id !== "native") return id;
-  const named = RESOLUTIONS.find((r) => r.id !== "native" && r.width === width && r.height === height);
-  return named ? named.id : `${width}x${height}`;
+export function standardResolution(label: string, width: number, height: number): Resolution | undefined {
+  const r = getResolution(normalizeResolution(label));
+  return r && r.width === width && r.height === height ? r : undefined;
 }
 
 /** Older saved results used "2160p"; upstream calls that size "4K". */

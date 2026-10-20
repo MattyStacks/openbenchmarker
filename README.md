@@ -33,10 +33,10 @@ Settings → Domains).
 
 ## How a run works
 
-1. Before the run you choose a **resolution**: 720p (1280×720, a lighter option for
-   lower-end GPUs), 1080p, 1440p, 4K (3840×2160), or Native (the display's physical
-   pixels). Results use upstream's names: `720p`, `1080p`, `1440p`, `4K`,
-   and `WIDTHxHEIGHT` for any other Native size. The scene renders at exactly that size with
+1. Before the run you choose one of four standard **resolutions**: 720p (1280×720, a
+   lighter option for lower-end GPUs), 1080p, 1440p or 4K (3840×2160), recorded with
+   upstream's names. Only these four can be submitted (there is no Native option, so results
+   are always comparable across machines). The scene renders at exactly that size with
    `setPixelRatio(1)`, and CSS only scales it to fit on screen. You also choose a
    **preset** (Low to Extreme) and a **duration** (30/60/90 s). These settings
    can't change during the run.
@@ -138,7 +138,9 @@ This tool feeds a public dataset, so:
 - Validation (`src/benchmark/validate.ts`) fails closed and mirrors upstream
   `templates/community_submission.yaml` and `scripts/checks.py`. Required:
   catalog `gpu_id`, `game_id`, date, resolution, preset, `avg_fps`, `p1_low`,
-  `system.os` (`windows`|`linux`), and `proof.method`. Linux-only fields on a
+  `system.os` (`windows`|`linux`), and `proof.method`. The resolution must be
+  `720p`, `1080p`, `1440p` or `4K`, and match the rendered pixel size: older results
+  from the removed Native option at any other size stay local only. Linux-only fields on a
   Windows run fail. Blank optional fields are left out of the YAML. YAML
   download and copy stay disabled until validation passes.
 
