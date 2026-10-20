@@ -11,7 +11,7 @@ import {
   UPSTREAM_TEMPLATES,
 } from "./benchmark/catalog";
 import { download, gamesYamlEntry, suggestedFileName, toCsv, toJson, toYaml } from "./benchmark/exporter";
-import { computeStats, liveFps, round1 } from "./benchmark/metrics";
+import { computeRunStats, liveBatchFps, nextBatchFrames, round1, type TimedBatch } from "./benchmark/metrics";
 import {
   DURATIONS,
   PRESETS,
@@ -156,6 +156,8 @@ function buildConfigForm(): void {
 // Run controller: warm-up -> timed -> finish, uncapped scheduler
 // ---------------------------------------------------------------------------
 const BATCH_MS = 28;
+/** Upper bound on waiting for outstanding GPU timer results once rendering has stopped. */
+const DRAIN_MS = 500;
 
 function stageMessage(html: string | null): void {
   const el = $("#stage-msg");
@@ -233,8 +235,13 @@ async function startRun(cfg: RunConfig): Promise<void> {
   $("#hud-settings").textContent = `${width}×${height} · ${preset.id} · ${cfg.duration} s · ${api}`;
 
   const px = new Uint8Array(4);
-  const timed: number[] = [];
-  const warm: number[] = [];
+  const timed: TimedBatch[] = [];
+  const warm: TimedBatch[] = [];
+  /** GPU time per timed frame in submission order; NaN until (or unless) its query result arrives. */
+  const gpuMs: number[] = [];
+  let timedFrames = 0;
+  let batchFrames = 1;
+  let lastReadback = 0;
   let phase: "warmup" | "timed" = "warmup";
   let done = false;
   const runStart = performance.now();
@@ -243,6 +250,34 @@ async function startRun(cfg: RunConfig): Promise<void> {
   const now = new Date();
 
   const channel = new MessageChannel();
+
+  // Per-frame GPU time via EXT_disjoint_timer_query_webgl2 (WebGL2 only). Results arrive only
+  // after control returns to the event loop, so they're polled at the start of each batch.
+  const gl2 = api === "WebGL2" ? (gl as WebGL2RenderingContext) : null;
+  const timerExt = gl2?.getExtension("EXT_disjoint_timer_query_webgl2") as
+    | { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number }
+    | null
+    | undefined;
+  const queryPool: WebGLQuery[] = [];
+  /** In submission order; `frame` is the index into gpuMs, or -1 for a warm-up frame. */
+  const pending: { q: WebGLQuery; frame: number }[] = [];
+  function pollQueries(): void {
+    if (!gl2 || !timerExt || pending.length === 0) return;
+    let ready = 0;
+    while (ready < pending.length && gl2.getQueryParameter(pending[ready].q, gl2.QUERY_RESULT_AVAILABLE)) ready++;
+    if (gl2.getParameter(timerExt.GPU_DISJOINT_EXT)) {
+      // Timings are unreliable (clock change, context switch): drop every outstanding result.
+      for (const p of pending) queryPool.push(p.q);
+      pending.length = 0;
+      return;
+    }
+    for (let i = 0; i < ready; i++) {
+      const { q, frame } = pending[i];
+      if (frame >= 0) gpuMs[frame] = (gl2.getQueryParameter(q, gl2.QUERY_RESULT) as number) / 1e6;
+      queryPool.push(q);
+    }
+    pending.splice(0, ready);
+  }
   const invalidate = (reason: string) => {
     if (!done) finish(reason);
   };
@@ -279,6 +314,7 @@ async function startRun(cfg: RunConfig): Promise<void> {
     channel.port1.onmessage = null;
     channel.port1.close();
     channel.port2.close();
+    if (gl2) for (const q of [...queryPool, ...pending.map((p) => p.q)]) gl2.deleteQuery(q);
     try {
       fly.dispose();
     } catch (e) {
@@ -291,8 +327,23 @@ async function startRun(cfg: RunConfig): Promise<void> {
 
   function finish(reason: string, keepStage = false): void {
     done = true;
-    const wallMs = timedStart ? performance.now() - timedStart : 0;
-    const st = computeStats(timed);
+    if (reason || !gl2 || !timerExt || pending.length === 0) {
+      finalize(reason, keepStage);
+      return;
+    }
+    // Rendering has stopped; collect outstanding GPU timer results over a few tasks.
+    $("#hud-phase").textContent = "Collecting GPU timings…";
+    const drainEnd = performance.now() + DRAIN_MS;
+    const drain = () => {
+      if (!gl.isContextLost()) pollQueries();
+      if (pending.length && !gl.isContextLost() && performance.now() < drainEnd) setTimeout(drain, 0);
+      else finalize("", false);
+    };
+    setTimeout(drain, 0);
+  }
+
+  function finalize(reason: string, keepStage: boolean): void {
+    const st = computeRunStats(timed, gpuMs);
     const result: BenchResult = {
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       gameId: BENCHMARK.gameId,
@@ -311,7 +362,8 @@ async function startRun(cfg: RunConfig): Promise<void> {
       p5Low: st.p5Low,
       worstMs: st.worstMs,
       frameCount: st.frames,
-      loopBusy: wallMs > 0 ? Math.min(1, st.totalMs / wallMs) : 0,
+      loopBusy: st.loopBusy,
+      timing: st.timing,
       valid: reason === "" && st.frames > 0,
       invalidReason: reason || (st.frames > 0 ? "" : "No timed frames recorded"),
       mobile: MOBILE,
@@ -363,7 +415,7 @@ async function startRun(cfg: RunConfig): Promise<void> {
 
   function updateHud(t: number): void {
     const arr = phase === "timed" ? timed : warm;
-    $("#hud-fps").textContent = Math.round(liveFps(arr)).toString();
+    $("#hud-fps").textContent = Math.round(liveBatchFps(arr)).toString();
     if (phase === "warmup") {
       const left = Math.max(0, WARMUP_SECONDS - (t - runStart) / 1000);
       $("#hud-phase").textContent = `WARM-UP ${left.toFixed(1)} s · not counted`;
@@ -372,44 +424,47 @@ async function startRun(cfg: RunConfig): Promise<void> {
       const el = (t - timedStart) / 1000;
       $("#hud-phase").textContent = `TIMED ${Math.min(el, cfg.duration).toFixed(1)} / ${cfg.duration} s`;
       $("#hud-bar").style.width = `${Math.min(100, (el / cfg.duration) * 100).toFixed(1)}%`;
-      $("#hud-frames").textContent = timed.length.toString();
+      $("#hud-frames").textContent = timedFrames.toString();
       if (t - lastStatsAt > 400) {
         lastStatsAt = t;
-        const st = computeStats(timed);
+        const st = computeRunStats(timed, gpuMs);
         $("#hud-avg").textContent = st.avgFps.toFixed(1);
         $("#hud-p1").textContent = st.p1Low.toFixed(1);
       }
     }
-    drawGraph(arr);
+    drawGraph(arr.map((b) => b.ms / b.frames)); // per-batch average frame time
   }
 
+  // Frames are submitted back-to-back with no per-frame sync, so the GPU never idles while
+  // three.js builds the next frame. One 1-pixel readback per batch (gl.finish() does not wait
+  // for Chrome's GPU process; readPixels does) keeps the queue at most one batch deep.
+  // Phase changes and the end of the run happen only at batch boundaries, right after the
+  // readback, so every frame's warm-up/timed membership is fixed when it is submitted.
   function batch(): void {
     if (done) return;
     const bStart = performance.now();
-    let t1 = bStart;
+    if (!lastReadback) lastReadback = bStart;
+    let n = 0;
     try {
+      pollQueries();
+      const phaseEnd = phase === "warmup" ? runStart + WARMUP_SECONDS * 1000 : timedStart + cfg.duration * 1000;
+      let t = bStart;
       do {
-        const t0 = performance.now();
-        fly.render((t0 - runStart) / 1000);
-        renderer.setRenderTarget(null);
-        // gl.finish() does not wait for Chrome's GPU process; a 1-pixel readback does.
-        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-        t1 = performance.now();
-        if (phase === "warmup") {
-          warm.push(t1 - t0);
-          if (t1 - runStart >= WARMUP_SECONDS * 1000) {
-            phase = "timed";
-            timedStart = performance.now();
-            timedViewportW = window.innerWidth;
-          }
-        } else {
-          timed.push(t1 - t0);
-          if (t1 - timedStart >= cfg.duration * 1000) {
-            finish("");
-            return;
-          }
+        let q: WebGLQuery | null = null;
+        if (gl2 && timerExt) {
+          q = queryPool.pop() ?? gl2.createQuery();
+          if (q) gl2.beginQuery(timerExt.TIME_ELAPSED_EXT, q);
         }
-      } while (!done && t1 - bStart < BATCH_MS);
+        fly.render((t - runStart) / 1000);
+        renderer.setRenderTarget(null);
+        if (q) {
+          gl2!.endQuery(timerExt!.TIME_ELAPSED_EXT);
+          pending.push({ q, frame: phase === "timed" ? timedFrames + n : -1 });
+        }
+        n++;
+        t = performance.now();
+      } while (n < batchFrames && t - bStart < BATCH_MS && t < phaseEnd);
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
       const err = gl.getError();
       if (err !== gl.NO_ERROR && err !== gl.CONTEXT_LOST_WEBGL) throw new Error(`WebGL error 0x${err.toString(16)}`);
     } catch (e) {
@@ -417,7 +472,27 @@ async function startRun(cfg: RunConfig): Promise<void> {
       return;
     }
     if (done) return;
-    updateHud(t1);
+    const tEnd = performance.now();
+    const b: TimedBatch = { frames: n, ms: tEnd - lastReadback, busyMs: tEnd - bStart };
+    lastReadback = tEnd;
+    batchFrames = nextBatchFrames(n, b.busyMs, BATCH_MS);
+    if (phase === "warmup") {
+      warm.push(b);
+      if (tEnd - runStart >= WARMUP_SECONDS * 1000) {
+        phase = "timed";
+        timedStart = tEnd; // queue is empty: the readback just drained it
+        timedViewportW = window.innerWidth;
+      }
+    } else {
+      timed.push(b);
+      for (let i = 0; i < n; i++) gpuMs.push(NaN);
+      timedFrames += n;
+      if (tEnd - timedStart >= cfg.duration * 1000) {
+        finish("");
+        return;
+      }
+    }
+    updateHud(tEnd);
     channel.port2.postMessage(0); // yield to input/compositor, no vsync wait
   }
   channel.port1.onmessage = batch;
@@ -488,7 +563,7 @@ function renderResults(r: BenchResult): void {
       <div class="score small"><span>Frames timed</span><b id="res-frames">${r.frameCount}</b></div>
       <div class="score small"><span>Run settings</span><b class="settings" id="res-settings">${esc(r.resolution)} (${r.width}×${r.height}) · ${esc(r.preset)} · ${r.durationS} s</b></div>
     </div>
-    <p class="muted small-print">Uncapped: frames were rendered back-to-back and each was timed from submission to GPU completion. Loop busy ${(r.loopBusy * 100).toFixed(0)}% of timed wall-clock.</p>
+    <p class="muted small-print">Uncapped: frames were rendered back-to-back with one GPU sync per ~${BATCH_MS} ms batch. Average FPS is frames divided by timed wall-clock. ${r.timing === "gpu-timer" ? "Lows and worst frame use each frame's GPU time from timer queries (or its batch average, if larger)." : r.timing === "batch-avg" ? "No GPU timer was available, so lows and worst frame use each batch's average frame time." : "Each frame was timed from submission to GPU completion."} Loop busy ${(r.loopBusy * 100).toFixed(0)}% of timed wall-clock.</p>
 
     <div class="results-grid">
       <form class="card sys-form" id="sys-form" autocomplete="off">

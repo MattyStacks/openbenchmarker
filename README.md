@@ -40,13 +40,20 @@ Settings → Domains).
    creates the WebGL context, builds the city, and renders one frame right away so
    any setup failure shows up at once.
 3. A **3 s warm-up** follows. It is never counted.
-4. The **timed phase** follows. Frames render in batches of about 28 ms, chained over a
-   `MessageChannel`. Batches don't wait for vsync, so the score can go well above
-   the monitor's refresh rate. After every frame, a 1-pixel `readPixels`
-   forces the GPU to finish. Chrome's `gl.finish()` doesn't actually wait, so
-   it isn't used. Each frame is timed from submission to completion.
-5. **Stats:** Avg FPS = frames / sum(frame times). 1% Low (`p1_low`) = mean FPS of
-   the slowest 1% of frames. The tool also records 5% low, worst frame, and frame count.
+4. The **timed phase** follows. Frames render back-to-back in batches of about 28 ms
+   (GPU time included), chained over a `MessageChannel`. Batches don't wait for vsync,
+   so the score can go well above the monitor's refresh rate. There is no per-frame
+   sync: one 1-pixel `readPixels` after each batch waits for the GPU, so the queue never
+   runs more than one batch ahead. Chrome's `gl.finish()` doesn't actually wait, so it
+   isn't used. Warm-up/timed membership is fixed when a frame is submitted.
+5. **Stats:** Avg FPS = timed frames / timed wall-clock (throughput). 1% Low (`p1_low`)
+   = mean FPS of the slowest 1% of frames, using per-frame times. When
+   `EXT_disjoint_timer_query_webgl2` is available, each frame's time is its GPU time
+   from a timer query, or its batch's average frame time if that is larger (CPU-bound);
+   results flagged disjoint are dropped. Without the extension, every frame gets its
+   batch's average frame time. The method is recorded as `timing` (`gpu-timer` or
+   `batch-avg`) in JSON/CSV. The tool also records 5% low, worst frame, and frame count.
+   Scores from 1.1.0 aren't comparable with 1.0.0, which synced after every frame.
 6. **Validity:** these mark the run **INVALID** and end it immediately: hiding the
    tab, resizing the window or stage, aborting, losing the WebGL context, or a
    render error. An invalid run can be saved locally but can never be submitted.
@@ -180,9 +187,9 @@ tests/                     Vitest unit tests
 
 - Headless or software (SwiftShader) numbers come from software rendering. Use them
   to compare relative load, not real GPU performance.
-- Each frame ends with a readback. That keeps timings honest but adds a small,
-  fixed sync cost to every frame. At very high frame rates (thousands of FPS),
-  this overhead becomes a noticeable share of each frame.
+- Each batch ends with a readback, so the GPU briefly idles between batches (HUD
+  update, yield, and building the first frame of the next batch). Within a batch,
+  the GPU is fed back-to-back.
 - The results page shows "Loop busy %": the share of timed wall-clock time spent
-  inside measured frames. It confirms the loop isn't sitting idle between frames.
+  rendering batches rather than yielding or updating the HUD.
   GPU utilisation itself can only be measured with tools on your own machine.

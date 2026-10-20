@@ -1,3 +1,4 @@
+import type { TimingMethod } from "./metrics";
 import type { PresetId, ResolutionId } from "./presets";
 
 export type GraphicsApi = "WebGL2" | "WebGL1";
@@ -45,8 +46,10 @@ export interface BenchResult {
   p5Low: number;
   worstMs: number;
   frameCount: number;
-  /** Fraction of timed wall-clock spent inside measured frames (loop busy-ness). */
+  /** Fraction of timed wall-clock spent rendering batches rather than yielding or updating the HUD. */
   loopBusy: number;
+  /** How the per-frame times behind the lows were measured. Absent on 1.0.0 results (per-frame readback). */
+  timing?: TimingMethod;
   valid: boolean;
   invalidReason: string;
   /** Run on a phone or tablet. Saved and exported locally, but not submittable (yet). */

@@ -23,7 +23,8 @@ export const UPSTREAM_TEMPLATES = `${UPSTREAM_REPO}/tree/main/templates`;
 
 export const BENCHMARKS = [{ gameId: "openbenchmarker_neon_flythrough", name: "OpenBenchmarker Neon Flythrough" }] as const;
 export const BENCHMARK = BENCHMARKS[0];
-export const BENCHMARK_VERSION = "1.0.0";
+/** 1.1.0: no per-frame readback, Avg FPS is throughput. Not comparable with 1.0.0 scores. */
+export const BENCHMARK_VERSION = "1.1.0";
 
 export function findGpu(id: string): CatalogGpu | undefined {
   return GPU_CATALOG.find((g) => g.id === id);

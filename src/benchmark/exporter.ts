@@ -24,7 +24,7 @@ export function toYaml(r: BenchResult): string {
   const s = r.system;
   const lines = [
     `# Captured by OpenBenchmarker ${r.benchmarkVersion} (https://openbenchmarker.com/), benchmark "${BENCHMARK.name}".`,
-    `# Every frame was timed in the browser (submission to GPU completion). Hardware fields were entered by the submitter.`,
+    `# Timed in the browser: Avg FPS = frames / wall-clock; lows from ${r.timing === "gpu-timer" ? "GPU timer queries" : "per-batch frame times"}. Hardware fields were entered by the submitter.`,
     `# Save as data/community/${s.gpuId}/${suggestedFileName(r, "yaml")} in a PR to ${UPSTREAM_REPO}`,
     `# Submitted data is public under CC BY 4.0 (data/LICENSE) and cannot be taken back.`,
     `gpu_id: ${s.gpuId}`,
@@ -84,6 +84,7 @@ const CSV_FIELDS: [string, (r: BenchResult) => string | number][] = [
   ["p5_low", (r) => round1(r.p5Low)],
   ["worst_frame_ms", (r) => Math.round(r.worstMs * 100) / 100],
   ["frame_count", (r) => r.frameCount],
+  ["timing", (r) => r.timing ?? ""],
   ["gpu_id", (r) => r.system.gpuId],
   ["os", (r) => r.system.os],
   ["os_detail", (r) => r.system.osDetail],

@@ -10,7 +10,8 @@ function result(over: Partial<BenchResult> = {}): BenchResult {
   return {
     id: "t1",
     gameId: BENCHMARK.gameId,
-    benchmarkVersion: "1.0.0",
+    benchmarkVersion: "1.1.0",
+    timing: "gpu-timer",
     date: "2026-10-19",
     time: "12:30",
     resolutionId: "1080p",
@@ -135,5 +136,13 @@ describe("exports", () => {
     expect(csv).toHaveLength(2);
     expect(csv[1].startsWith("incomplete,")).toBe(true);
     expect(toCsv([result({ valid: false, invalidReason: "Tab hidden" })]).split("\n")[1]).toMatch(/^invalid,Tab hidden/);
+  });
+
+  it("timing method is in JSON and CSV but not an upstream YAML field", () => {
+    const r = withSys({ gpuId: GPU, os: "windows" });
+    expect(JSON.parse(toJson(r)).timing).toBe("gpu-timer");
+    const [head, row] = toCsv([r]).trim().split("\n").map((l) => l.split(","));
+    expect(row[head.indexOf("timing")]).toBe("gpu-timer");
+    expect(toYaml(r)).not.toMatch(/^\s*timing:/m);
   });
 });
