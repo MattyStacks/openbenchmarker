@@ -75,7 +75,7 @@ try {
   } else if (opt("probe")) {
     // Evaluate an async expression in the capture page (modules load via the dev server), e.g.
     // --probe "(await import('/src/engine/world.ts')).JOURNEY_SECONDS"
-    const page = await open(String(opt("preset", "Low")), 320, 180);
+    const page = await open(String(opt("preset", "Low")), Number(opt("w", 320)), Number(opt("h", 180)));
     console.log(JSON.stringify(await page.evaluate(`(async () => (${opt("probe")}))()`), null, 1));
   } else if (opt("ui")) {
     // Page screenshots: home (desktop + phone), run HUD, a sample result and history.

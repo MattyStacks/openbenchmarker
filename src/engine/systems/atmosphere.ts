@@ -31,7 +31,9 @@ export function buildAtmosphere(ctx: BuildCtx): void {
   const { group, track, preset } = ctx;
   for (let i = 0; i < Math.min(preset.skylineLayers, RINGS.length); i++) {
     const R = RINGS[i];
-    const geo = track(new THREE.CylinderGeometry(R.r, R.r, R.h + 40, 192, 1, true).translate(0, (R.h + 40) / 2 - 20, 0));
+    // Starts at ground level: nothing may sit below the street plane on Ultra+ (the mirror
+    // there doesn't write depth, so anything underneath would show through the street).
+    const geo = track(new THREE.CylinderGeometry(R.r, R.r, R.h + 20, 192, 1, true).translate(0, (R.h + 20) / 2, 0));
     const mat = track(
       new THREE.ShaderMaterial({
         side: THREE.BackSide,

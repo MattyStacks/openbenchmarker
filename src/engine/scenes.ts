@@ -94,6 +94,12 @@ export function makeFlythrough(renderer: THREE.WebGLRenderer, preset: Preset, w:
     });
     mirror.rotation.x = -Math.PI / 2;
     mirror.position.y = 0.0;
+    // The see-through street sits just above the mirror. If both wrote depth they would
+    // z-fight (flicker) in the distance, so the mirror draws first without depth writes: towers
+    // still cover it, and the street always lands on top of it.
+    const mm = mirror.material as THREE.Material;
+    mm.depthWrite = false;
+    mirror.renderOrder = -6;
     scene.add(mirror);
   }
 

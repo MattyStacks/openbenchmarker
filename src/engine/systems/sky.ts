@@ -1,7 +1,28 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { BuildCtx } from "../ctx";
 import { makeGroundMaterial } from "../ground";
 import { CITY_HALF } from "../world";
+
+/**
+ * The ground plane (in its XY plane, rotated flat by the caller), 8000 units across. Over the
+ * city it is split into 32-unit cells: the street shader works from the interpolated world
+ * position, and across one huge triangle (clipped behind the camera) that interpolation drifts by
+ * more than a lane line's width as the camera moves, which made the markings flicker. Outside
+ * the city four large quads finish the plane.
+ */
+function groundGeometry(): THREE.BufferGeometry {
+  const C = 2560, F = 8000, cell = 32;
+  const parts = [new THREE.PlaneGeometry(C, C, C / cell, C / cell)];
+  const side = (F - C) / 2;
+  parts.push(new THREE.PlaneGeometry(F, side).translate(0, (C + side) / 2, 0));
+  parts.push(new THREE.PlaneGeometry(F, side).translate(0, -(C + side) / 2, 0));
+  parts.push(new THREE.PlaneGeometry(side, C).translate((C + side) / 2, 0, 0));
+  parts.push(new THREE.PlaneGeometry(side, C).translate(-(C + side) / 2, 0, 0));
+  const g = mergeGeometries(parts)!;
+  parts.forEach((p) => p.dispose());
+  return g;
+}
 
 /** Overcast night sky dome, lights (the high cool key light casts the shadows), wet ground. */
 export function buildSky(ctx: BuildCtx): void {
@@ -75,7 +96,7 @@ export function buildSky(ctx: BuildCtx): void {
   const groundTime = { value: 0 };
   ctx.onUpdate((t) => void (groundTime.value = t));
   const groundMat = track(makeGroundMaterial(preset.reflections > 0, groundTime));
-  const ground = new THREE.Mesh(track(new THREE.PlaneGeometry(8000, 8000)), groundMat);
+  const ground = new THREE.Mesh(track(groundGeometry()), groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = 0.05;
   ground.receiveShadow = shadows;
