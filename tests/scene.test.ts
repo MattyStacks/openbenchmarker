@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { BENCHMARKS } from "../src/benchmark/catalog";
-import { PRESETS, getPreset } from "../src/benchmark/presets";
+import { DURATIONS, PRESETS, WARMUP_SECONDS, getPreset } from "../src/benchmark/presets";
 import { SolidIndex, laneBox, layoutDrones, layoutSwarm, layoutTraffic, orbitAt, orbitBox, type Box } from "../src/engine/layout";
 import { mulberry32 } from "../src/engine/rng";
 import { layoutLanternStrings, layoutSigns, signBox } from "../src/engine/signlayout";
-import { partBox, planCity } from "../src/engine/towergen";
-import { CLEAR_MOVING, CLEAR_SOLID, FLIGHT, JOURNEY_SECONDS, pathDistToBox } from "../src/engine/world";
+import { K, partBox, planCity } from "../src/engine/towergen";
+import { CLEAR_MOVING, CLEAR_SOLID, FLIGHT, JOURNEY_SECONDS, LANDMARK_BRIDGES, pathDistToBox } from "../src/engine/world";
 
 /** Brute force: closest approach of the dense path to a box. */
 function bruteDist(b: Box): number {
@@ -52,6 +52,43 @@ describe("flight path", () => {
       const r1 = FLIGHT.pose(t, p1, l1), r2 = FLIGHT.pose(t, p2, l2);
       expect([p1.toArray(), l1.toArray(), r1]).toEqual([p2.toArray(), l2.toArray(), r2]);
       expect(Math.abs(r1)).toBeLessThanOrEqual(0.42);
+    }
+  });
+
+  it("is a journey longer than the longest run (3 s warm-up + 90 s), so no frame repeats", () => {
+    expect(JOURNEY_SECONDS).toBeGreaterThanOrEqual(WARMUP_SECONDS + Math.max(...DURATIONS));
+  });
+
+  it("dives near the street, climbs over the rooftops, banks and varies its speed", () => {
+    const ys = Array.from({ length: FLIGHT.pts.length / 3 }, (_, i) => FLIGHT.pts[i * 3 + 1]);
+    expect(Math.min(...ys)).toBeLessThan(16);
+    expect(Math.max(...ys)).toBeGreaterThan(150);
+    const pos = new THREE.Vector3(), look = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3();
+    let maxRoll = 0, minV = Infinity, maxV = 0;
+    for (let t = 0; t < JOURNEY_SECONDS; t += 0.25) {
+      maxRoll = Math.max(maxRoll, Math.abs(FLIGHT.pose(t, pos, look)));
+      const v = FLIGHT.pointAt(t + 0.05, a).distanceTo(FLIGHT.pointAt(t - 0.05, b)) / 0.1;
+      minV = Math.min(minV, v);
+      maxV = Math.max(maxV, v);
+    }
+    expect(maxRoll).toBeGreaterThan(0.2);
+    expect(maxV / minV).toBeGreaterThan(1.4);
+  });
+
+  it("passes under every landmark sky bridge, at every preset", () => {
+    for (const preset of PRESETS) {
+      const decks = plans.get(preset.id)!.parts.filter((p) => p.k === K.ShellBox && p.y > 25 && p.sy < 5);
+      for (const L of LANDMARK_BRIDGES)
+        for (const y of L.ys) {
+          const deck = decks.find((p) => p.y === y && (L.axis === 0 ? p.z === L.at : p.x === L.at));
+          expect(deck, `${preset.id} bridge ${L.street}/${L.at}@${y}`).toBeDefined();
+          let under = false;
+          for (let i = 0; i < FLIGHT.pts.length / 3 && !under; i++) {
+            const x = FLIGHT.pts[i * 3], py = FLIGHT.pts[i * 3 + 1], z = FLIGHT.pts[i * 3 + 2];
+            under = Math.abs(x - deck!.x) < deck!.sx / 2 && Math.abs(z - deck!.z) < deck!.sz / 2 && py < deck!.y;
+          }
+          expect(under, `${preset.id} flies under ${L.street}/${L.at}@${y}`).toBe(true);
+        }
     }
   });
 

@@ -2,7 +2,7 @@
 // can check every part against the camera path. Everything is an axis-aligned box (cylinders by
 // their bounding box), so clearance checks are exact.
 import { mulberry32, stream } from "./rng";
-import { BLOCK, CITY_HALF, CLEAR_SOLID, FLIGHT, HALF, STREET, pathDistToBox } from "./world";
+import { BLOCK, CITY_HALF, CLEAR_SOLID, FLIGHT, HALF, LANDMARK_BRIDGES, STREET, pathDistToBox } from "./world";
 import type { Box } from "./layout";
 
 export const K = {
@@ -113,11 +113,13 @@ export function planLots(seed: number): Lot[] {
   const blocks = Math.round(CITY_HALF / BLOCK);
   const inner = BLOCK - STREET; // 46
   const lots: Lot[] = [];
+  const forced = new Set(landmarkBlocks().map(([bx, bz]) => `${bx},${bz}`));
   for (let bx = -blocks; bx < blocks; bx++)
     for (let bz = -blocks; bz < blocks; bz++) {
       const x0 = bx * BLOCK + STREET / 2, z0 = bz * BLOCK + STREET / 2;
       const r = rnd();
-      const [nx, nz] = r < 0.22 ? [1, 1] : r < 0.42 ? [2, 1] : r < 0.6 ? [1, 2] : r < 0.9 ? [2, 2] : [3, 2];
+      const force = forced.has(`${bx},${bz}`);
+      const [nx, nz] = force ? [1, 1] : r < 0.22 ? [1, 1] : r < 0.42 ? [2, 1] : r < 0.6 ? [1, 2] : r < 0.9 ? [2, 2] : [3, 2];
       const cw = inner / nx, cd = inner / nz;
       for (let i = 0; i < nx; i++)
         for (let j = 0; j < nz; j++) {
@@ -131,11 +133,25 @@ export function planLots(seed: number): Lot[] {
           const arche: Arche =
             h > 190 && big > 18 ? "mega" : big > 14 && a < 0.2 ? "round" : a < 0.45 ? "tiered" : a < 0.7 ? "podium" : "slab";
           const near = FLIGHT.index.distToBox(x - w / 2, 0, z - d / 2, x + w / 2, 400, z + d / 2, 600);
-          lots.push({ x, z, w, d, h, seed: Math.floor(rnd() * 2 ** 31), pal: Math.floor(rnd() * 4), arche, pri: near + rnd() * 160 });
+          const lot: Lot = { x, z, w, d, h, seed: Math.floor(rnd() * 2 ** 31), pal: Math.floor(rnd() * 4), arche, pri: near + rnd() * 160 };
+          // Landmark bridge anchors: always built, tall single-shell slabs.
+          if (force) Object.assign(lot, { arche: "slab", h: Math.max(h, 150), pri: -1 });
+          lots.push(lot);
         }
     }
   lots.sort((a, b) => a.pri - b.pri);
   return lots;
+}
+
+/** The blocks either side of each landmark bridge. */
+function landmarkBlocks(): [number, number][] {
+  const out: [number, number][] = [];
+  for (const L of LANDMARK_BRIDGES) {
+    const along = Math.floor(L.at / BLOCK), left = Math.round(L.street / BLOCK) - 1, right = Math.round(L.street / BLOCK);
+    if (L.axis === 0) out.push([left, along], [right, along]);
+    else out.push([along, left], [along, right]);
+  }
+  return out;
 }
 
 interface Gen {
@@ -397,8 +413,34 @@ export function planCity(count: number, detail: number, seed: number): CityPlan 
     const base = g.shells[0];
     plan.towers.push({ x: base.x, z: base.z, w: base.sx, d: base.sz, h: g.top, baseTop: g.baseTop, arche: L.arche });
   }
+  addLandmarkBridges(plan);
   addBridges(plan, detail, seed);
   return plan;
+}
+
+/** The sky bridges the flight passes under, between the forced towers across their street. */
+function addLandmarkBridges(plan: CityPlan): void {
+  for (const L of LANDMARK_BRIDGES) {
+    // a: the tower on the low side of the street line, b: the high side; u = across the street.
+    const u = (t: Tower) => (L.axis === 0 ? t.x : t.z), v = (t: Tower) => (L.axis === 0 ? t.z : t.x);
+    const hu = (t: Tower) => (L.axis === 0 ? t.w : t.d) / 2, hv = (t: Tower) => (L.axis === 0 ? t.d : t.w) / 2;
+    const near = (t: Tower) => Math.abs(v(t) - L.at) < hv(t) && Math.abs(u(t) - L.street) < BLOCK;
+    const a = plan.towers.find((t) => near(t) && u(t) < L.street);
+    const b = plan.towers.find((t) => near(t) && u(t) > L.street);
+    if (!a || !b) continue;
+    const u0 = u(a) + hu(a), u1 = u(b) - hu(b), mid = (u0 + u1) / 2, len = u1 - u0 + 0.4;
+    for (const y of L.ys) {
+      if (y + FLOOR * 1.4 > Math.min(a.baseTop, b.baseTop)) continue;
+      const deck: Part = L.axis === 0
+        ? { k: K.ShellBox, x: mid, y, z: L.at, sx: len, sy: FLOOR * 1.4, sz: 9, c: 0, win: [0.37, 1, 0.9, 1] }
+        : { k: K.ShellBox, x: L.at, y, z: mid, sx: 9, sy: FLOOR * 1.4, sz: len, c: 0, win: [0.61, 3, 0.9, 1] };
+      const strip: Part = { ...deck, k: K.LightBar, y: y - 0.3, sy: 0.3, sx: L.axis === 0 ? len : 1, sz: L.axis === 0 ? 1 : len, c: 0xff3edb, i: 2.6, win: undefined };
+      const beam: Part = { ...deck, k: K.DetBox, y: y - 1.2, sy: 0.9, sx: L.axis === 0 ? len : 10, sz: L.axis === 0 ? 10 : len, c: 0x24232e, win: undefined };
+      if (![deck, strip, beam].every(partClear)) continue;
+      plan.parts.push(deck, strip, beam);
+      plan.bridges++;
+    }
+  }
 }
 
 /** Enclosed sky bridges across the street between tall neighbours whose bases face each other. */
