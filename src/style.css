@@ -157,12 +157,7 @@ body[data-view="run"] main { flex: 1 1 auto; min-height: 0; }
 .art-near .s4::after { right: 14%; top: 26%; width: 22%; height: 50%; background: rgba(255, 62, 219, 0.85); box-shadow: 0 0 14px var(--magenta); }
 .art-near .s5 { left: 40%; width: 6%; height: 40%; }
 .art-near .s5::before { left: 20%; top: 14%; width: 60%; height: 12%; background: rgba(46, 233, 255, 0.85); box-shadow: 0 0 10px var(--cyan); }
-.art-rain {
-  position: absolute; inset: -20% 0 0 0; opacity: 0.35;
-  background: repeating-linear-gradient(100deg, transparent 0 22px, rgba(190, 210, 255, 0.5) 22px 23px, transparent 23px 47px);
-  mask-image: linear-gradient(180deg, transparent, #000 30%, #000);
-  animation: rain 0.7s linear infinite;
-}
+/* The hero art is fully static: an infinite animation here repainted the whole hero every frame. */
 .art-drones {
   position: absolute; inset: 0;
   background:
@@ -173,10 +168,7 @@ body[data-view="run"] main { flex: 1 1 auto; min-height: 0; }
     radial-gradient(1px 1px at 22% 40%, #fff 60%, transparent 62%),
     radial-gradient(1px 1px at 86% 18%, var(--cyan) 60%, transparent 62%),
     radial-gradient(1px 1px at 56% 24%, #fff 60%, transparent 62%);
-  animation: blink 1.6s steps(2, jump-none) infinite;
 }
-@keyframes rain { to { background-position: 0 60px; } }
-@keyframes blink { 50% { opacity: 0.45; } }
 .hero-copy { position: relative; z-index: 1; align-self: end; max-width: 680px; margin: 140px 0 0; padding: 40px 24px 22px; }
 .hero-copy::before {
   content: ""; position: absolute; inset: 0; z-index: -1;
