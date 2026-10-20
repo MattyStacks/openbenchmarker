@@ -37,16 +37,18 @@ export interface Preset {
   msaa: number;
   /** Reflector render scale; 0 disables planar reflections. */
   reflections: number;
+  /** Far-field drone swarm: blinking specks across the sky (in addition to `drones`). */
+  farDrones: number;
 }
 
 // Ultra/Extreme counts are raised above the original spec table (800/12000/140/240/44/9 and
 // 1800/45000/320/600/110/22): measured per-frame cost only grew ~1.5x per tier at those values.
 export const PRESETS: Preset[] = [
-  { id: "Low", buildings: 120, rain: 800, signs: 24, cars: 36, drones: 8, holos: 2, bloom: 0, shadowMap: 0, msaa: 0, reflections: 0 },
-  { id: "Medium", buildings: 240, rain: 2500, signs: 48, cars: 80, drones: 16, holos: 4, bloom: 0.55, shadowMap: 1024, msaa: 0, reflections: 0 },
-  { id: "High", buildings: 420, rain: 5000, signs: 80, cars: 150, drones: 28, holos: 6, bloom: 0.85, shadowMap: 2048, msaa: 4, reflections: 0 },
-  { id: "Ultra", buildings: 1100, rain: 24000, signs: 200, cars: 400, drones: 70, holos: 14, bloom: 1.15, shadowMap: 2048, msaa: 4, reflections: 0.75 },
-  { id: "Extreme", buildings: 2800, rain: 110000, signs: 560, cars: 1400, drones: 260, holos: 40, bloom: 1.45, shadowMap: 4096, msaa: 8, reflections: 1 },
+  { id: "Low", buildings: 120, rain: 800, signs: 24, cars: 36, drones: 8, holos: 2, bloom: 0, shadowMap: 0, msaa: 0, reflections: 0, farDrones: 120 },
+  { id: "Medium", buildings: 240, rain: 2500, signs: 48, cars: 80, drones: 16, holos: 4, bloom: 0.55, shadowMap: 1024, msaa: 0, reflections: 0, farDrones: 300 },
+  { id: "High", buildings: 420, rain: 5000, signs: 80, cars: 150, drones: 28, holos: 6, bloom: 0.85, shadowMap: 2048, msaa: 4, reflections: 0, farDrones: 700 },
+  { id: "Ultra", buildings: 1100, rain: 24000, signs: 200, cars: 400, drones: 70, holos: 14, bloom: 1.15, shadowMap: 2048, msaa: 4, reflections: 0.75, farDrones: 2000 },
+  { id: "Extreme", buildings: 2800, rain: 110000, signs: 560, cars: 1400, drones: 260, holos: 40, bloom: 1.45, shadowMap: 4096, msaa: 8, reflections: 1, farDrones: 6000 },
 ];
 
 export const DURATIONS = [30, 60, 90] as const;

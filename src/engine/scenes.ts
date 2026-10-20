@@ -49,8 +49,11 @@ const SanitizeShader = {
 };
 
 export interface Flythrough {
-  /** Render one frame of scene time `t` seconds. */
-  render(t: number): void;
+  /**
+   * Render one frame of scene time `t` seconds. `view` (dev captures only) replaces the flight
+   * camera with a fixed position and look target.
+   */
+  render(t: number, view?: { pos: THREE.Vector3Tuple; look: THREE.Vector3Tuple }): void;
   dispose(): void;
   /** What actually got enabled (bloom can fall back). */
   features: { bloom: boolean; reflections: boolean; msaa: number; shadows: boolean; fallbackReason: string };
@@ -119,8 +122,12 @@ export function makeFlythrough(renderer: THREE.WebGLRenderer, preset: Preset, w:
   }
 
   const look = new THREE.Vector3();
-  const render = (t: number) => {
-    const roll = FLIGHT.pose(t, camera.position, look);
+  const render = (t: number, view?: { pos: THREE.Vector3Tuple; look: THREE.Vector3Tuple }) => {
+    let roll = 0;
+    if (view) {
+      camera.position.fromArray(view.pos);
+      look.fromArray(view.look);
+    } else roll = FLIGHT.pose(t, camera.position, look);
     camera.up.set(0, 1, 0);
     camera.lookAt(look);
     camera.rotateZ(roll);

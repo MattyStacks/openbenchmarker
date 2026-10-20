@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { canvasTexture, type BuildCtx } from "../ctx";
-import { layoutBuildings, type BuildingSpot } from "../layout";
+import { layoutBuildings, spotBox, type BuildingSpot } from "../layout";
 import { stream } from "../rng";
 
 /** 256x512 = 32x64 world units; 16x32 window cells; pixel (0..2, 0..2) is always dark wall. */
@@ -43,6 +43,7 @@ export function buildTowers(ctx: BuildCtx): BuildingSpot[] {
   const { group, track, preset, shadows } = ctx;
   const rnd = stream(ctx.seed, 2);
   const spots = layoutBuildings(preset.buildings, ctx.seed);
+  for (const s of spots) ctx.solids.add(spotBox(s));
   const palettes = [
     ["#ffd59a", "#ffb35c", "#fff1c9"],
     ["#7fe9ff", "#3fc8ff", "#d6f7ff"],

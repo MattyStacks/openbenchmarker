@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { Preset } from "../benchmark/presets";
-import type { BuildingSpot } from "./layout";
+import type { BuildingSpot, SolidIndex } from "./layout";
 
 /** Everything a scene system needs while building, plus where it registers its per-frame work. */
 export interface BuildCtx {
@@ -19,6 +19,8 @@ export interface BuildCtx {
   spots: BuildingSpot[];
   /** Bright neon sources (signs etc.) that rain and haze can pick up colour from. */
   lights: GlowLight[];
+  /** Every solid volume placed so far; moving things route around them. */
+  solids: SolidIndex;
 }
 
 export interface GlowLight {

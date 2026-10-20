@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { BENCHMARKS } from "../src/benchmark/catalog";
 import { PRESETS, getPreset } from "../src/benchmark/presets";
-import { layoutBuildings, spotBox, type Box } from "../src/engine/layout";
+import { SolidIndex, layoutBuildings, layoutDrones, layoutSwarm, orbitAt, orbitBox, spotBox, type Box } from "../src/engine/layout";
 import { mulberry32 } from "../src/engine/rng";
-import { CLEAR_SOLID, FLIGHT, JOURNEY_SECONDS, pathDistToBox } from "../src/engine/world";
+import { CLEAR_MOVING, CLEAR_SOLID, FLIGHT, JOURNEY_SECONDS, pathDistToBox } from "../src/engine/world";
 
 /** Brute force: closest approach of the dense path to a box. */
 function bruteDist(b: Box): number {
@@ -76,6 +76,31 @@ describe("camera clearance", () => {
 
   it("layout is deterministic for a seed", () => {
     expect(layoutBuildings(50, 7)).toEqual(layoutBuildings(50, 7));
+  });
+
+  it("near drones keep CLEAR_MOVING from the path and stay out of buildings, at any preset", () => {
+    for (const preset of PRESETS) {
+      const solids = new SolidIndex();
+      for (const s of layoutBuildings(preset.buildings, 1984)) solids.add(spotBox(s));
+      const drones = layoutDrones(preset.drones, 1984, solids);
+      expect(drones.length).toBe(preset.drones);
+      for (const o of drones) {
+        expectClear(orbitBox(o), CLEAR_MOVING, `${preset.id} drone`);
+        expect(solids.hits(orbitBox(o))).toBe(false);
+      }
+    }
+  });
+
+  it("far-swarm orbits keep CLEAR_MOVING from the path (sampled along each ring)", () => {
+    const extreme = getPreset("Extreme")!;
+    const swarm = layoutSwarm(extreme.farDrones, 1984);
+    expect(swarm.length).toBe(extreme.farDrones);
+    const v = new THREE.Vector3();
+    for (const o of swarm.slice(0, 400))
+      for (let k = 0; k < 64; k++) {
+        orbitAt(o, (k / 64) * ((Math.PI * 2) / Math.abs(o.w)), v);
+        expect(FLIGHT.index.distToPoint(v.x, v.y, v.z, CLEAR_MOVING + 1) - 0.5).toBeGreaterThanOrEqual(CLEAR_MOVING - 1e-9);
+      }
   });
 });
 

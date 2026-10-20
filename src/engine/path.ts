@@ -158,4 +158,20 @@ export class PathIndex {
   distToPoint(x: number, y: number, z: number, cap: number): number {
     return this.distToBox(x, y, z, x, y, z, cap);
   }
+  /** Calls fn(x, y, z) for every path sample inside the box; stops early if fn returns true. */
+  someIn(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, fn: (x: number, y: number, z: number) => boolean): boolean {
+    const C = PathIndex.CELL, p = this.pts;
+    const cx1 = Math.floor(maxX / C), cz1 = Math.floor(maxZ / C);
+    for (let cx = Math.floor(minX / C); cx <= cx1; cx++)
+      for (let cz = Math.floor(minZ / C); cz <= cz1; cz++) {
+        const cell = this.cells.get(PathIndex.key(cx, cz));
+        if (!cell) continue;
+        for (const i of cell) {
+          const x = p[i * 3], y = p[i * 3 + 1], z = p[i * 3 + 2];
+          if (x < minX || x > maxX || y < minY || y > maxY || z < minZ || z > maxZ) continue;
+          if (fn(x, y, z)) return true;
+        }
+      }
+    return false;
+  }
 }

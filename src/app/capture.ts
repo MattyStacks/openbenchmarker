@@ -9,7 +9,7 @@ export interface CaptureApi {
   features: Record<string, unknown>;
   counts: Record<string, number>;
   /** Render one frame of scene time t; returns renderer.info summed over every pass. */
-  renderAt(t: number): Record<string, number>;
+  renderAt(t: number, view?: { pos: [number, number, number]; look: [number, number, number] }): Record<string, number>;
   /** Relative cost only (software GL in headless runs): ms per frame over `frames` frames at t. */
   timeAt(t: number, frames: number): number;
 }
@@ -33,10 +33,10 @@ export function runCapture(): void {
   const api: CaptureApi = {
     features: { ...fly.features },
     counts: fly.counts,
-    renderAt(t) {
+    renderAt(t, view) {
       renderer.info.autoReset = false;
       renderer.info.reset();
-      fly.render(t);
+      fly.render(t, view);
       renderer.setRenderTarget(null);
       const r = renderer.info.render;
       const out = { calls: r.calls, triangles: r.triangles, points: r.points, lines: r.lines, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, programs: renderer.info.programs?.length ?? 0 };

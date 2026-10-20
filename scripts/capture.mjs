@@ -60,6 +60,11 @@ try {
       console.log(`${p.padEnd(8)} ${ms.toFixed(1)} ms/frame (software GL, relative only)`);
       await page.close();
     }
+  } else if (opt("probe")) {
+    // Evaluate an async expression in the capture page (modules load via the dev server), e.g.
+    // --probe "(await import('/src/engine/world.ts')).JOURNEY_SECONDS"
+    const page = await open(String(opt("preset", "Low")), 320, 180);
+    console.log(JSON.stringify(await page.evaluate(`(async () => (${opt("probe")}))()`), null, 1));
   } else if (opt("ui")) {
     // Page screenshots: home (desktop + phone), run HUD, a sample result and history.
     const out = opt("ui");
@@ -108,12 +113,16 @@ try {
     const presets = String(opt("presets", "Low,Ultra")).split(",");
     const times = String(opt("times", "5,20,40")).split(",").map(Number);
     const w = Number(opt("w", 1280)), h = Number(opt("h", 720));
+    // --view x,y,z,lx,ly,lz: fixed camera (position, look target) instead of the flight camera.
+    const v = opt("view") ? String(opt("view")).split(",").map(Number) : null;
+    const view = v ? { pos: v.slice(0, 3), look: v.slice(3, 6) } : undefined;
+    const tag = opt("name") ? `${opt("name")}_` : "";
     mkdirSync(out, { recursive: true });
     for (const p of presets) {
       const page = await open(p, w, h);
       for (const t of times) {
-        const info = await page.evaluate((t) => window.__cap.renderAt(t), t);
-        const file = join(out, `${p}_t${String(t).padStart(3, "0")}.png`);
+        const info = await page.evaluate(([t, view]) => window.__cap.renderAt(t, view), [t, view]);
+        const file = join(out, `${tag}${p}_t${String(t).padStart(3, "0")}.png`);
         await page.screenshot({ path: file });
         console.log(`${file}  ${info.calls} calls, ${info.triangles} tris`);
       }

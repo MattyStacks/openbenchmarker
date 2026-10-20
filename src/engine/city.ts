@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { Preset } from "../benchmark/presets";
 import type { BuildCtx } from "./ctx";
+import { SolidIndex } from "./layout";
 import { SEED } from "./rng";
 import { buildDrones } from "./systems/drones";
 import { buildFx } from "./systems/fx";
@@ -33,6 +34,7 @@ export function buildCity(preset: Preset, size: { w: number; h: number }, seed =
     counts: {},
     spots: [],
     lights: [],
+    solids: new SolidIndex(),
   };
   buildSky(ctx);
   ctx.spots = buildTowers(ctx);
