@@ -1,4 +1,4 @@
-import { DURATIONS, PRESETS, RESOLUTIONS, type PresetId, type ResolutionId } from "../benchmark/presets";
+import { DURATIONS, PRESETS, RESOLUTIONS, SCORE_TESTS, getResolution, type PresetId, type ResolutionId } from "../benchmark/presets";
 import { $, esc } from "./dom";
 import { startRun } from "./run";
 import { app } from "./shell";
@@ -33,5 +33,17 @@ export function buildConfigForm(): void {
     };
     saveConfig(c);
     void startRun(c);
+  });
+
+  const scoreRuns = $("#score-runs");
+  scoreRuns.innerHTML = SCORE_TESTS.map((t) => {
+    const r = getResolution(t.resolution)!;
+    return `<button type="button" class="btn btn-score" data-test="${t.id}"><b>${esc(t.name)}</b><small>${t.preset} · ${t.resolution} (${r.width}×${r.height}) · ${t.duration} s</small></button>`;
+  }).join("");
+  scoreRuns.addEventListener("click", (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-test]");
+    const t = SCORE_TESTS.find((x) => x.id === btn?.dataset.test);
+    if (!t || app.running) return;
+    void startRun({ resolution: t.resolution, preset: t.preset, duration: t.duration, scoreTest: t.id });
   });
 }

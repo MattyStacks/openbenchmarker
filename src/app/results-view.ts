@@ -1,6 +1,8 @@
 import { BENCHMARK, CATALOG_SNAPSHOT_DATE, GPU_CATALOG, NOT_LISTED, UPSTREAM_ISSUES, UPSTREAM_REPO, UPSTREAM_TEMPLATES } from "../benchmark/catalog";
 import { download, gamesYamlEntry, suggestedFileName, toCsv, toJson, toYaml } from "../benchmark/exporter";
+import { VERDICT_LABEL, diagnose, isMaskedRenderer } from "../benchmark/diagnose";
 import { round1 } from "../benchmark/metrics";
+import { getScoreTest } from "../benchmark/presets";
 import { commandsFor } from "../benchmark/sysinfo";
 import { LINUX_ONLY_FIELDS, type BenchResult, type SystemInfo } from "../benchmark/types";
 import { validateSubmission } from "../benchmark/validate";
@@ -37,6 +39,63 @@ export const TEXT_FIELDS: { key: keyof SystemInfo; label: string; placeholder: s
   { key: "proton", label: "Proton", placeholder: "e.g. GE-Proton9-20", linux: true },
 ];
 
+const fmtMs = (x: number | null | undefined) => (x === null || x === undefined || !Number.isFinite(x) ? "n/a" : `${x.toFixed(2)} ms`);
+const fmtPct = (x: number | null | undefined) => (x === null || x === undefined || !Number.isFinite(x) ? "n/a" : `${Math.round(x * 100)}%`);
+
+/** "What limited this run": verdict, time breakdown, findings and every raw signal. */
+function diagPanel(r: BenchResult): string {
+  const dx = diagnose(r);
+  const d = r.diag;
+  const bar = (cls: string, label: string, v: number | null, title: string) =>
+    `<div class="share ${cls}" title="${esc(title)}"><span>${label}</span><span class="bar"><i style="width:${v === null ? 0 : Math.round(v * 100)}%"></i></span><b>${fmtPct(v)}</b></div>`;
+  return `<section class="card diag" aria-labelledby="diag-title">
+    <h2 id="diag-title"><span class="kana" aria-hidden="true">診断</span>What limited this run</h2>
+    <div class="diag-head"><span class="limit-tag v-${dx.verdict}">${esc(VERDICT_LABEL[dx.verdict])}${dx.estimated && dx.verdict !== "unknown" ? " (est.)" : ""}</span><h3>${esc(dx.headline)}</h3></div>
+    <p class="diag-detail">${esc(dx.detail)}</p>
+    ${
+      d
+        ? `<div class="share-bars" aria-label="Share of each frame's time">
+        ${bar("gpu", "GPU busy", dx.shares.gpu, "Share of the run the GPU spent on our frames (GPU timer queries)")}
+        ${bar("js", "Page JavaScript", dx.shares.js, "Scene update and three.js draw submission on the main thread")}
+        ${bar("wait", "Waiting for GPU", dx.shares.wait, "Waiting with the GPU queue full: the GPU (or its driver) was behind, which is what a GPU-limited run looks like")}
+        ${bar("over", "Browser overhead", dx.shares.overhead, "Event loop, HUD updates and other tasks between batches")}
+      </div>
+      <p class="muted tiny">Shares of the average ${fmtMs(d.frameMs)} frame. They overlap: the GPU works while JavaScript prepares the next frame. A GPU-limited run shows GPU busy near 100%.</p>`
+        : ""
+    }
+    ${
+      dx.findings.length
+        ? `<ul class="findings">${dx.findings
+            .map((f) => `<li class="${f.severity}"><b>${esc(f.title)}</b><p>${esc(f.detail)}</p>${f.fix ? `<p class="fix">→ ${esc(f.fix)}</p>` : ""}</li>`)
+            .join("")}</ul>`
+        : ""
+    }
+    ${
+      d
+        ? `<details><summary>All measured and detected signals</summary><dl class="hints">
+        <dt>GPU time / frame</dt><dd>${fmtMs(d.gpuMs)}</dd>
+        <dt>Wall time / frame</dt><dd>${fmtMs(d.frameMs)}</dd>
+        <dt>JS time / frame</dt><dd>${fmtMs(d.cpuMs)} (scene update ${fmtMs(d.updateMs)}, draw submission ${fmtMs(Math.max(0, d.cpuMs - d.updateMs))})</dd>
+        <dt>GPU wait / frame</dt><dd>${fmtMs(d.syncMs)}</dd>
+        <dt>Loop busy</dt><dd>${fmtPct(r.loopBusy)}</dd>
+        <dt>Main-thread stalls</dt><dd>${d.stalls} (${fmtMs(d.stallMs)} total)</dd>
+        <dt>Hitches</dt><dd>${d.hitches} (frame-time std. dev. ${fmtMs(d.frameStdMs)})</dd>
+        <dt>JS heap growth</dt><dd>${d.heapGrowthMb === null ? "n/a" : `${Math.round(d.heapGrowthMb)} MB`}</dd>
+        <dt>Timing method</dt><dd>${esc(r.timing ?? "n/a")}</dd>
+        <dt>Rendered with</dt><dd>bloom ${d.features.bloom ? "on" : "off"}, MSAA ${d.features.msaa}×, shadow map ${d.features.shadowMap || "off"}, reflections ${d.features.reflections ? `${d.features.reflections}×` : "off"}</dd>
+        <dt>WebGL renderer <em>(detected)</em></dt><dd>${isMaskedRenderer(d.renderer) ? `hidden by the browser ("${esc(d.renderer)}")` : esc(d.renderer)}</dd>
+        <dt>WebGL vendor <em>(detected)</em></dt><dd>${isMaskedRenderer(d.renderer) ? "hidden" : esc(d.vendor)}</dd>
+        <dt>ANGLE backend <em>(detected)</em></dt><dd>${esc(d.backend || "n/a")}</dd>
+        <dt>Max texture size</dt><dd>${d.maxTextureSize}</dd>
+        <dt>CPU threads <em>(detected)</em></dt><dd>${d.cpuThreads ?? "n/a"}</dd>
+        <dt>On battery <em>(detected)</em></dt><dd>${d.onBattery === null ? "unknown" : d.onBattery ? "yes" : "no"}</dd>
+        <dt>Browser <em>(detected)</em></dt><dd>${esc(d.browser)}</dd>
+      </dl></details>`
+        : ""
+    }
+  </section>`;
+}
+
 export function renderResults(r: BenchResult): void {
   showView("results");
   const hints = browserHints();
@@ -54,14 +113,21 @@ export function renderResults(r: BenchResult): void {
     ${r.valid ? "" : `<div class="banner-invalid" role="alert"><b>INVALID RUN:</b> ${esc(r.invalidReason)}. Saved locally; it can never be submitted.</div>`}
     ${r.mobile ? `<p class="muted">Mobile run: saved locally and exportable as JSON/CSV. Submissions from phones and tablets aren't accepted yet.</p>` : ""}
     <div class="score-cards">
-      <div class="score hero-score"><span>Average FPS</span><b id="res-avg">${round1(r.avgFps).toFixed(1)}</b></div>
+      ${
+        r.score !== undefined
+          ? `<div class="score hero-score"><span>${esc(getScoreTest(r.scoreTest)?.name ?? "Score")}</span><b id="res-score">${r.score}</b><span class="score-test">${round1(r.avgFps).toFixed(1)} FPS × 100</span></div>
+      <div class="score"><span>Average FPS</span><b id="res-avg">${round1(r.avgFps).toFixed(1)}</b></div>`
+          : `<div class="score hero-score"><span>Average FPS</span><b id="res-avg">${round1(r.avgFps).toFixed(1)}</b></div>`
+      }
       <div class="score"><span>1% Low FPS</span><b id="res-p1">${round1(r.p1Low).toFixed(1)}</b></div>
       <div class="score small"><span>5% Low FPS</span><b>${round1(r.p5Low).toFixed(1)}</b></div>
       <div class="score small"><span>Worst frame</span><b>${r.worstMs.toFixed(2)} ms</b></div>
       <div class="score small"><span>Frames timed</span><b id="res-frames">${r.frameCount}</b></div>
-      <div class="score small"><span>Run settings</span><b class="settings" id="res-settings">${esc(r.resolution)} (${r.width}×${r.height}) · ${esc(r.preset)} · ${r.durationS} s · ${esc(r.graphicsApi)}</b></div>
+      <div class="score small"><span>Run settings</span><b class="settings" id="res-settings">${r.scoreTest ? `${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)} · ` : ""}${esc(r.resolution)} (${r.width}×${r.height}) · ${esc(r.preset)} · ${r.durationS} s · ${esc(r.graphicsApi)}</b></div>
     </div>
-    <p class="muted small-print">Uncapped: frames were rendered back-to-back with one GPU sync per ~${BATCH_MS} ms batch. Average FPS is frames divided by timed wall-clock. ${r.timing === "gpu-timer" ? "Lows and worst frame use each frame's GPU time from timer queries (or its batch average, if larger)." : r.timing === "batch-avg" ? "No GPU timer was available, so lows and worst frame use each batch's average frame time." : "Each frame was timed from submission to GPU completion."} Loop busy ${(r.loopBusy * 100).toFixed(0)}% of timed wall-clock.</p>
+    ${r.scoreTest && r.score === undefined ? `<p class="muted">Started as ${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)}, but ${r.valid ? "its settings didn't match the locked test" : "the run was invalid"}, so it has no score.</p>` : ""}
+    ${diagPanel(r)}
+    <p class="muted small-print">Uncapped: frames were rendered back-to-back in ~${BATCH_MS} ms batches, with two batches kept queued on the GPU. Average FPS is frames divided by timed wall-clock. ${r.timing === "gpu-timer" ? "Lows and worst frame use each frame's GPU time from timer queries (or its batch average, if larger)." : r.timing === "batch-avg" ? "No GPU timer was available, so lows and worst frame use each batch's average frame time." : "Each frame was timed from submission to GPU completion."} Loop busy ${(r.loopBusy * 100).toFixed(0)}% of timed wall-clock.</p>
 
     <div class="results-grid">
       <form class="card sys-form" id="sys-form" autocomplete="off">
@@ -75,6 +141,8 @@ export function renderResults(r: BenchResult): void {
         </div>
         <label class="field"><span>Operating system <em>required</em></span>
           <select name="os"><option value="">— Select —</option><option value="windows">windows</option><option value="linux">linux</option></select></label>
+        <label class="field"><span>GPU overclocked <em>optional</em></span>
+          <select name="overclocked"><option value="">— Not saying —</option><option value="no">No, stock clocks and power limit</option><option value="yes">Yes, overclocked or raised power limit</option></select></label>
         <label class="field"><span>Graphics API <em>recorded by the run</em></span><input name="graphicsApi" value="${esc(r.graphicsApi)}" readonly aria-readonly="true" /></label>
         ${TEXT_FIELDS.map(
           (f) =>
@@ -84,7 +152,7 @@ export function renderResults(r: BenchResult): void {
 
       <div class="card">
         <h2><span class="kana" aria-hidden="true">ヒント</span>Browser hints <span class="muted">(for your eyes only)</span></h2>
-        <p class="muted tiny">Reported by the browser, often masked or generic. Never copied into your result: use them to help you pick the right values.</p>
+        <p class="muted tiny">Reported by the browser, often masked or generic. Never copied into your system fields: use them to help you pick the right values. The run records the renderer, thread count, battery state and browser separately, labelled as detected (see "What limited this run").</p>
         <dl class="hints">
           <dt>WebGL renderer</dt><dd>${esc(hints.renderer)}</dd>
           <dt>Logical CPU threads</dt><dd>${esc(hints.threads)}</dd>

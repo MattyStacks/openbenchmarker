@@ -1,5 +1,7 @@
 import { BENCHMARKS, NOT_LISTED, UPSTREAM_ISSUES, findGpu } from "./catalog";
-import { RESOLUTIONS, getPreset, standardResolution } from "./presets";
+import { isSoftwareRenderer } from "./diagnose";
+import { scoreFor } from "./metrics";
+import { RESOLUTIONS, getPreset, getScoreTest, matchesScoreTest, standardResolution } from "./presets";
 import { LINUX_ONLY_FIELDS, type BenchResult } from "./types";
 
 /** Mirrors upstream proof.method for this tool. */
@@ -49,6 +51,30 @@ export function validateSubmission(r: BenchResult | null | undefined): string[] 
   const mem = (s.memoryGb ?? "").trim();
   if (mem && (!/^\d+$/.test(mem) || Number(mem) < 1 || Number(mem) > MAX_MEMORY_GB))
     errors.push(`Memory: '${mem}' must be a whole number of GB (digits only)`);
+
+  const oc = (s.overclocked ?? "").trim();
+  if (oc && oc !== "yes" && oc !== "no") errors.push(`Overclocked: '${oc}' must be yes, no or blank`);
+
+  if (r.score !== undefined) {
+    const t = getScoreTest(r.scoreTest);
+    if (!t) errors.push(`Score: '${r.scoreTest ?? ""}' is not a score test`);
+    else if (!matchesScoreTest(t, r.preset, r.resolution, r.width, r.height, r.durationS))
+      errors.push(`Score: settings don't match ${t.name} (${t.preset}, ${t.resolution}, ${t.duration} s)`);
+    if (r.score !== scoreFor(r.avgFps)) errors.push("Score: doesn't match the measured Avg FPS");
+  }
+
+  const d = r.diag;
+  if (d && isSoftwareRenderer(d.renderer))
+    errors.push("Renderer: software rendering (hardware acceleration off), so the result doesn't measure a GPU; turn acceleration on and run again");
+  if (d) {
+    const nonNeg = (x: unknown) => typeof x === "number" && Number.isFinite(x) && x >= 0;
+    const bad: string[] = [];
+    if (d.gpuBusy !== null && !(nonNeg(d.gpuBusy) && d.gpuBusy <= 1)) bad.push("GPU busy");
+    if (d.gpuMs !== null && !nonNeg(d.gpuMs)) bad.push("GPU time");
+    for (const [k, label] of [["cpuMs", "CPU time"], ["updateMs", "scene update time"], ["syncMs", "GPU wait"], ["frameMs", "frame time"], ["stalls", "stalls"], ["hitches", "hitches"]] as const)
+      if (!nonNeg(d[k])) bad.push(label);
+    if (bad.length) errors.push(`Diagnostics: out of range (${bad.join(", ")})`);
+  }
 
   if (os === "windows") {
     const mixed = LINUX_ONLY_FIELDS.filter((k) => (s[k] ?? "").trim());

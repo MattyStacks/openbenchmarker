@@ -1,4 +1,4 @@
-import { DURATIONS, getPreset, getResolution, normalizeResolution, type PresetId, type ResolutionId } from "../benchmark/presets";
+import { DURATIONS, getPreset, getResolution, normalizeResolution, type PresetId, type ResolutionId, type ScoreTestId } from "../benchmark/presets";
 import { emptySystem, type BenchResult } from "../benchmark/types";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +54,8 @@ export interface RunConfig {
   resolution: ResolutionId;
   preset: PresetId;
   duration: number;
+  /** Set only for a locked score test run; never saved as the last-used custom config. */
+  scoreTest?: ScoreTestId;
 }
 
 export function loadConfig(): RunConfig {

@@ -58,6 +58,8 @@ export interface Flythrough {
   dispose(): void;
   /** What actually got enabled (bloom can fall back). */
   features: { bloom: boolean; reflections: boolean; msaa: number; shadows: boolean; fallbackReason: string };
+  /** JS time spent in scene updates (animation, instance matrices) since the caller last reset it, ms. */
+  timing: { updateMs: number };
   counts: Record<string, number>;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
@@ -130,6 +132,7 @@ export function makeFlythrough(renderer: THREE.WebGLRenderer, preset: Preset, w:
   }
 
   const look = new THREE.Vector3();
+  const timing = { updateMs: 0 };
   const render = (t: number, view?: { pos: THREE.Vector3Tuple; look: THREE.Vector3Tuple }) => {
     let roll = 0;
     if (view) {
@@ -140,7 +143,9 @@ export function makeFlythrough(renderer: THREE.WebGLRenderer, preset: Preset, w:
     camera.lookAt(look);
     camera.rotateZ(roll);
     camera.updateMatrixWorld();
+    const u0 = performance.now();
     city.update(t, camera);
+    timing.updateMs += performance.now() - u0;
     if (composer) {
       grade!.uniforms.uTime.value = t;
       composer.render();
@@ -167,6 +172,7 @@ export function makeFlythrough(renderer: THREE.WebGLRenderer, preset: Preset, w:
   return {
     render,
     features,
+    timing,
     counts: city.counts,
     scene,
     camera,

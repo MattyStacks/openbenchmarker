@@ -87,6 +87,12 @@
           </div>
         </div>
 
+        <section class="panel score-runs" aria-labelledby="score-runs-title">
+          <h2 class="panel-title" id="score-runs-title"><span class="kana" aria-hidden="true">採点</span>Score runs</h2>
+          <p class="config-note">Fixed tests with locked settings, so every score is the same workload. A faster or overclocked GPU scores higher. You get FPS, the score, and a breakdown of whether your GPU or CPU was the limit.</p>
+          <div class="score-run-buttons" id="score-runs"></div>
+        </section>
+
         <div class="home-grid">
           <form id="config" class="panel config" autocomplete="off">
             <h2 class="panel-title"><span class="kana" aria-hidden="true">設定</span>Run settings</h2>
@@ -103,13 +109,14 @@
               <div class="seg" id="cfg-duration"></div>
             </fieldset>
             <p class="config-note">Plus a 3 s warm-up that is never counted. Settings are locked during the run. Keep this tab visible and don't resize the window or rotate your device, or the run is marked invalid.</p>
-            <button type="submit" class="btn btn-primary btn-start" id="start">Start benchmark <span aria-hidden="true">▶</span></button>
+            <button type="submit" class="btn btn-primary btn-start" id="start">Start custom run <span aria-hidden="true">▶</span></button>
           </form>
 
           <aside class="panel about">
             <h2 class="panel-title"><span class="kana" aria-hidden="true">誠実</span>Honest results</h2>
             <ul>
-              <li><b>Measured by the run:</b> Avg FPS, 1% Low, 5% Low, worst frame, frame count, resolution, preset, date, graphics API.</li>
+              <li><b>Measured by the run:</b> Avg FPS, 1% Low, 5% Low, worst frame, frame count, score (score runs), resolution, preset, date, graphics API, and what limited the run (GPU busy time, CPU time per frame, stalls).</li>
+              <li><b>Detected by the browser:</b> WebGL renderer, CPU thread count, battery state and browser version, recorded in a separate labelled section. They never fill in your system details.</li>
               <li><b>Provided by you:</b> GPU (from the official catalog), OS and any optional system details. Nothing is guessed or auto-filled.</li>
               <li>Results stay in this browser unless you choose to export or submit them to <a href="https://opengpubenchmarks.com/" target="_blank" rel="noopener">opengpubenchmarks.com</a>.</li>
             </ul>
@@ -131,10 +138,13 @@
             <div class="hud-panel hud-fps">
               <div class="hud-big"><span id="hud-fps">0</span><small>FPS</small></div>
               <div class="hud-unlimited">UNLIMITED · uncapped</div>
+              <div class="hud-limit" id="hud-limit" role="status">LIMIT · measuring…</div>
               <dl class="hud-stats">
                 <dt>Avg</dt><dd id="hud-avg">–</dd>
                 <dt>1% low</dt><dd id="hud-p1">–</dd>
                 <dt>Frames</dt><dd id="hud-frames">0</dd>
+                <dt title="Mean GPU time per frame (timer queries)">GPU</dt><dd id="hud-gpu">–</dd>
+                <dt title="Mean JavaScript time per frame (scene update + draw submission)">CPU</dt><dd id="hud-cpu">–</dd>
               </dl>
             </div>
             <div class="hud-panel hud-graph">

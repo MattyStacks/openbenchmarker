@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeRunStats, computeStats, liveBatchFps, nextBatchFrames, runFrameTimes } from "../src/benchmark/metrics";
+import { STALL_MS, computeRunStats, computeStats, hitchStats, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimes, runFrameTimesInto, scoreFor } from "../src/benchmark/metrics";
 
 describe("computeStats", () => {
   it("uniform 60 FPS gives 60 avg and 60 lows", () => {
@@ -106,5 +106,93 @@ describe("scheduling helpers", () => {
     expect(nextBatchFrames(10, 28, 28)).toBe(10);
     expect(nextBatchFrames(1, 500, 28)).toBe(1);
     expect(nextBatchFrames(0, 0, 28)).toBe(1);
+  });
+});
+
+describe("GPU-bound and CPU signals", () => {
+  const b = (frames: number, ms: number, extra: Partial<import("../src/benchmark/metrics").TimedBatch> = {}) => ({ frames, ms, busyMs: ms, ...extra });
+
+  it("GPU busy is the GPU time share of wall-clock", () => {
+    const full = computeRunStats([b(10, 100)], new Array(10).fill(10));
+    expect(full.gpuBusy).toBeCloseTo(1, 6);
+    expect(full.gpuMsPerFrame).toBeCloseTo(10, 6);
+    const half = computeRunStats([b(10, 100)], new Array(10).fill(5));
+    expect(half.gpuBusy).toBeCloseTo(0.5, 6);
+  });
+
+  it("frames without a timer result count at the measured mean; no timers gives null", () => {
+    const partial = computeRunStats([b(10, 100)], [5, 5, 5, 5, 5, NaN, NaN, NaN, NaN, NaN]);
+    expect(partial.gpuBusy).toBeCloseTo(0.5, 6);
+    const none = computeRunStats([b(10, 100)]);
+    expect(none.gpuBusy).toBeNull();
+    expect(none.gpuMsPerFrame).toBeNull();
+  });
+
+  it("GPU busy never exceeds 100%", () => {
+    expect(computeRunStats([b(10, 100)], new Array(10).fill(30)).gpuBusy).toBe(1);
+  });
+
+  it("averages CPU, update and wait time per frame and counts stalls", () => {
+    const s = computeRunStats([
+      b(10, 100, { cpuMs: 40, updateMs: 10, syncMs: 50, yieldMs: 1 }),
+      b(10, 100, { cpuMs: 60, updateMs: 30, syncMs: 30, yieldMs: STALL_MS + 5 }),
+    ]);
+    expect(s.cpuMsPerFrame).toBeCloseTo(5, 6);
+    expect(s.updateMsPerFrame).toBeCloseTo(2, 6);
+    expect(s.syncMsPerFrame).toBeCloseTo(4, 6);
+    expect(s.stalls).toBe(1);
+    expect(s.stallMs).toBeCloseTo(STALL_MS + 5, 6);
+  });
+
+  it("counts hitches against the median frame time", () => {
+    const times = [...new Array(100).fill(10), 30, 40];
+    const h = hitchStats(times);
+    expect(h.hitches).toBe(2);
+    expect(hitchStats(new Array(50).fill(10))).toEqual({ hitches: 0, frameStdMs: 0 });
+  });
+
+  it("ignores timer jitter on sub-millisecond frames as hitches", () => {
+    // 0.14 ms frames with 0.5 ms blips: 2.5x the median, but nothing a display could show.
+    expect(hitchStats([...new Array(1000).fill(0.14), ...new Array(50).fill(0.5)]).hitches).toBe(0);
+    expect(hitchStats([...new Array(1000).fill(0.14), 6]).hitches).toBe(1);
+  });
+
+  it("live lows by quickselect match the sorted computation", () => {
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const batches = Array.from({ length: 300 }, () => b(1 + Math.floor(rnd() * 20), 5 + rnd() * 200, { busyMs: 0 }));
+    const frames = batches.reduce((a, x) => a + x.frames, 0);
+    const gpu = Array.from({ length: frames }, () => (rnd() < 0.9 ? rnd() * 30 : NaN));
+    const { out, n } = runFrameTimesInto(batches, gpu, new Float64Array(4));
+    expect(n).toBe(frames);
+    expect(Array.from(out.subarray(0, n))).toEqual(runFrameTimes(batches, gpu));
+    const want = computeStats(runFrameTimes(batches, gpu));
+    expect(lowFpsSelect(out, n, 0.01)).toBeCloseTo(want.p1Low, 6);
+    const again = runFrameTimesInto(batches, gpu, out);
+    expect(lowFpsSelect(again.out, again.n, 0.05)).toBeCloseTo(want.p5Low, 6);
+    expect(lowFpsSelect(new Float64Array(3).fill(10), 3, 0.01)).toBeCloseTo(100, 6);
+    expect(lowFpsSelect(new Float64Array(0), 0, 0.01)).toBe(0);
+  });
+
+  it("live breakdown uses the recent window", () => {
+    const live = liveBreakdown([b(10, 100, { cpuMs: 20 })], 9);
+    expect(live.frameMs).toBeCloseTo(10, 6);
+    expect(live.cpuMs).toBeCloseTo(2, 6);
+    expect(live.gpuBusy).toBeCloseTo(0.9, 6);
+    expect(liveBreakdown([b(10, 100)], null).gpuBusy).toBeNull();
+  });
+});
+
+describe("scoreFor", () => {
+  it("rises strictly with average FPS, so an overclock always scores higher", () => {
+    let last = -1;
+    for (const fps of [10, 59.9, 60, 60.01, 65, 110, 1000]) {
+      const sc = scoreFor(fps);
+      expect(sc).toBeGreaterThan(last);
+      last = sc;
+    }
+    expect(scoreFor(65.12)).toBe(6512);
+    expect(scoreFor(0)).toBe(0);
+    expect(scoreFor(NaN)).toBe(0);
   });
 });

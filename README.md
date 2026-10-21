@@ -7,7 +7,9 @@ An open-source GPU benchmark that runs in the browser with nothing to install
 flight through a dense, rain-soaked cyberpunk megacity. The camera dives between stacked
 towers to just above the street traffic, flies under sky bridges, weaves through the
 streets, rides between stacked sky-lanes of flying cars, and climbs over the rooftops for
-a skyline that runs out to the horizon. It reports **Average FPS** and **1% Low FPS**.
+a skyline that runs out to the horizon. It reports **Average FPS** and **1% Low FPS**, a
+3DMark-style **score** on the two fixed score runs, and a diagnosis of what limited the run
+(GPU, CPU, driver/browser).
 You can keep results in your browser or submit them to
 [Open GPU Benchmarks](https://opengpubenchmarks.com/).
 
@@ -31,6 +33,64 @@ serves `./dist` with an SPA fallback. Attach the custom domain
 `opengpubenchmarker.com` in the Cloudflare dashboard (Workers → openbenchmarker →
 Settings → Domains).
 
+## Score runs
+
+There are two fixed tests, like 3DMark's. Their settings are locked, so every score measures the
+same workload:
+
+| Score run      | Preset  | Resolution          | Duration |
+|----------------|---------|---------------------|---------:|
+| Score: Entry   | Low     | 720p (1280×720)     | 60 s     |
+| Score: Extreme | Extreme | 4K (3840×2160)      | 60 s     |
+
+**Score = round(Average FPS × 100).** The score is linear in FPS, so any gain, from a faster GPU
+or an overclock, raises it. FPS, the 1%/5% lows and the diagnosis are shown next to it.
+
+- FPS goes up with a faster GPU because nothing caps it. Frames render back-to-back with no vsync
+  or `requestAnimationFrame` wait, and Avg FPS is frames ÷ wall-clock time.
+- Scene time follows wall-clock time, so the duration decides which part of the flight is timed.
+  That's why score runs lock the duration as well.
+- A score is only given to a valid run started from a score-run button whose settings match
+  exactly. Custom runs report FPS only.
+- A CPU-limited run still gets its score. It is never stopped or hidden, but it is labelled, and
+  the diagnosis says what held it back. Score: Entry is often CPU-limited on fast GPUs. Score:
+  Extreme is meant to be GPU-limited.
+
+## What limited this run (diagnostics)
+
+During the run, the HUD shows a live **LIMIT** chip (GPU / CPU / GPU + CPU, with GPU busy %),
+plus the GPU and JavaScript time per frame. The results page explains the limit in plain words
+and lists fixes. All of it comes from signals the browser exposes (`src/benchmark/diagnose.ts`):
+
+| Signal | How it's measured |
+|---|---|
+| GPU busy % / GPU ms per frame | `EXT_disjoint_timer_query_webgl2` time per frame ÷ wall-clock |
+| JS ms per frame (scene update vs draw submission) | `performance.now()` around each frame, and around the scene update |
+| GPU wait per frame | Time spent waiting with the GPU queue full (two batches queued) |
+| Browser overhead | Share of wall-clock outside render batches (`1 − loop busy`) |
+| Main-thread stalls | Yields delayed > 20 ms by other work (tabs, extensions, GC) |
+| Hitches, frame-time spread | Frames > 2.5× the median and at least 4 ms over it; standard deviation |
+| JS heap growth | `performance.memory` (Chromium only) |
+| Renderer, ANGLE backend, max texture size | `WEBGL_debug_renderer_info` and `gl.getParameter` |
+| Battery | Battery Status API (Chromium), at the start and when timing begins |
+
+The verdicts:
+- **GPU-limited** when the GPU is busy ≥ 90%.
+- **Mixed** at 75–90%.
+- Below that it is **CPU-limited** when the page's JavaScript or browser overhead dominates, or
+  **Driver / browser-limited** when JS is idle but each batch still waits for the GPU. That wait
+  is CPU work in the browser's GPU process and the driver.
+- Without GPU timers (Firefox, Safari), the verdict is estimated from the GPU wait and marked
+  "est.".
+
+The diagnosis also flags:
+- software rendering (results can't be submitted)
+- a likely integrated GPU
+- running on battery
+- stalls
+- uneven frame pacing
+- preset features that fell back
+
 ## How a run works
 
 1. Before the run you choose one of four standard **resolutions**: 720p (1280×720, a
@@ -44,12 +104,22 @@ Settings → Domains).
    creates the WebGL context, builds the city, and renders one frame right away so
    any setup failure shows up at once.
 3. A **3 s warm-up** follows. It is never counted.
-4. The **timed phase** follows. Frames render back-to-back in batches of about 28 ms
-   (GPU time included), chained over a `MessageChannel`. Batches don't wait for vsync,
-   so the score can go well above the monitor's refresh rate. There is no per-frame
-   sync: one 1-pixel `readPixels` after each batch waits for the GPU, so the queue never
-   runs more than one batch ahead. Chrome's `gl.finish()` doesn't actually wait, so it
-   isn't used. Warm-up/timed membership is fixed when a frame is submitted.
+4. The **timed phase** follows. Frames render back-to-back in batches of about 28 ms,
+   chained over a `MessageChannel`. Batches don't wait for vsync, so the score can go well
+   above the monitor's refresh rate.
+   - **Pipelined (WebGL2):** each batch ends with a fence, and two batches are kept queued on
+     the GPU. When one finishes, the next is already waiting, so the GPU doesn't idle while
+     the page updates the HUD, yields, or builds the next frame. While the queue is full, the
+     loop sleeps until shortly before the oldest batch is due, instead of pinning a CPU core.
+   - **Batch intervals:** a batch's interval runs from the previous batch's completion to its
+     own.
+   - **Phase boundaries:** the queue is drained with a 1-pixel `readPixels` at the warm-up→timed
+     switch and at the end, so timing starts and stops on an idle GPU. Chrome's `gl.finish()`
+     doesn't actually wait, so it isn't used. Warm-up/timed membership is fixed when a frame is
+     submitted.
+   - **WebGL1:** it has no fences, so every batch is drained with a readback.
+   - Before 2.1.0, every batch was drained, which left the GPU idle for part of each batch
+     (about 3–15% depending on the settings).
 5. **Stats:** Avg FPS = timed frames / timed wall-clock (throughput). 1% Low (`p1_low`)
    = mean FPS of the slowest 1% of frames, using per-frame times. When
    `EXT_disjoint_timer_query_webgl2` is available, each frame's time is its GPU time
@@ -58,7 +128,8 @@ Settings → Domains).
    batch's average frame time. The method is recorded as `timing` (`gpu-timer` or
    `batch-avg`) in JSON/CSV. The tool also records 5% low, worst frame, and frame count.
    Scores from 1.1.0 aren't comparable with 1.0.0, which synced after every frame.
-   Scores from **2.0.0** aren't comparable with 1.x either: 2.0.0 is a new scene and new
+   **2.1.0** keeps the GPU queue full (see step 4), so GPU-limited results can be a few
+   percent higher than on 2.0.0 with the same hardware. Scores from **2.0.0** aren't comparable with 1.x either: 2.0.0 is a new scene and new
    presets (a much heavier workload). The measurement itself is unchanged. My Results
    shows each result's version.
 6. **Validity:** these mark the run **INVALID** and end it immediately: hiding the
@@ -128,8 +199,10 @@ This tool feeds a public dataset, so:
   created (shown read-only on the results form).
 - **Provided** by the user: everything else. All fields start blank. Nothing is
   guessed or auto-filled. Example values appear only as grey placeholders.
-- Browser hints (WebGL renderer string, CPU thread count, user agent) are shown
-  as clearly labelled hints and are **never** copied into a result.
+- **Detected** by the browser: WebGL renderer/vendor, ANGLE backend, CPU thread count, battery
+  state and browser version. They are stored in a separate, labelled `detected:` block, for the
+  diagnosis only. They **never** fill in the GPU or any `system:` field. A software-rendered run
+  (SwiftShader, llvmpipe, Microsoft Basic Render) can't be submitted.
 - The GPU must be an exact `gpu_id` from the upstream catalog. Free text is
   rejected. **If your GPU isn't listed, you can't submit.** Open an issue or PR
   upstream to add it ([issue chooser](https://github.com/MattyStacks/open-gpu-benchmarks/issues/new/choose),
@@ -140,7 +213,8 @@ This tool feeds a public dataset, so:
   catalog `gpu_id`, `game_id`, date, resolution, preset, `avg_fps`, `p1_low`,
   `system.os` (`windows`|`linux`), and `proof.method`. The resolution must be
   `720p`, `1080p`, `1440p` or `4K`, and match the rendered pixel size: older results
-  from the removed Native option at any other size stay local only. Linux-only fields on a
+  from the removed Native option at any other size stay local only. A `score` must match its
+  score run's locked settings and `round(avg_fps × 100)`. `overclocked` is optional (yes/no). Linux-only fields on a
   Windows run fail. Blank optional fields are left out of the YAML. YAML
   download and copy stay disabled until validation passes.
 
@@ -148,6 +222,13 @@ This tool feeds a public dataset, so:
 
 The results page builds `result_YYYYMMDD_openbenchmarker_neon_flythrough.yaml` for
 `data/community/<gpu_id>/`, and it can open GitHub's new-file form already filled in.
+Besides the upstream fields, each result item carries run details. These are the score and
+`score_test` (score runs), `rendered_with` (the bloom/MSAA/shadows/reflections actually used) and
+`diagnostics` (the limit verdict and the signals behind it). A top-level `detected:` block holds
+the browser-read values, and there is an optional top-level `overclocked`. Upstream accepts these
+today without validating them. `docs/upstream-submission-changes.md` spells out the
+`checks.py`/template changes that make them first-class.
+
 The first PR that uses this benchmark must also add it to upstream `data/games.yaml`:
 
 ```yaml
@@ -199,6 +280,11 @@ After the first deploy:
 
 When the home page changes meaningfully, update `<lastmod>` in `public/sitemap.xml`.
 
+## Future plans
+
+See [TODO.md](TODO.md): a heavier Extreme workload, a separate score leaderboard site (submitted
+to separately from Open GPU Benchmarks), and diagnostics that need more than a browser.
+
 ## License
 
 - **Code:** [MIT](LICENSE), © 2026 MattyStacks.
@@ -210,8 +296,9 @@ When the home page changes meaningfully, update `<lastmod>` in `public/sitemap.x
 ## Layout
 
 ```
-src/benchmark/metrics.ts      computeStats / liveFps (pure)
-src/benchmark/presets.ts      RESOLUTIONS, PRESETS, durations
+src/benchmark/metrics.ts      computeStats / run stats (GPU busy, CPU time, stalls, hitches) / scoreFor (pure)
+src/benchmark/diagnose.ts     "what limited this run": verdict + findings (pure)
+src/benchmark/presets.ts      RESOLUTIONS, PRESETS, durations, SCORE_TESTS
 src/benchmark/catalog.ts      catalog snapshot, NOT_LISTED, BENCHMARKS (exactly one), version
 src/benchmark/types.ts        SystemInfo (all blank), BenchResult
 src/benchmark/validate.ts     validateSubmission (fail-closed)
@@ -261,9 +348,13 @@ the katakana-style glyphs are drawn as strokes in code, so they need no CJK font
 
 - Headless or software (SwiftShader) numbers come from software rendering. Use them
   to compare relative load, not real GPU performance.
-- Each batch ends with a readback, so the GPU briefly idles between batches (HUD
-  update, yield, and building the first frame of the next batch). Within a batch,
-  the GPU is fed back-to-back.
-- The results page shows "Loop busy %": the share of timed wall-clock time spent
-  rendering batches rather than yielding or updating the HUD.
-  GPU utilisation itself can only be measured with tools on your own machine.
+- Two batches stay queued on the GPU (WebGL2), so a GPU-limited run keeps the GPU busy close
+  to 100%. The results page reports GPU busy % from timer queries; Task Manager's GPU graph
+  should agree.
+- The browser drives the GPU from one thread (the page's main thread, plus the browser's GPU
+  process). A CPU-limited run is limited by that one thread's speed, so Task Manager shows low
+  total CPU use on many-core CPUs.
+- On the dev server, `?inflight=N` changes how many batches are queued (1 drains the GPU
+  between batches, like 2.0.0). Production builds ignore it.
+- The results page shows "Loop busy %": the share of timed wall-clock time spent submitting
+  frames or waiting on a full GPU queue, rather than yielding or updating the HUD.

@@ -1,6 +1,8 @@
 import { BENCHMARK_VERSION } from "../benchmark/catalog";
 import { download, toCsv } from "../benchmark/exporter";
+import { VERDICT_LABEL, diagnose } from "../benchmark/diagnose";
 import { round1 } from "../benchmark/metrics";
+import { getScoreTest } from "../benchmark/presets";
 import type { BenchResult } from "../benchmark/types";
 import { missingLabels, validateSubmission } from "../benchmark/validate";
 import { $, esc } from "./dom";
@@ -32,12 +34,14 @@ export function renderHistory(): void {
         ? `${mixed ? `<p class="muted small-print">Scores from different major versions (e.g. 1.x and ${esc(BENCHMARK_VERSION)}) measure different workloads and aren't comparable.</p>` : ""}
         <div class="row"><button class="btn" id="hist-csv">Export all as CSV</button></div>
         <div class="table-wrap"><table class="history">
-          <thead><tr><th>Date</th><th>Version</th><th>Resolution</th><th>Preset</th><th>Avg FPS</th><th>1% Low</th><th>Status</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+          <thead><tr><th>Date</th><th>Version</th><th>Resolution</th><th>Preset</th><th>Score</th><th>Avg FPS</th><th>1% Low</th><th>Limit</th><th>Status</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
           <tbody>${history
             .map((r) => {
               const s = statusOf(r);
               const old = major(r.benchmarkVersion) !== major(BENCHMARK_VERSION);
-              return `<tr><td>${esc(r.date)} ${esc(r.time)}</td><td class="num${old ? " ver-old" : ""}">v${esc(r.benchmarkVersion)}</td><td>${esc(r.resolution)}</td><td>${esc(r.preset)}</td><td class="num">${round1(r.avgFps).toFixed(1)}</td><td class="num">${round1(r.p1Low).toFixed(1)}</td>
+              const v = r.diag ? diagnose(r).verdict : null;
+              return `<tr><td>${esc(r.date)} ${esc(r.time)}</td><td class="num${old ? " ver-old" : ""}">v${esc(r.benchmarkVersion)}</td><td>${esc(r.resolution)}</td><td>${esc(r.preset)}</td><td class="num">${r.score !== undefined ? `<span title="${esc(getScoreTest(r.scoreTest)?.name ?? "")}">${r.score}</span>` : ""}</td><td class="num">${round1(r.avgFps).toFixed(1)}</td><td class="num">${round1(r.p1Low).toFixed(1)}</td>
+              <td>${v ? `<span class="limit-tag v-${v}">${esc(VERDICT_LABEL[v])}</span>` : ""}</td>
               <td><span class="status ${s.cls}">${esc(s.text)}</span></td>
               <td class="actions"><a class="btn btn-sm" href="#/result/${encodeURIComponent(r.id)}">Open</a><button class="btn btn-sm" data-del="${esc(r.id)}">Delete</button></td></tr>`;
             })

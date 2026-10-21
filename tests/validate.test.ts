@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BENCHMARK, GPU_CATALOG, NOT_LISTED } from "../src/benchmark/catalog";
 import { toCsv, toJson, toYaml, suggestedFileName } from "../src/benchmark/exporter";
-import { emptySystem, type BenchResult } from "../src/benchmark/types";
+import { emptySystem, type BenchResult, type RunDiagnostics } from "../src/benchmark/types";
 import { missingLabels, validateSubmission } from "../src/benchmark/validate";
 
 const GPU = GPU_CATALOG[0].id;
@@ -151,11 +151,110 @@ describe("exports", () => {
     expect(toCsv([result({ valid: false, invalidReason: "Tab hidden" })]).split("\n")[1]).toMatch(/^invalid,Tab hidden/);
   });
 
-  it("timing method is in JSON and CSV but not an upstream YAML field", () => {
+  it("timing method is in JSON, CSV and the YAML result item", () => {
     const r = withSys({ gpuId: GPU, os: "windows" });
     expect(JSON.parse(toJson(r)).timing).toBe("gpu-timer");
     const [head, row] = toCsv([r]).trim().split("\n").map((l) => l.split(","));
     expect(row[head.indexOf("timing")]).toBe("gpu-timer");
-    expect(toYaml(r)).not.toMatch(/^\s*timing:/m);
+    expect(toYaml(r)).toMatch(/^ {4}timing_method: gpu-timer$/m);
+  });
+});
+
+const DIAG: RunDiagnostics = {
+  gpuBusy: 0.968,
+  gpuMs: 6.76,
+  cpuMs: 2.1,
+  updateMs: 0.6,
+  syncMs: 4.4,
+  frameMs: 6.98,
+  stalls: 0,
+  stallMs: 0,
+  hitches: 2,
+  frameStdMs: 0.9,
+  heapGrowthMb: 3,
+  renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  vendor: "Google Inc. (NVIDIA)",
+  backend: "D3D11",
+  maxTextureSize: 16384,
+  cpuThreads: 24,
+  onBattery: false,
+  browser: "Chrome 141",
+  features: { bloom: true, msaa: 4, shadowMap: 2048, reflections: 0.75, fallbackReason: "" },
+};
+
+describe("score, diagnostics and detected data", () => {
+  const scored = (over: Partial<BenchResult> = {}) =>
+    withSys(
+      { gpuId: GPU, os: "windows", overclocked: "yes" },
+      { resolutionId: "4K", resolution: "4K", width: 3840, height: 2160, preset: "Extreme", avgFps: 65.12, p1Low: 55, scoreTest: "extreme", score: 6512, diag: DIAG, ...over },
+    );
+
+  it("a matching score run validates", () => {
+    expect(validateSubmission(scored())).toEqual([]);
+  });
+
+  it("a score must match its test's settings and the measured FPS", () => {
+    expect(missingLabels(validateSubmission(scored({ score: 9999 })))).toEqual(["Score"]);
+    expect(missingLabels(validateSubmission(scored({ durationS: 30 })))).toEqual(["Score"]);
+    expect(missingLabels(validateSubmission(scored({ scoreTest: undefined })))).toEqual(["Score"]);
+  });
+
+  it("overclocked is yes, no or blank", () => {
+    const r = scored();
+    r.system.overclocked = "maybe";
+    expect(missingLabels(validateSubmission(r))).toEqual(["Overclocked"]);
+  });
+
+  it("software-rendered runs can't be submitted", () => {
+    expect(missingLabels(validateSubmission(scored({ diag: { ...DIAG, renderer: "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)" } })))).toEqual(["Renderer"]);
+  });
+
+  it("out-of-range diagnostics block submission", () => {
+    expect(missingLabels(validateSubmission(scored({ diag: { ...DIAG, gpuBusy: 1.4 } })))).toEqual(["Diagnostics"]);
+    expect(missingLabels(validateSubmission(scored({ diag: { ...DIAG, cpuMs: -1 } })))).toEqual(["Diagnostics"]);
+  });
+
+  it("YAML carries the score, rendered settings, diagnostics and a separate detected block", () => {
+    const y = toYaml(scored());
+    expect(y).toMatch(/^overclocked: true$/m);
+    expect(y).toMatch(/^ {4}score: 6512$/m);
+    expect(y).toMatch(/^ {4}score_test: extreme$/m);
+    expect(y).toMatch(/^ {4}render_width: 3840$/m);
+    expect(y).toMatch(/^ {4}rendered_with:\n {6}bloom: true\n {6}msaa: 4$/m);
+    expect(y).toMatch(/^ {4}diagnostics:\n {6}limit: gpu\n {6}limit_estimated: false\n {6}gpu_busy_pct: 96.8$/m);
+    expect(y).toMatch(/^ {6}cpu_ms_per_frame: 2.1$/m);
+    expect(y).toMatch(/^detected: #.*\n {2}webgl_renderer: "ANGLE \(NVIDIA/m);
+    expect(y).toMatch(/^ {2}angle_backend: "D3D11"$/m);
+    expect(y).toMatch(/^ {2}cpu_threads: 24$/m);
+    // Detected data never lands under system:.
+    const system = y.slice(y.indexOf("\nsystem:"), y.indexOf("\ndetected:"));
+    expect(system).not.toMatch(/renderer|cpu_threads|browser/);
+    expect(y.split("\n").filter((l) => !l.trimStart().startsWith("#")).join("\n")).not.toMatch(/: [[{]/);
+  });
+
+  it("custom runs and old results leave the new fields out", () => {
+    const y = toYaml(withSys({ gpuId: GPU, os: "windows" }));
+    for (const k of ["score", "score_test", "overclocked", "diagnostics", "detected", "rendered_with"]) expect(y).not.toMatch(new RegExp(`^\\s*${k}:`, "m"));
+  });
+
+  it("leaves a masked renderer out of the detected block", () => {
+    const y = toYaml(scored({ diag: { ...DIAG, renderer: "Brave", vendor: "Brave", backend: "", cpuThreads: null } }));
+    expect(y).toMatch(/^detected:/m);
+    expect(y).not.toMatch(/webgl_renderer|webgl_vendor|cpu_threads/);
+  });
+
+  it("CSV and JSON include score, limit and detected columns", () => {
+    const r = scored();
+    // Minimal CSV split that honours quoted cells (the renderer string contains commas).
+    const cells = (l: string) => [...l.matchAll(/("(?:[^"]|"")*"|[^,]*)(?:,|$)/g)].map((m) => m[1].replace(/^"|"$/g, "").replace(/""/g, '"')).slice(0, -1);
+    const [head, row] = toCsv([r]).trim().split("\n").map(cells);
+    expect(row).toHaveLength(head.length);
+    expect(row[head.indexOf("detected_webgl_renderer")]).toMatch(/^ANGLE \(NVIDIA, /);
+    expect(row[head.indexOf("score")]).toBe("6512");
+    expect(row[head.indexOf("limit")]).toBe("gpu");
+    expect(row[head.indexOf("gpu_busy_pct")]).toBe("96.8");
+    expect(row[head.indexOf("detected_cpu_threads")]).toBe("24");
+    expect(row[head.indexOf("overclocked")]).toBe("yes");
+    expect(JSON.parse(toJson(r)).diagnosis.verdict).toBe("gpu");
   });
 });

@@ -84,3 +84,33 @@ export function standardResolution(label: string, width: number, height: number)
 export function normalizeResolution(label: string): string {
   return label === "2160p" ? "4K" : label;
 }
+
+export type ScoreTestId = "entry" | "extreme";
+
+export interface ScoreTest {
+  id: ScoreTestId;
+  name: string;
+  preset: PresetId;
+  resolution: ResolutionId;
+  duration: Duration;
+}
+
+/**
+ * Locked configurations that produce an official score, like 3DMark's fixed tests. One fixed
+ * duration means every score covers the same stretch of the flight (scene time follows wall-clock).
+ * Entry is the lightest setting; on fast GPUs it is often CPU-limited, which the diagnostics show.
+ */
+export const SCORE_TESTS: ScoreTest[] = [
+  { id: "entry", name: "Score: Entry", preset: "Low", resolution: "720p", duration: 60 },
+  { id: "extreme", name: "Score: Extreme", preset: "Extreme", resolution: "4K", duration: 60 },
+];
+
+export function getScoreTest(id: string | undefined): ScoreTest | undefined {
+  return SCORE_TESTS.find((t) => t.id === id);
+}
+
+/** True when a run's settings are exactly the score test's locked configuration. */
+export function matchesScoreTest(t: ScoreTest, preset: string, resolution: string, width: number, height: number, durationS: number): boolean {
+  const res = getResolution(t.resolution)!;
+  return preset === t.preset && resolution === t.resolution && width === res.width && height === res.height && durationS === t.duration;
+}
