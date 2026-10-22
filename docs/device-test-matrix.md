@@ -16,8 +16,7 @@ Combos: 1080p Extreme (control), then 1440p High, 1440p Ultra, 1440p Extreme, 4K
 
 | Device / browser | RAM | 1080p Ext | 1440p High | 1440p Ultra | 1440p Ext | 4K Low | 4K Med | 4K Ultra | 4K Ext | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
-| First phone tested (model?) | | ✓ | ✓ | ✗ | ✗ | – | – | – | – | 2026-10-22, before Plan 2 |
-| iPhone, Safari | | | | | | | | | | |
+| iPhone, Safari | | ✓ | ✓ | ✗ | ✗ | – | – | – | – | 2026-10-22. Plan 2 preview: the phone confirmation and the "didn't finish" notice both appeared |
 | iPhone, Chrome (WebKit) | | | | | | | | | | |
 | iPad, Safari | | | | | | | | | | |
 | Android high-RAM, Chrome | | | | | | | | | | |

@@ -4,7 +4,7 @@ Date: 2026-10-22, benchmark 2.2.0, three.js 0.186.1. This page estimates the GPU
 
 ## What was seen
 
-On the first phone tested, every preset at 720p and 1080p finished, Extreme included. At 1440p, Low, Medium and High finished, and Ultra and Extreme crashed the browser. 4K is heavier still. The page simply reloads. An OS memory kill can't be caught in JavaScript.
+On the first phone tested (iPhone, Safari), every preset at 720p and 1080p finished, Extreme included. At 1440p, Low, Medium and High finished, and Ultra and Extreme crashed the browser. 4K is heavier still. The page simply reloads. An OS memory kill can't be caught in JavaScript.
 
 ## How the buffers add up
 
@@ -48,7 +48,7 @@ The phone confirmation (`isMemoryHeavy` in `src/app/run-guard.ts`) follows this 
 
 ## Version-bump proposals (not implemented)
 
-Each of these changes either the GPU work or the image, so each would need a benchmark version bump and fresh baselines. They are listed for a separate decision.
+Each of these changes either the GPU work or the image, so each would need a benchmark version bump and fresh baselines. **Parked (2026-10-22):** no changes to the run until all seven share-results plans are done. Revisit after that.
 
 1. **No MSAA on the composer's second buffer, for presets with volumetrics (High, Ultra, Extreme).** With volumetrics on, each frame does an even number of buffer swaps (volumetric, sanitize, grade, output), so the scene always renders into the first buffer. The second only ever gets full-screen post passes, where MSAA adds no detail. Saves 12·S B/px: about 169 MB at 1440p and 380 MB at 4K on phones. Low and Medium make an odd number of swaps, so the scene alternates between the buffers and this doesn't apply. It removes an MSAA resolve per post pass, which changes GPU time, so it needs a bump.
 2. **Half-size reflector on Ultra and Extreme (`reflections: 0.5`).** That's a quarter of the reflector memory: 1440p Ultra on phones drops from about 715 MB to about 557 MB. The reflections would look softer.
