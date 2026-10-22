@@ -397,3 +397,17 @@ table.history { width: 100%; border-collapse: collapse; font-size: 14px; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Run didn't finish (crash detection) and the phone high-resolution confirmation. */
+.run-notice { margin: 14px 0; padding: 14px 16px; border: 1px solid var(--warn); background: rgba(255, 179, 64, 0.1); border-radius: 10px; display: grid; gap: 10px; }
+.run-notice p { margin: 0; }
+.run-notice .row .btn { min-height: 44px; }
+.dnf-note { margin: 0; padding: 8px 12px; border-left: 3px solid var(--warn); background: rgba(255, 179, 64, 0.08); font-size: 14px; }
+.btn-score .dnf { color: var(--warn); }
+.confirm { width: min(440px, calc(100vw - 32px)); padding: 18px 20px; color: var(--text); background: var(--bg2); border: 1px solid var(--warn); border-radius: 12px; }
+.confirm::backdrop { background: rgba(5, 3, 14, 0.75); }
+.confirm h2 { margin: 0 0 8px; font-size: 18px; }
+.confirm p { margin: 0 0 10px; }
+.confirm-actions { display: grid; gap: 10px; margin-top: 14px; }
+.confirm-actions .btn { min-height: 48px; }
+@media (min-width: 481px) { .confirm-actions { grid-template-columns: 1fr 1fr; } }

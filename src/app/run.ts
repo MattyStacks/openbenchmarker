@@ -9,6 +9,7 @@ import { $, esc, nextFrame } from "./dom";
 import { BATCH_MS, MOBILE } from "./env";
 import { drawGraph } from "./hud";
 import { route } from "./router";
+import { beginRun, endRun, markFinished, setRunPhase } from "./run-guard";
 import { detectDeviceContext, detectDeviceContextAsync } from "./share-env";
 import { app, showView } from "./shell";
 import { upsertResult, type RunConfig } from "./store";
@@ -128,17 +129,20 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     return;
   }
 
+  // Cleared when the run ends in any way; still there on the next load = the OS killed the page.
+  beginRun({ resolution, preset: preset.id, duration: cfg.duration, ...(scoreTest ? { scoreTest: scoreTest.id } : {}) });
   const canvas = document.createElement("canvas");
   canvas.className = "bench-canvas";
   $("#canvas-host").replaceChildren(canvas);
   let renderer: THREE.WebGLRenderer;
+  let made: THREE.WebGLRenderer | null = null;
   let fly: Flythrough;
   let gl: WebGLRenderingContext | WebGL2RenderingContext;
   let api: GraphicsApi;
   try {
     // No canvas MSAA: every preset renders through the composer, which has its own MSAA, so a
     // multisampled canvas only added a full-screen resolve on every screen update.
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
+    renderer = made = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
     renderer.setPixelRatio(1);
     renderer.setSize(width, height, false); // exact render size; CSS only scales the display
     fitCanvas(canvas, width, height);
@@ -147,6 +151,12 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     fly = makeFlythrough(renderer, preset, width, height);
   } catch (e) {
     app.running = false;
+    endRun();
+    // Free the context now, so a failed start doesn't hold GPU memory while the message shows.
+    if (made) {
+      made.dispose();
+      made.forceContextLoss();
+    }
     canvas.remove();
     stageMessage(
       `<h3>Could not start the renderer</h3><p>${esc((e as Error).message || e)}</p><p>This browser or GPU may not support WebGL2.</p><button class="btn" data-act="home">Back</button>`,
@@ -154,6 +164,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     return;
   }
   if (fly.features.fallbackReason) console.warn(fly.features.fallbackReason);
+  setRunPhase("warmup");
   $("#hud-settings").textContent = `${scoreTest ? `${scoreTest.name} · ` : ""}${width}×${height} · ${preset.id} · ${cfg.duration} s · ${api}`;
   const info = rendererInfo(gl);
   const maxTextureSize = Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 0;
@@ -280,6 +291,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   }
 
   function finalize(reason: string, keepStage: boolean): void {
+    endRun();
     const st = computeRunStats(timed, gpuMs);
     const heapEnd = heapMb();
     const diag: RunDiagnostics = {
@@ -343,6 +355,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       system: emptySystem(),
     };
     upsertResult(result);
+    if (valid) markFinished(resolution, preset.id);
     cleanup();
     app.running = false;
     if (keepStage) {
@@ -526,6 +539,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
 
       const phaseEnd = phase === "warmup" ? runStart + WARMUP_SECONDS * 1000 : timedStart + cfg.duration * 1000;
       if (tick0 >= phaseEnd) {
+        if (phase === "warmup") setRunPhase("timed"); // in the uncounted warm-up tail, before the drain
         const t = drain();
         if (phase === "timed") {
           finish("");

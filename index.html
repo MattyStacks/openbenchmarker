@@ -68,6 +68,18 @@
       </noscript>
 
       <!-- Home: the single benchmark + its run configuration, visible immediately -->
+      <dialog class="confirm" id="highres-confirm" aria-labelledby="highres-title">
+        <form method="dialog">
+          <h2 id="highres-title">This might crash on a phone</h2>
+          <p id="highres-body"></p>
+          <p class="muted tiny" id="highres-hint" hidden></p>
+          <div class="confirm-actions">
+            <button class="btn btn-primary" value="switch" id="highres-switch">Switch to 1080p</button>
+            <button class="btn" value="run">Run anyway</button>
+          </div>
+        </form>
+      </dialog>
+
       <section class="view view-home" id="view-home">
         <div class="hero">
           <div class="hero-art" aria-hidden="true">
@@ -86,6 +98,8 @@
             </p>
           </div>
         </div>
+
+        <div class="run-notice" id="run-notice" role="status" hidden></div>
 
         <section class="panel score-runs" aria-labelledby="score-runs-title">
           <h2 class="panel-title" id="score-runs-title"><span class="kana" aria-hidden="true">採点</span>Score runs</h2>
@@ -109,6 +123,7 @@
               <div class="seg" id="cfg-duration"></div>
             </fieldset>
             <p class="config-note">Plus a 3 s warm-up that is never counted. Settings are locked during the run. Keep this tab visible and don't resize the window or rotate your device, or the run is marked invalid.</p>
+            <p class="dnf-note" id="cfg-dnf" hidden></p>
             <button type="submit" class="btn btn-primary btn-start" id="start">Start custom run <span aria-hidden="true">▶</span></button>
           </form>
 

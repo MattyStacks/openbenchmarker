@@ -57,6 +57,13 @@ localStorage and does not see results saved on production. Remove it with
 `npx wrangler preview delete --name share-results`. See [docs/privacy-audit.md](docs/privacy-audit.md)
 for what the site does and does not store or send.
 
+Phones can run out of memory at 1440p and 4K on heavier presets, and the OS then
+closes the page. The site detects this on the next load, offers a lower
+resolution, and asks for a one-tap confirmation before memory-heavy runs on phones
+and tablets. See [docs/high-res-memory.md](docs/high-res-memory.md) for the
+estimates and [docs/device-test-matrix.md](docs/device-test-matrix.md) for the
+device checklist.
+
 To deploy, run `npx wrangler login` once, then `npm run deploy`. `wrangler.toml`
 serves `./dist` with an SPA fallback. Attach the custom domain
 `opengpubenchmarker.com` in the Cloudflare dashboard (Workers → openbenchmarker →
@@ -360,6 +367,7 @@ src/app/results-view.ts       results page, system form, export & submit
 src/app/history-view.ts       My Results (#/history)
 src/app/home.ts, shell.ts, router.ts, store.ts, hud.ts, env.ts, dom.ts
 src/app/share-env.ts          device detection for display/sharing only (pure, tested)
+src/app/run-guard.ts          crash detection (run-in-progress record), "didn't finish" hints, phone high-res confirmation
 src/app/capture.ts            dev-only: fixed-t renders and renderer.info for scripts/capture.mjs
 src/engine/world.ts           grid, clearances, the 96 s flight keys, landmark bridges
 src/engine/path.ts            FlightPath (pose as a function of t) + 3D clearance index

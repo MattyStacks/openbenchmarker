@@ -1,8 +1,10 @@
 import { DURATIONS, PRESETS, RESOLUTIONS, SCORE_TESTS, getResolution, type PresetId, type ResolutionId } from "../benchmark/presets";
 import { $, esc } from "./dom";
+import { MOBILE } from "./env";
 import { startRun } from "./run";
+import { didNotFinish, leftoverMessage, needsHighResWarning, type InProgressRun } from "./run-guard";
 import { app } from "./shell";
-import { loadConfig, saveConfig, type RunConfig } from "./store";
+import { allResults, loadConfig, saveConfig, type RunConfig } from "./store";
 
 /** Short load hints under each preset name (display only). */
 const PRESET_HINT: Record<PresetId, string> = {
@@ -16,13 +18,104 @@ const PRESET_HINT: Record<PresetId, string> = {
 const radio = (name: string, value: string | number, checked: boolean, label: string, sub = "") =>
   `<label><input type="radio" name="${name}" value="${value}" ${checked ? "checked" : ""}/><span>${label}${sub ? `<small>${sub}</small>` : ""}</span></label>`;
 
+function setRadio(name: string, value: string | number): void {
+  const el = document.querySelector<HTMLInputElement>(`#config input[name="${name}"][value="${value}"]`);
+  if (el) el.checked = true;
+}
+
+/** Device memory in GB (Chromium only, rounded and capped by the browser). A hint, never a gate. */
+function deviceMemoryGb(): number | null {
+  const m = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  return typeof m === "number" && m > 0 ? m : null;
+}
+
+/** One-tap confirmation before a heavy 1440p/4K run on a phone or tablet. */
+function confirmHighRes(cfg: RunConfig): Promise<"run" | "switch" | "cancel"> {
+  const dlg = $<HTMLDialogElement>("#highres-confirm");
+  $("#highres-body").textContent = "1440p and 4K at heavier presets need a lot of memory and may crash the browser on some phones. 1080p is a safe bet.";
+  const mem = deviceMemoryGb();
+  const hint = $("#highres-hint");
+  hint.hidden = mem === null || mem > 4;
+  hint.textContent = mem !== null ? `This device reports about ${mem} GB of memory.` : "";
+  $("#highres-title").textContent = `${cfg.resolution} · ${cfg.preset} might crash on a phone`;
+  return new Promise((resolve) => {
+    dlg.addEventListener("close", () => resolve(dlg.returnValue === "run" || dlg.returnValue === "switch" ? dlg.returnValue : "cancel"), { once: true });
+    dlg.returnValue = "";
+    dlg.showModal();
+    $<HTMLButtonElement>("#highres-switch").focus();
+  });
+}
+
+/** Every run starts here: the phone warning (if needed), then the run. */
+async function launch(cfg: RunConfig): Promise<void> {
+  if (app.running) return;
+  const finished = allResults().filter((r) => r.valid).map((r) => ({ resolution: r.resolutionId, preset: r.preset }));
+  if (needsHighResWarning(cfg.resolution, cfg.preset, MOBILE, finished)) {
+    const choice = await confirmHighRes(cfg);
+    if (choice === "cancel") return;
+    if (choice === "switch") {
+      cfg = { resolution: "1080p", preset: cfg.preset, duration: cfg.duration };
+      setRadio("resolution", "1080p");
+      saveConfig(cfg);
+    }
+  }
+  void startRun(cfg);
+}
+
+/** "Didn't finish on this device last time" hints for the selected combo and the score runs. */
+function refreshRunHints(): void {
+  const form = $<HTMLFormElement>("#config");
+  const fd = new FormData(form);
+  const res = String(fd.get("resolution") ?? "");
+  const preset = String(fd.get("preset") ?? "");
+  const note = $("#cfg-dnf");
+  const dnf = didNotFinish(res, preset);
+  note.hidden = !dnf;
+  note.textContent = dnf ? `${res} · ${preset}: didn't finish on this device last time. You can still run it.` : "";
+  document.querySelectorAll<HTMLElement>("#score-runs [data-test]").forEach((btn) => {
+    const t = SCORE_TESTS.find((x) => x.id === btn.dataset.test);
+    btn.querySelector(".dnf")?.remove();
+    if (t && didNotFinish(t.resolution, t.preset)) btn.insertAdjacentHTML("beforeend", `<small class="dnf">Didn't finish on this device last time</small>`);
+  });
+}
+
+function showLeftoverNotice(r: InProgressRun): void {
+  const msg = leftoverMessage(r);
+  const box = $("#run-notice");
+  box.innerHTML = `<p><b>${esc(msg.title)}</b></p><p>${esc(msg.body)}</p><div class="row">${
+    msg.suggest ? `<button type="button" class="btn btn-primary" data-act="safer">Run at ${esc(msg.suggest)}</button>` : ""
+  }<button type="button" class="btn" data-act="dismiss">Dismiss</button></div>`;
+  box.hidden = false;
+  box.addEventListener("click", (e) => {
+    const act = (e.target as HTMLElement).closest<HTMLElement>("[data-act]")?.dataset.act;
+    if (!act) return;
+    box.hidden = true;
+    if (act === "safer" && msg.suggest) {
+      const cfg: RunConfig = { resolution: msg.suggest, preset: r.preset, duration: r.duration };
+      setRadio("resolution", cfg.resolution);
+      saveConfig(cfg);
+      void launch(cfg);
+    }
+  });
+}
+
 // Home: configuration (visible immediately, no reveal step)
-export function buildConfigForm(): void {
+export function buildConfigForm(leftover: InProgressRun | null = null): void {
   const cfg = loadConfig();
+  // Don't preselect the settings that just crashed: start from the safer resolution instead.
+  if (leftover && !leftover.scoreTest && leftover.resolution === cfg.resolution) {
+    const safer = leftoverMessage(leftover).suggest;
+    if (safer) {
+      cfg.resolution = safer;
+      saveConfig(cfg);
+    }
+  }
   $("#cfg-resolution").innerHTML = RESOLUTIONS.map((r) => radio("resolution", r.id, r.id === cfg.resolution, esc(r.id), `${r.width}×${r.height}`)).join("");
   $("#cfg-preset").innerHTML = PRESETS.map((p) => radio("preset", p.id, p.id === cfg.preset, p.id, PRESET_HINT[p.id])).join("");
   $("#cfg-duration").innerHTML = DURATIONS.map((d) => radio("duration", d, d === cfg.duration, `${d} s`)).join("");
-  $<HTMLFormElement>("#config").addEventListener("submit", (e) => {
+  const form = $<HTMLFormElement>("#config");
+  form.addEventListener("change", refreshRunHints);
+  form.addEventListener("submit", (e) => {
     e.preventDefault();
     if (app.running) return;
     const fd = new FormData(e.target as HTMLFormElement);
@@ -32,7 +125,7 @@ export function buildConfigForm(): void {
       duration: Number(fd.get("duration")),
     };
     saveConfig(c);
-    void startRun(c);
+    void launch(c);
   });
 
   const scoreRuns = $("#score-runs");
@@ -44,6 +137,11 @@ export function buildConfigForm(): void {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-test]");
     const t = SCORE_TESTS.find((x) => x.id === btn?.dataset.test);
     if (!t || app.running) return;
-    void startRun({ resolution: t.resolution, preset: t.preset, duration: t.duration, scoreTest: t.id });
+    void launch({ resolution: t.resolution, preset: t.preset, duration: t.duration, scoreTest: t.id });
   });
+
+  // A finished run clears its combo's hint; refresh whenever the page comes back home.
+  window.addEventListener("hashchange", refreshRunHints);
+  refreshRunHints();
+  if (leftover) showLeftoverNotice(leftover);
 }
