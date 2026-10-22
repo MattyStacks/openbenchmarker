@@ -54,6 +54,7 @@ result:
       msaa: 8
       shadow_map: 4096
       reflections: 1
+      volumetrics: 32             # ray-march steps of the volumetric haze; 0 = off (2.2.0+)
     diagnostics:
       limit: gpu                  # gpu | cpu | driver | mixed | software | unknown
       limit_estimated: false      # true when inferred without GPU timer queries
@@ -110,7 +111,7 @@ RUN_DETAIL_FIELDS = {
     "render_height": ("int", 1, 16384),
     "warmup_s": ("number", 0, 600),
 }
-RENDERED_WITH_FIELDS = {"bloom": ("bool",), "msaa": ("int", 0, 16), "shadow_map": ("int", 0, 16384), "reflections": ("number", 0, 4)}
+RENDERED_WITH_FIELDS = {"bloom": ("bool",), "msaa": ("int", 0, 16), "shadow_map": ("int", 0, 16384), "reflections": ("number", 0, 4), "volumetrics": ("int", 0, 256)}
 DIAGNOSTICS_FIELDS = {
     "limit_estimated": ("bool",),
     "gpu_busy_pct": ("number", 0, 100),

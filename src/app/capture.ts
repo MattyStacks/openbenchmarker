@@ -1,6 +1,6 @@
 // Dev-only: render the flythrough at a fixed scene time for screenshots and load reports.
 // Loaded from main.ts only when import.meta.env.DEV is true, so production builds drop it.
-// URL: /?capture&preset=Ultra&w=1280&h=720  → window.__cap.renderAt(t) / timeAt(t, frames)
+// URL: /?capture&preset=Ultra&w=1280&h=720[&set=field:value,...]  → window.__cap.renderAt(t) / timeAt(t, frames)
 import * as THREE from "three";
 import { getPreset } from "../benchmark/presets";
 import { makeFlythrough } from "../engine/scenes";
@@ -18,7 +18,10 @@ export interface CaptureApi {
 
 export function runCapture(): void {
   const q = new URLSearchParams(location.search);
-  const preset = getPreset(q.get("preset") ?? "Ultra") ?? getPreset("Ultra")!;
+  const base = getPreset(q.get("preset") ?? "Ultra") ?? getPreset("Ultra")!;
+  // &set=volumetrics:32,rain:20000 overrides preset fields (trying out new values).
+  const over = Object.fromEntries((q.get("set") ?? "").split(",").filter(Boolean).map((kv) => [kv.split(":")[0], Number(kv.split(":")[1])]));
+  const preset = { ...base, ...over };
   const w = Number(q.get("w")) || 1280;
   const h = Number(q.get("h")) || 720;
   document.body.replaceChildren();

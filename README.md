@@ -66,7 +66,7 @@ and lists fixes. All of it comes from signals the browser exposes (`src/benchmar
 |---|---|
 | GPU busy % / GPU ms per frame | `EXT_disjoint_timer_query_webgl2` time per frame ÷ wall-clock |
 | JS ms per frame (scene update vs draw submission) | `performance.now()` around each frame, and around the scene update |
-| GPU wait per frame | Time spent waiting with the GPU queue full (two batches queued) |
+| GPU wait per frame | Time spent waiting with the GPU queue full (three batches queued) |
 | Browser overhead | Share of wall-clock outside render batches (`1 − loop busy`) |
 | Main-thread stalls | Yields delayed > 20 ms by other work (tabs, extensions, GC) |
 | Hitches, frame-time spread | Frames > 2.5× the median and at least 4 ms over it; standard deviation |
@@ -104,11 +104,13 @@ The diagnosis also flags:
    creates the WebGL context, builds the city, and renders one frame right away so
    any setup failure shows up at once.
 3. A **3 s warm-up** follows. It is never counted.
-4. The **timed phase** follows. Frames render back-to-back in batches of about 28 ms,
+4. The **timed phase** follows. Frames render back-to-back in batches of about 8 ms,
    chained over a `MessageChannel`. Batches don't wait for vsync, so the score can go well
-   above the monitor's refresh rate.
-   - **Pipelined (WebGL2):** each batch ends with a fence, and two batches are kept queued on
-     the GPU. When one finishes, the next is already waiting, so the GPU doesn't idle while
+   above the monitor's refresh rate. The browser only shows the canvas between tasks (a
+   batch's last frame), so batches are kept short for smooth motion on screen; 2.1.0's
+   28 ms batches showed only ~35 updates a second however high the FPS.
+   - **Pipelined (WebGL2):** each batch ends with a fence, and three batches are kept queued
+     on the GPU. When one finishes, the next is already waiting, so the GPU doesn't idle while
      the page updates the HUD, yields, or builds the next frame. While the queue is full, the
      loop sleeps until shortly before the oldest batch is due, instead of pinning a CPU core.
    - **Batch intervals:** a batch's interval runs from the previous batch's completion to its
@@ -118,6 +120,10 @@ The diagnosis also flags:
      doesn't actually wait, so it isn't used. Warm-up/timed membership is fixed when a frame is
      submitted.
    - **WebGL1:** it has no fences, so every batch is drained with a readback.
+   - **Pre-roll:** while the city is built, every material is compiled and frames are rendered
+     at 16 points across the whole flight, so shader compiles and texture uploads happen
+     before the warm-up rather than as hitches mid-run (a cold shader cache, e.g. the first
+     run after a browser update, used to stutter).
    - Before 2.1.0, every batch was drained, which left the GPU idle for part of each batch
      (about 3–15% depending on the settings).
 5. **Stats:** Avg FPS = timed frames / timed wall-clock (throughput). 1% Low (`p1_low`)
@@ -141,13 +147,13 @@ page flow (never fixed or sticky), so the HUD can't end up hidden under it.
 
 ### Presets
 
-| Preset  | Towers | Detail | Rain    | Signs | Cars  | Lane levels | Drones | Far drones | Holos | Skyline | Clouds | Shafts | Bloom | Shadow map | MSAA | Reflections |
-|---------|-------:|-------:|--------:|------:|------:|------------:|-------:|-----------:|------:|--------:|-------:|-------:|------:|-----------:|-----:|------------:|
-| Low     | 260    | 0      | 1 500   | 120   | 90    | 2           | 8      | 120        | 2     | 1       | 1      | 2      | –     | –          | –    | –           |
-| Medium  | 520    | 1      | 2 500   | 260   | 200   | 3           | 16     | 300        | 4     | 2       | 1      | 4      | 0.55  | 1024       | –    | –           |
-| High    | 900    | 2      | 5 000   | 500   | 400   | 4           | 28     | 700        | 6     | 3       | 2      | 8      | 0.85  | 2048       | 4    | –           |
-| Ultra   | 1 600  | 3      | 24 000  | 1 100 | 900   | 5           | 70     | 2 000      | 14    | 4       | 3      | 14     | 1.15  | 2048       | 4    | 0.75×       |
-| Extreme | 2 700  | 3      | 110 000 | 2 600 | 2 200 | 5           | 260    | 6 000      | 40    | 4       | 3      | 24     | 1.45  | 4096       | 8    | 1.0×        |
+| Preset  | Towers | Detail | Rain    | Signs | Cars  | Lane levels | Drones | Far drones | Holos | Skyline | Clouds | Shafts | Bloom | Shadow map | MSAA | Reflections | Haze steps |
+|---------|-------:|-------:|--------:|------:|------:|------------:|-------:|-----------:|------:|--------:|-------:|-------:|------:|-----------:|-----:|------------:|-----------:|
+| Low     | 260    | 0      | 3 000   | 120   | 90    | 2           | 8      | 120        | 2     | 1       | 1      | 2      | 0.4   | –          | –    | –           | –          |
+| Medium  | 520    | 1      | 5 000   | 260   | 200   | 3           | 16     | 300        | 4     | 2       | 1      | 4      | 0.55  | 1024       | 8    | –           | –          |
+| High    | 900    | 2      | 8 000   | 500   | 400   | 4           | 28     | 700        | 6     | 3       | 2      | 8      | 0.6   | 2048       | 8    | –           | 6          |
+| Ultra   | 1 600  | 3      | 24 000  | 1 100 | 900   | 5           | 70     | 2 000      | 14    | 4       | 3      | 14     | 0.7   | 2048       | 8    | 1.0×        | 12         |
+| Extreme | 2 700  | 3      | 330 000 | 2 600 | 2 200 | 5           | 260    | 6 000      | 40    | 4       | 3      | 24     | 0.7   | 8192       | 8    | 1.0×        | 24         |
 
 - **Towers** get the full archetype treatment (slab, tiered setback, podium + tower,
   round/octagonal, megastructure) on the lots nearest the flight; every other lot of the
@@ -158,7 +164,14 @@ page flow (never fixed or sticky), so the HUD can't end up hidden under it.
 - **Lane levels**: traffic altitudes in use (street, then sky-lanes at 50, 25, 80, 120).
 - **Skyline**: horizon rings of window-dotted silhouettes. **Clouds**: low cloud layers
   lit from below. **Shafts**: rooftop searchlight beams, plus 3× as many light spills
-  under the biggest signs.
+  under the biggest signs. **Haze steps**: volumetric haze (`src/engine/volumetric.ts`), a
+  per-pixel ray march through drifting 3D noise that picks up light from the nearest neon
+  signs. It is GPU-only work that scales with pixels × steps.
+- The shadow map is capped at the GPU's `MAX_TEXTURE_SIZE` (Extreme asks for 8192); a capped
+  run says so and isn't comparable.
+- 2.2.0 rebalanced the presets to load fast GPUs about twice as hard (target on an RTX 5080
+  at 4K: Extreme ~65 FPS, Ultra ~100, High ~150, Medium ~250; Low stays light enough for
+  phones). Measured with the dev-only preset lab (`/?lab` on `npm run dev`).
 - Every field is non-decreasing from Low to Extreme (a test enforces it).
 
 The streets are drawn procedurally on the ground plane on every preset, at no extra draw

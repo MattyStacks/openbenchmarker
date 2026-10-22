@@ -79,10 +79,10 @@ function diagPanel(r: BenchResult): string {
         <dt>GPU wait / frame</dt><dd>${fmtMs(d.syncMs)}</dd>
         <dt>Loop busy</dt><dd>${fmtPct(r.loopBusy)}</dd>
         <dt>Main-thread stalls</dt><dd>${d.stalls} (${fmtMs(d.stallMs)} total)</dd>
-        <dt>Hitches</dt><dd>${d.hitches} (frame-time std. dev. ${fmtMs(d.frameStdMs)})</dd>
+        <dt>Hitches</dt><dd>${d.hitches}${d.gpuHitches !== undefined && d.hitches ? ` (${d.gpuHitches} from GPU time, ${Math.max(0, d.hitches - d.gpuHitches)} from frame pacing)` : ""}, frame-time std. dev. ${fmtMs(d.frameStdMs)}</dd>
         <dt>JS heap growth</dt><dd>${d.heapGrowthMb === null ? "n/a" : `${Math.round(d.heapGrowthMb)} MB`}</dd>
         <dt>Timing method</dt><dd>${esc(r.timing ?? "n/a")}</dd>
-        <dt>Rendered with</dt><dd>bloom ${d.features.bloom ? "on" : "off"}, MSAA ${d.features.msaa}×, shadow map ${d.features.shadowMap || "off"}, reflections ${d.features.reflections ? `${d.features.reflections}×` : "off"}</dd>
+        <dt>Rendered with</dt><dd>bloom ${d.features.bloom ? "on" : "off"}, MSAA ${d.features.msaa}×, shadow map ${d.features.shadowMap || "off"}, reflections ${d.features.reflections ? `${d.features.reflections}×` : "off"}, volumetric haze ${d.features.volumetrics ? `${d.features.volumetrics} steps` : "off"}</dd>
         <dt>WebGL renderer <em>(detected)</em></dt><dd>${isMaskedRenderer(d.renderer) ? `hidden by the browser ("${esc(d.renderer)}")` : esc(d.renderer)}</dd>
         <dt>WebGL vendor <em>(detected)</em></dt><dd>${isMaskedRenderer(d.renderer) ? "hidden" : esc(d.vendor)}</dd>
         <dt>ANGLE backend <em>(detected)</em></dt><dd>${esc(d.backend || "n/a")}</dd>
@@ -127,7 +127,7 @@ export function renderResults(r: BenchResult): void {
     </div>
     ${r.scoreTest && r.score === undefined ? `<p class="muted">Started as ${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)}, but ${r.valid ? "its settings didn't match the locked test" : "the run was invalid"}, so it has no score.</p>` : ""}
     ${diagPanel(r)}
-    <p class="muted small-print">Uncapped: frames were rendered back-to-back in ~${BATCH_MS} ms batches, with two batches kept queued on the GPU. Average FPS is frames divided by timed wall-clock. ${r.timing === "gpu-timer" ? "Lows and worst frame use each frame's GPU time from timer queries (or its batch average, if larger)." : r.timing === "batch-avg" ? "No GPU timer was available, so lows and worst frame use each batch's average frame time." : "Each frame was timed from submission to GPU completion."} Loop busy ${(r.loopBusy * 100).toFixed(0)}% of timed wall-clock.</p>
+    <p class="muted small-print">Uncapped: frames were rendered back-to-back in ~${BATCH_MS} ms batches, with three batches kept queued on the GPU. Average FPS is frames divided by timed wall-clock. ${r.timing === "gpu-timer" ? "Lows and worst frame use each frame's GPU time from timer queries (or its batch average, if larger)." : r.timing === "batch-avg" ? "No GPU timer was available, so lows and worst frame use each batch's average frame time." : "Each frame was timed from submission to GPU completion."} Loop busy ${(r.loopBusy * 100).toFixed(0)}% of timed wall-clock.</p>
 
     <div class="results-grid">
       <form class="card sys-form" id="sys-form" autocomplete="off">

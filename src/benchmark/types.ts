@@ -48,6 +48,8 @@ export interface RunDiagnostics {
   stalls: number;
   stallMs: number;
   hitches: number;
+  /** Hitches from GPU time alone (absent before 2.2.0). */
+  gpuHitches?: number;
   frameStdMs: number;
   /** JS heap growth over the timed phase, MB (Chromium only). */
   heapGrowthMb: number | null;
@@ -63,7 +65,7 @@ export interface RunDiagnostics {
   /** Browser name and major version, e.g. "Chrome 141". */
   browser: string;
   /** What the scene actually rendered with. */
-  features: { bloom: boolean; msaa: number; shadowMap: number; reflections: number; fallbackReason: string };
+  features: { bloom: boolean; msaa: number; shadowMap: number; reflections: number; /** Ray-march steps (absent before 2.2.0). */ volumetrics?: number; fallbackReason: string };
 }
 
 /** A completed run. Everything outside `system` is measured by the tool. */

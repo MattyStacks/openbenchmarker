@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { BENCHMARK, BENCHMARK_VERSION } from "../benchmark/catalog";
 import { browserName, isSoftwareRenderer, liveVerdict, parseBackend } from "../benchmark/diagnose";
-import { computeRunStats, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimesInto, scoreFor, type TimedBatch } from "../benchmark/metrics";
+import { computeRunStats, graphPoints, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimesInto, scoreFor, type TimedBatch } from "../benchmark/metrics";
 import { WARMUP_SECONDS, getPreset, getResolution, getScoreTest, matchesScoreTest } from "../benchmark/presets";
 import { emptySystem, type BenchResult, type GraphicsApi, type RunDiagnostics } from "../benchmark/types";
 import { makeFlythrough, type Flythrough } from "../engine/scenes";
@@ -20,18 +20,27 @@ const DRAIN_MS = 500;
 /** Resolved GPU timer results kept for the live HUD readout. */
 const RECENT_GPU = 120;
 /**
- * Batches queued on the GPU at once (WebGL2). Two keep it fed without a long queue. The dev
+ * Batches queued on the GPU at once (WebGL2). Batches are short (BATCH_MS), so three keep at
+ * least ~24 ms of work queued against main-thread hiccups (GC, other tabs). The dev
  * server accepts ?inflight=N to compare (1 drains the GPU between batches, like the old loop).
  */
-const MAX_IN_FLIGHT = (import.meta.env.DEV && Number(new URLSearchParams(location.search).get("inflight"))) || 2;
+const DEV_PARAMS = new URLSearchParams(import.meta.env.DEV ? location.search : "");
+const MAX_IN_FLIGHT = Number(DEV_PARAMS.get("inflight")) || 3;
+/** Dev server only: ?batch=MS overrides the batch length, ?present=all draws every frame to the canvas. */
+const BATCH = Number(DEV_PARAMS.get("batch")) || BATCH_MS;
+const PRESENT_ALL = DEV_PARAMS.get("present") === "all";
+/** Dev server only: ?presentHz=N caps how often a frame goes to the canvas (default: every refresh). */
+const PRESENT_HZ = Number(DEV_PARAMS.get("presentHz")) || 0;
 /** HUD refresh interval, ms. The loop ticks far more often than this while waiting on the GPU. */
 const HUD_MS = 50;
 /**
  * While the queue is full, the loop sleeps until about SPIN_MS before the oldest batch is due,
  * then polls every task. Another batch is still queued behind it, so the GPU stays fed either
  * way; sleeping just avoids pinning a CPU core (which costs laptops GPU power budget).
+ * Browsers round chained short timeouts up to ~4 ms, so the loop only sleeps when the batch is
+ * due well after that; otherwise it noticed finished batches late (fake frame-time spikes).
  */
-const SPIN_MS = 2;
+const SPIN_MS = 5;
 const MAX_SLEEP_MS = 10;
 /** Live 1% low refresh interval, ms. It scans every timed frame, so it runs rarely (O(n), no sort). */
 const LIVE_LOWS_MS = 1000;
@@ -126,7 +135,9 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   let gl: WebGLRenderingContext | WebGL2RenderingContext;
   let api: GraphicsApi;
   try {
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+    // No canvas MSAA: every preset renders through the composer, which has its own MSAA, so a
+    // multisampled canvas only added a full-screen resolve on every screen update.
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
     renderer.setPixelRatio(1);
     renderer.setSize(width, height, false); // exact render size; CSS only scales the display
     fitCanvas(canvas, width, height);
@@ -231,6 +242,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     canvas.removeEventListener("webglcontextlost", onLost);
     ro.disconnect();
     $("#abort").removeEventListener("click", onAbort);
+    cancelAnimationFrame(rafId);
     channel.port1.onmessage = null;
     channel.port1.close();
     channel.port2.close();
@@ -276,6 +288,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       stalls: st.stalls,
       stallMs: st.stallMs,
       hitches: st.hitches,
+      gpuHitches: st.gpuHitches,
       frameStdMs: st.frameStdMs,
       heapGrowthMb: heapAtTimed !== null && heapEnd !== null ? heapEnd - heapAtTimed : null,
       renderer: info.renderer,
@@ -288,8 +301,9 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       features: {
         bloom: fly.features.bloom,
         msaa: fly.features.msaa,
-        shadowMap: fly.features.shadows ? preset.shadowMap : 0,
+        shadowMap: fly.features.shadows ? fly.features.shadowMap : 0,
         reflections: fly.features.reflections ? preset.reflections : 0,
+        volumetrics: fly.features.volumetrics,
         fallbackReason: fly.features.fallbackReason,
       },
     };
@@ -375,7 +389,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
         $("#hud-p1").textContent = lowFpsSelect(liveTimes, r.n, 0.01).toFixed(1);
       }
     }
-    drawGraph(graph, g2d, arr.slice(-240).map((b) => b.ms / b.frames)); // per-batch average frame time
+    drawGraph(graph, g2d, graphPoints(arr));
   }
 
   // Frames are submitted back-to-back with no per-frame sync, in batches of about BATCH_MS.
@@ -399,6 +413,22 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     yieldMs: number;
   }
   const inFlight: InFlight[] = [];
+  // Present at most once per display refresh: the first frame after each animation frame goes to
+  // the canvas, the rest end offscreen with the same GPU work. Drawing every frame to the canvas
+  // made the browser's own screen updates contend with the benchmark on the GPU when frames took
+  // about one refresh interval (stutter, GPU-time spikes, lost FPS).
+  let presentDue = true;
+  let rafId = 0;
+  let lastPresentAt = 0;
+  const onRaf = (now: number) => {
+    // Allow 2 ms of refresh jitter so e.g. 60 Hz on a 120 Hz display is every other refresh.
+    if (!PRESENT_HZ || now - lastPresentAt >= 1000 / PRESENT_HZ - 2) {
+      presentDue = true;
+      lastPresentAt = now;
+    }
+    rafId = requestAnimationFrame(onRaf);
+  };
+  rafId = requestAnimationFrame(onRaf);
   let lastComplete = 0;
   let waitSince = 0;
   let timedSubmitted = 0;
@@ -423,7 +453,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     lastComplete = t;
     lastFrameMs = ms / frames;
     const b: TimedBatch = { frames, ms, busyMs: Math.min(ms, cpuMs + waitMs), cpuMs, updateMs, syncMs: waitMs, yieldMs };
-    batchFrames = nextBatchFrames(Math.max(1, Math.round(frames / list.length)), ms / list.length, BATCH_MS);
+    batchFrames = nextBatchFrames(Math.max(1, Math.round(frames / list.length)), ms / list.length, BATCH);
     if (list[0].phase === "warmup") warm.push(b);
     else {
       timed.push(b);
@@ -458,7 +488,8 @@ export async function startRun(cfg: RunConfig): Promise<void> {
         if (q) gl2.beginQuery(timerExt.TIME_ELAPSED_EXT, q);
       }
       const f0 = performance.now();
-      fly.render((t - runStart) / 1000);
+      fly.render((t - runStart) / 1000, undefined, presentDue || PRESENT_ALL);
+      presentDue = false;
       renderer.setRenderTarget(null);
       cpuMs += performance.now() - f0;
       if (phase === "timed") gpuMs.push(NaN);
@@ -469,7 +500,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       if (phase === "timed") timedSubmitted++;
       n++;
       t = performance.now();
-    } while (n < batchFrames && t - tick0 < BATCH_MS && t < phaseEnd);
+    } while (n < batchFrames && t - tick0 < BATCH && t < phaseEnd);
     const fence = gl2 ? gl2.fenceSync(gl2.SYNC_GPU_COMMANDS_COMPLETE, 0) : null;
     gl.flush();
     inFlight.push({ fence, phase, frames: n, cpuMs, updateMs: fly.timing.updateMs, waitMs: waitSince ? tick0 - waitSince : 0, yieldMs });
@@ -523,7 +554,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     if (gl2 && inFlight.length >= MAX_IN_FLIGHT && lastFrameMs > 0) {
       const now = performance.now();
       const eta = lastComplete + lastFrameMs * inFlight[0].frames - now;
-      if (eta > SPIN_MS + 1) {
+      if (eta > SPIN_MS + 2) {
         const sleep = Math.min(MAX_SLEEP_MS, Math.floor(eta - SPIN_MS));
         postedAt = now + sleep;
         setTimeout(tick, sleep);

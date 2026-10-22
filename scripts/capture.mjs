@@ -3,6 +3,7 @@
 // Starts a Vite dev server, opens /?capture (dev-only hook in src/app/capture.ts) in headless Chromium.
 //
 //   node scripts/capture.mjs --out shots/stage3 [--presets Low,Ultra] [--times 5,20,40] [--w 1280 --h 720]
+//                            [--set volumetrics:32,rain:20000]   # override preset fields
 //   node scripts/capture.mjs --info [--t 20]          # draw calls / triangles for every preset (JSON)
 //   node scripts/capture.mjs --timing [--t 20]        # relative ms/frame per preset (software GL!)
 //   node scripts/capture.mjs --og public/og-image.png [--t 20]   # 1200x630 Ultra frame
@@ -34,7 +35,7 @@ async function open(preset, w, h) {
   const page = await browser.newPage({ viewport: { width: w, height: h } });
   page.on("pageerror", (e) => console.error(`[${preset}] page error:`, e.message));
   page.on("console", (m) => m.type() === "error" && console.error(`[${preset}]`, m.text()));
-  await page.goto(`${base}?capture&preset=${preset}&w=${w}&h=${h}`);
+  await page.goto(`${base}?capture&preset=${preset}&w=${w}&h=${h}${opt("set") ? `&set=${opt("set")}` : ""}`);
   await page.waitForFunction(() => window.__cap, null, { timeout: 600_000, polling: 250 });
   return page;
 }

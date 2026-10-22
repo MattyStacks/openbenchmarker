@@ -34,10 +34,20 @@ export interface GlowLight {
 
 export const NEON = [0xff2bd6, 0x22e6ff, 0xff4f6a, 0x9b5cff, 0x3dffb0, 0xffb02e];
 
-export function canvasTexture(w: number, h: number, draw: (c: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
+/**
+ * A 2D canvas on the page, or an OffscreenCanvas in a worker (no DOM there). Typed as the page
+ * canvas: the 2D drawing API and texture uploads used here are the same for both.
+ */
+export function makeCanvas(w: number, h: number): HTMLCanvasElement {
+  if (typeof document === "undefined") return new OffscreenCanvas(w, h) as unknown as HTMLCanvasElement;
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
+  return canvas;
+}
+
+export function canvasTexture(w: number, h: number, draw: (c: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
+  const canvas = makeCanvas(w, h);
   draw(canvas.getContext("2d")!);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;

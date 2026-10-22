@@ -202,8 +202,11 @@ describe("preset scaling", () => {
     expect(extreme.towerDetail).toBeGreaterThan(low.towerDetail);
     expect(extreme.reflections).toBeGreaterThan(low.reflections);
   });
-  it("only Ultra and Extreme have reflections", () => {
+  it("only Ultra and Extreme have reflections, High and up volumetric haze", () => {
+    // Reflections redraw the whole scene: many draw calls for little GPU work, which made the
+    // browser's GPU process the limit on lighter presets at high FPS. Those use MSAA and haze.
     expect(PRESETS.filter((p) => p.reflections > 0).map((p) => p.id)).toEqual(["Ultra", "Extreme"]);
+    expect(PRESETS.filter((p) => p.volumetrics > 0).map((p) => p.id)).toEqual(["High", "Ultra", "Extreme"]);
   });
   it("every numeric knob is non-decreasing from Low to Extreme", () => {
     const keys = Object.keys(low).filter((k) => typeof (low as unknown as Record<string, unknown>)[k] === "number");

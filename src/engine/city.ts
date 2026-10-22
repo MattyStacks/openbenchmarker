@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { Preset } from "../benchmark/presets";
-import type { BuildCtx } from "./ctx";
+import type { BuildCtx, GlowLight } from "./ctx";
 import { SolidIndex } from "./layout";
 import { SEED } from "./rng";
 import { buildAtmosphere } from "./systems/atmosphere";
@@ -15,6 +15,8 @@ import { buildTraffic } from "./systems/traffic";
 export interface City {
   group: THREE.Group;
   counts: Record<string, number>;
+  /** Bright neon sources (for effects that light the air). */
+  lights: GlowLight[];
   update(t: number, camera: THREE.Camera): void;
   dispose(): void;
 }
@@ -57,6 +59,7 @@ export function buildCity(preset: Preset, size: { w: number; h: number }, seed =
   return {
     group,
     counts: ctx.counts,
+    lights: ctx.lights,
     update(t, camera) {
       for (const u of updaters) u(t, camera);
     },

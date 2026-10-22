@@ -82,6 +82,8 @@ export interface RunStats extends FrameStats {
   stallMs: number;
   /** Frames slower than HITCH_FACTOR x the median and at least HITCH_MIN_MS over it. */
   hitches: number;
+  /** Hitches whose GPU timer alone was that slow (GPU-side); the rest came from frame pacing. */
+  gpuHitches: number;
   /** Standard deviation of frame times, ms. */
   frameStdMs: number;
 }
@@ -216,14 +218,18 @@ export function computeRunStats(batches: readonly TimedBatch[], gpuMs?: ArrayLik
     syncMsPerFrame: frames > 0 ? syncMs / frames : 0,
     stalls,
     stallMs,
-    ...hitchStats(times),
+    ...hitchStats(times, gpuMs),
   };
 }
 
-/** Hitch count and frame-time spread from per-frame times. */
-export function hitchStats(times: readonly number[]): { hitches: number; frameStdMs: number } {
+/**
+ * Hitch count and frame-time spread from per-frame times. With `gpuMs` (aligned with `times`),
+ * also counts the hitches whose GPU time alone crossed the threshold: GPU-side spikes, as opposed
+ * to gaps where the GPU wasn't fed (frame pacing).
+ */
+export function hitchStats(times: readonly number[], gpuMs?: ArrayLike<number>): { hitches: number; gpuHitches: number; frameStdMs: number } {
   const t = times.filter((x) => Number.isFinite(x) && x > 0);
-  if (t.length === 0) return { hitches: 0, frameStdMs: 0 };
+  if (t.length === 0) return { hitches: 0, gpuHitches: 0, frameStdMs: 0 };
   const sorted = [...t].sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)];
   let mean = 0;
@@ -231,11 +237,14 @@ export function hitchStats(times: readonly number[]): { hitches: number; frameSt
   mean /= t.length;
   let v = 0;
   let hitches = 0;
+  const isHitch = (x: number) => x > median * HITCH_FACTOR && x - median >= HITCH_MIN_MS;
   for (const x of t) {
     v += (x - mean) ** 2;
-    if (x > median * HITCH_FACTOR && x - median >= HITCH_MIN_MS) hitches++;
+    if (isHitch(x)) hitches++;
   }
-  return { hitches, frameStdMs: Math.sqrt(v / t.length) };
+  let gpuHitches = 0;
+  if (gpuMs) for (let i = 0; i < Math.min(gpuMs.length, times.length); i++) if (Number.isFinite(gpuMs[i]) && isHitch(gpuMs[i])) gpuHitches++;
+  return { hitches, gpuHitches, frameStdMs: Math.sqrt(v / t.length) };
 }
 
 /** Points per average FPS. Linear, so any FPS gain (an overclock included) raises the score. */
@@ -261,6 +270,26 @@ export function liveBatchFps(batches: readonly TimedBatch[], windowMs = 500): nu
     n += batches[i].frames;
   }
   return ms > 0 ? (n * 1000) / ms : 0;
+}
+
+/**
+ * Frame-time graph points, oldest first: average frame time over windows of at least `binMs`,
+ * built from the newest batches back (at most `points`). Batches are only a few ms long, so
+ * plotting each one would mostly show when the loop noticed a batch finishing.
+ */
+export function graphPoints(batches: readonly TimedBatch[], binMs = 25, points = 240): number[] {
+  const out: number[] = [];
+  let ms = 0, n = 0;
+  for (let i = batches.length - 1; i >= 0 && out.length < points; i--) {
+    ms += batches[i].ms;
+    n += batches[i].frames;
+    if (ms >= binMs && n > 0) {
+      out.push(ms / n);
+      ms = 0;
+      n = 0;
+    }
+  }
+  return out.reverse();
 }
 
 /**

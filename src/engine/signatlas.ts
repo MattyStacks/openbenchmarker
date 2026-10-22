@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { makeCanvas } from "./ctx";
 import { pick, stream } from "./rng";
 import { CELLS, type CellKind } from "./signlayout";
 
@@ -60,14 +61,12 @@ export function makeSignAtlas(seed: number): THREE.DataTexture {
     const r = rnd(), n = pick(rnd, NOUNS), m = pick(rnd, MODS);
     return r < 0.35 ? n : r < 0.6 ? `${n} ${m}` : r < 0.8 ? `${m} ${n}` : `${n} // ${pick(rnd, NOUNS)}`;
   };
-  const rgb = document.createElement("canvas");
-  rgb.width = rgb.height = ATLAS;
+  const rgb = makeCanvas(ATLAS, ATLAS);
   const c = rgb.getContext("2d", { willReadFrequently: true })!;
   c.fillStyle = "#000";
   c.fillRect(0, 0, ATLAS, ATLAS);
   c.globalCompositeOperation = "lighter";
-  const cov = document.createElement("canvas");
-  cov.width = cov.height = ATLAS;
+  const cov = makeCanvas(ATLAS, ATLAS);
   const a = cov.getContext("2d", { willReadFrequently: true })!;
   a.fillStyle = "#fff";
 

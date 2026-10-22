@@ -14,6 +14,16 @@ const BOX = new THREE.Vector3(180, 120, 180);
  * under 1 px; thinner-than-a-pixel drops fade instead of fattening. Drops pick up colour from the
  * nearest neon lights.
  */
+/**
+ * Per-drop brightness. Past FULL_BRIGHT_DROPS, drops get fainter so the storm keeps adding GPU
+ * work (more streaks to draw and blend) without turning into a white wall: total brightness grows
+ * only with the fourth root of the count.
+ */
+const FULL_BRIGHT_DROPS = 40000;
+export function dropGain(n: number): number {
+  return n > FULL_BRIGHT_DROPS ? (FULL_BRIGHT_DROPS / n) ** 0.75 : 1;
+}
+
 export function buildRain(ctx: BuildCtx): void {
   const { group, track, preset } = ctx;
   const rnd = stream(ctx.seed, 4);
@@ -85,7 +95,7 @@ export function buildRain(ctx: BuildCtx): void {
           vSide = corner.y;
           vAlong = corner.x;
           float far = 1.0 - smoothstep(0.45, 1.0, depth / (uBox.x * 0.5));
-          vAlpha = 0.24 * pow(clamp(px, 0.0, 1.0), 0.6) * far;
+          vAlpha = ${(0.24 * dropGain(n)).toFixed(4)} * pow(clamp(px, 0.0, 1.0), 0.6) * far;
           vec3 lit = vec3(0.30, 0.36, 0.55);
           for (int i = 0; i < ${MAX_LIGHTS}; i++) {
             vec3 dl = p - uLightPos[i].xyz;

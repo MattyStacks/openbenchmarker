@@ -1,4 +1,4 @@
-/** Frame-time graph: the last 240 per-batch average frame times, auto-scaled, with a 60 FPS line. */
+/** Frame-time graph: up to 240 points (graphPoints windows of ~25 ms), auto-scaled, with a 60 FPS line. */
 export function drawGraph(graph: HTMLCanvasElement, g2d: CanvasRenderingContext2D, times: number[]): void {
   const W = graph.width, H = graph.height;
   g2d.clearRect(0, 0, W, H);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STALL_MS, computeRunStats, computeStats, hitchStats, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimes, runFrameTimesInto, scoreFor } from "../src/benchmark/metrics";
+import { STALL_MS, computeRunStats, computeStats, hitchStats, graphPoints, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimes, runFrameTimesInto, scoreFor } from "../src/benchmark/metrics";
 
 describe("computeStats", () => {
   it("uniform 60 FPS gives 60 avg and 60 lows", () => {
@@ -148,7 +148,9 @@ describe("GPU-bound and CPU signals", () => {
     const times = [...new Array(100).fill(10), 30, 40];
     const h = hitchStats(times);
     expect(h.hitches).toBe(2);
-    expect(hitchStats(new Array(50).fill(10))).toEqual({ hitches: 0, frameStdMs: 0 });
+    expect(hitchStats(new Array(50).fill(10))).toEqual({ hitches: 0, gpuHitches: 0, frameStdMs: 0 });
+    // The second hitch's GPU time was normal: the GPU wasn't fed (pacing), not a GPU spike.
+    expect(hitchStats(times, [...new Array(100).fill(9), 30, 9]).gpuHitches).toBe(1);
   });
 
   it("ignores timer jitter on sub-millisecond frames as hitches", () => {
@@ -172,6 +174,13 @@ describe("GPU-bound and CPU signals", () => {
     expect(lowFpsSelect(again.out, again.n, 0.05)).toBeCloseTo(want.p5Low, 6);
     expect(lowFpsSelect(new Float64Array(3).fill(10), 3, 0.01)).toBeCloseTo(100, 6);
     expect(lowFpsSelect(new Float64Array(0), 0, 0.01)).toBe(0);
+  });
+
+  it("graph points average batches into windows", () => {
+    const pts = graphPoints([b(1, 10), b(1, 10), b(2, 10), b(1, 10), b(1, 30)], 25);
+    // Newest back: [30 ms / 1] then [10+10+10 / 4]; the leftover 10 ms isn't a full window.
+    expect(pts).toEqual([7.5, 30]);
+    expect(graphPoints([b(1, 30), b(1, 30), b(1, 30)], 25, 2)).toEqual([30, 30]);
   });
 
   it("live breakdown uses the recent window", () => {
