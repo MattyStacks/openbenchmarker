@@ -295,7 +295,7 @@ When the home page changes meaningfully, update `<lastmod>` in `public/sitemap.x
 
 ## Future plans
 
-See [TODO.md](TODO.md): a heavier Extreme workload, a separate score leaderboard site (submitted
+See [TODO.md](TODO.md): a Safari check, a separate score leaderboard site (submitted
 to separately from Open GPU Benchmarks), and diagnostics that need more than a browser.
 
 ## License

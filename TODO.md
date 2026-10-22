@@ -1,22 +1,11 @@
 # TODO and future plans
 
-## Rebalance the presets, Extreme at 4K first (next)
+## Test in Safari (WebKit)
 
-A 5080 runs Extreme at 4K at ~116 FPS, with 8.3 ms of GPU time per frame at ~96% GPU busy
-(2.1.0, Edge/D3D11). The target is ~60–70 FPS, so about 14–16 ms of GPU time per frame (~1.8×).
-The other presets will likely shift too, as one block of work.
-
-- Add only GPU-side work: no more cars or drones, because `traffic.ts` and `drones.ts` update
-  them in JavaScript every frame and would make the test CPU-limited. Candidates:
-  - more shader-driven rain
-  - an 8192 shadow map, falling back to `MAX_TEXTURE_SIZE` (recorded in `rendered_with`)
-  - heavier bloom, fog and atmosphere passes
-  - more instanced tower detail
-- Check each step on a real GPU with Score: Extreme. The results page shows GPU time per frame
-  and GPU busy %, which should stay at ~95%+ (GPU-limited) while FPS drops.
-- Keep presets non-decreasing (`tests/presets.test.ts`). Update the README preset and load tables.
-- Bump `BENCHMARK_VERSION` (Extreme scores from before and after aren't comparable). Do it
-  before a leaderboard launches, so no posted scores are reset.
+2.2.0 is checked in Edge and Brave on an RTX 5080 (all presets at 4K, 93–98% GPU busy) and on
+a phone (720p Low, ~300 FPS). Safari on a Mac or iPhone hasn't been confirmed yet.
+Things to check there: the volumetric haze (it needs a float depth texture), the 8192 shadow map
+cap and whether GPU timer queries are available (if not, the limit is estimated).
 
 ## Leaderboard site
 
