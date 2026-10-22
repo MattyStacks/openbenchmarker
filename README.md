@@ -25,8 +25,37 @@ npm run dev        # local dev server
 npm test           # Vitest unit tests
 npm run build      # type-check + production build into dist/
 npm run preview    # serve dist/ locally
-npm run deploy     # build + wrangler deploy
+npm run deploy     # build + wrangler deploy (production)
+npm run preview:deploy  # build + upload a preview version (does not promote it)
 ```
+
+### Testing on a phone (LAN) and preview deploys
+
+```sh
+npx vite --host          # dev server on the LAN, e.g. http://192.168.1.20:5173
+npx vite preview --host  # same for the production build in dist/
+```
+
+The Web Share API and `navigator.clipboard` need a secure context (HTTPS or
+`localhost`). Over plain LAN HTTP they are unavailable, so on a phone use LAN
+only for layout, run flow and results rendering; test share/clipboard paths on
+`localhost` or on a preview deploy:
+
+```sh
+npm run preview:deploy   # after `npm test` and `npm run build` pass locally
+```
+
+That runs `wrangler preview --name share-results` (Worker Previews; `previews = {}`
+and `previews_enabled = true` on the route in `wrangler.toml`). The Preview is
+served at `https://share-results.opengpubenchmarker.com` (the custom domain is
+set to "Production and Preview") and at
+`https://share-results-openbenchmarker.mattys.workers.dev`. A Preview never
+touches production: `opengpubenchmarker.com` changes only on `npm run deploy`.
+Previews are public, like the site itself; `public/_headers` marks preview
+subdomains `noindex`. A Preview is a different origin, so it has its own
+localStorage and does not see results saved on production. Remove it with
+`npx wrangler preview delete --name share-results`. See [docs/privacy-audit.md](docs/privacy-audit.md)
+for what the site does and does not store or send.
 
 To deploy, run `npx wrangler login` once, then `npm run deploy`. `wrangler.toml`
 serves `./dist` with an SPA fallback. Attach the custom domain
@@ -216,6 +245,15 @@ This tool feeds a public dataset, so:
   state and browser version. They are stored in a separate, labelled `detected:` block, for the
   diagnosis only. They **never** fill in the GPU or any `system:` field. A software-rendered run
   (SwiftShader, llvmpipe, Microsoft Basic Render) can't be submitted.
+- **Device context (deliberate exception):** each result also saves a separate `device` field
+  (`src/app/share-env.ts`: browser + major version, OS, phone/tablet/desktop, WebKit-engine flag,
+  and the GPU name as reported by the browser, normalized and labelled "reported by browser").
+  This is a deliberate exception to the browser-hints rule, for display and sharing only: it
+  never fills a `system:` field, is never copied into submission YAML, and older saved results
+  are migrated with only safe inferences (user-filled OS, recorded browser/renderer; an
+  old "Chrome N" stays unknown because other Chromium browsers recorded the same) or
+  "unknown". Limit: iPadOS Safari sends a Mac UA, so an iPad is recognised only by a Mac UA
+  plus more than one touch point; a touch-screen Mac would be misread as an iPad. See [docs/privacy-audit.md](docs/privacy-audit.md).
 - The GPU must be an exact `gpu_id` from the upstream catalog. Free text is
   rejected. **If your GPU isn't listed, you can't submit.** Open an issue or PR
   upstream to add it ([issue chooser](https://github.com/MattyStacks/open-gpu-benchmarks/issues/new/choose),
@@ -321,6 +359,7 @@ src/app/run.ts                run controller (warm-up, timed batches, GPU timers
 src/app/results-view.ts       results page, system form, export & submit
 src/app/history-view.ts       My Results (#/history)
 src/app/home.ts, shell.ts, router.ts, store.ts, hud.ts, env.ts, dom.ts
+src/app/share-env.ts          device detection for display/sharing only (pure, tested)
 src/app/capture.ts            dev-only: fixed-t renders and renderer.info for scripts/capture.mjs
 src/engine/world.ts           grid, clearances, the 96 s flight keys, landmark bridges
 src/engine/path.ts            FlightPath (pose as a function of t) + 3D clearance index

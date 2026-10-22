@@ -3,6 +3,31 @@ import type { PresetId, ResolutionId, ScoreTestId } from "./presets";
 
 export type GraphicsApi = "WebGL2" | "WebGL1";
 
+export type BrowserId = "chrome" | "edge" | "brave" | "firefox" | "safari" | "opera" | "vivaldi" | "samsung" | "other";
+export type OsId = "windows" | "macos" | "linux" | "chromeos" | "android" | "ios" | "other";
+export type DeviceType = "phone" | "tablet" | "desktop" | "unknown";
+
+/**
+ * Device context detected by the browser, for display and sharing only.
+ * Deliberate exception to the browser-hints rule: it lives in its own field,
+ * never fills `system` and is never submitted (see README honest-data rules).
+ * `gpuLabel` is the WebGL renderer as reported by the browser, normalized;
+ * null when the browser masks it or it carries no usable name.
+ */
+export interface DeviceContext {
+  browser: BrowserId;
+  browserMajor: number | null;
+  os: OsId;
+  deviceType: DeviceType;
+  /** True on iOS/iPadOS, where every browser runs on WebKit. */
+  webkitEngine: boolean;
+  gpuLabel: string | null;
+}
+
+export function unknownDevice(): DeviceContext {
+  return { browser: "other", browserMajor: null, os: "other", deviceType: "unknown", webkitEngine: false, gpuLabel: null };
+}
+
 /** Everything the user provides. Every field starts blank; nothing is ever auto-filled. */
 export interface SystemInfo {
   gpuId: string;
@@ -103,5 +128,7 @@ export interface BenchResult {
   score?: number;
   /** Absent on results from before diagnostics were recorded. */
   diag?: RunDiagnostics;
+  /** Device context as reported by the browser; display/sharing only, never submitted. Absent before Plan 1. */
+  device?: DeviceContext;
   system: SystemInfo;
 }

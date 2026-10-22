@@ -1,5 +1,6 @@
 import { DURATIONS, getPreset, getResolution, normalizeResolution, type PresetId, type ResolutionId, type ScoreTestId } from "../benchmark/presets";
-import { emptySystem, type BenchResult } from "../benchmark/types";
+import { emptySystem, unknownDevice, type BenchResult, type BrowserId, type DeviceContext } from "../benchmark/types";
+import { normalizeGpuLabel } from "./share-env";
 
 // ---------------------------------------------------------------------------
 // Local history (this browser only)
@@ -7,11 +8,38 @@ import { emptySystem, type BenchResult } from "../benchmark/types";
 const STORE_KEY = "ogb.results.v1";
 const CONFIG_KEY = "ogb.config.v1";
 
+// "Chrome N" is left out: browserName() also records Samsung Internet, Vivaldi and other Chromium browsers that way.
+const BROWSER_BY_NAME: Record<string, BrowserId> = { Brave: "brave", Edge: "edge", Firefox: "firefox", Safari: "safari", Opera: "opera" };
+
+/**
+ * Fill `device` for results saved before it existed. Only what is safe is
+ * inferred: OS from the user-filled `system.os`, browser from the recorded
+ * `diag.browser` ("Edge 141"; not "Chrome", which is ambiguous), GPU label from the recorded renderer.
+ * Everything else stays unknown; nothing is guessed.
+ */
+export function migrateDevice(r: BenchResult): DeviceContext {
+  if (r.device?.browser) return { ...unknownDevice(), ...r.device };
+  const d = unknownDevice();
+  const sysOs = (r.system?.os ?? "").trim();
+  if (sysOs === "windows") d.os = "windows";
+  else if (sysOs === "linux") d.os = "linux";
+  const m = /^(\w+)\s+(\d+)$/.exec((r.diag?.browser ?? "").trim());
+  if (m && BROWSER_BY_NAME[m[1]]) {
+    d.browser = BROWSER_BY_NAME[m[1]];
+    d.browserMajor = parseInt(m[2], 10) || null;
+  }
+  if (r.diag?.renderer) d.gpuLabel = normalizeGpuLabel(r.diag.renderer, r.diag.vendor);
+  return d;
+}
+
 function loadHistory(): BenchResult[] {
   try {
     const raw = JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
     return Array.isArray(raw)
-      ? raw.map((r) => ({ ...r, resolution: normalizeResolution(r.resolution), system: { ...emptySystem(), ...(r.system || {}) } }))
+      ? raw.map((r) => {
+          const base: BenchResult = { ...r, resolution: normalizeResolution(r.resolution), system: { ...emptySystem(), ...(r.system || {}) } };
+          return { ...base, device: migrateDevice(base) };
+        })
       : [];
   } catch {
     return [];

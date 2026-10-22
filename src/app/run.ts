@@ -9,6 +9,7 @@ import { $, esc, nextFrame } from "./dom";
 import { BATCH_MS, MOBILE } from "./env";
 import { drawGraph } from "./hud";
 import { route } from "./router";
+import { detectDeviceContext, detectDeviceContextAsync } from "./share-env";
 import { app, showView } from "./shell";
 import { upsertResult, type RunConfig } from "./store";
 
@@ -157,6 +158,9 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   const info = rendererInfo(gl);
   const maxTextureSize = Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 0;
   const software = isSoftwareRenderer(info.renderer);
+  // Display/sharing only. The async read (navigator.brave.isBrave(), high-entropy platform) resolves before warm-up ends.
+  let device = detectDeviceContext(info.renderer, info.vendor);
+  void detectDeviceContextAsync(info.renderer, info.vendor).then((d) => (device = d));
 
   const px = new Uint8Array(4);
   const timed: TimedBatch[] = [];
@@ -335,6 +339,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       ...(scoreTest ? { scoreTest: scoreTest.id } : {}),
       ...(scored ? { score: scoreFor(st.avgFps) } : {}),
       diag,
+      device,
       system: emptySystem(),
     };
     upsertResult(result);

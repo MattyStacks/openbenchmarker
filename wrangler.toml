@@ -2,8 +2,17 @@
 name = "openbenchmarker"
 compatibility_date = "2026-10-01"
 
+# Worker Previews (`npm run preview:deploy` = `wrangler preview --name share-results`).
+# A Preview never touches production; production changes only on `wrangler deploy`.
+# These settings are written on the next `wrangler deploy` and match the dashboard:
+# Preview URLs on <name>.opengpubenchmarker.com (custom domain, "Production and Preview")
+# and on <name>-openbenchmarker.mattys.workers.dev.
+preview_urls = true
+previews = {}
+
 # Custom domain: wrangler deploy creates the DNS record and certificate.
-routes = [{ pattern = "opengpubenchmarker.com", custom_domain = true }]
+# previews_enabled also serves Previews on *.opengpubenchmarker.com.
+routes = [{ pattern = "opengpubenchmarker.com", custom_domain = true, previews_enabled = true }]
 
 [assets]
 directory = "./dist"
