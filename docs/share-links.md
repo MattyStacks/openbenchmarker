@@ -45,7 +45,17 @@ Bits are packed most significant first, then base64url without padding (RFC 4648
 | GPU name length | 6 | 0–63 UTF-8 bytes, cut at a character boundary | — |
 | GPU name | 8 × length | browser-reported label (plan 1's `normalizeGpuLabel`) | — |
 
-**Trailer:** zero padding to a whole byte, then a **CRC-8** (SMBUS, poly 0x07) over every byte before it. A record without a GPU name is 184 bits (23 bytes), so a result link with no GPU name is 2 + 23 + 1 = 26 bytes.
+**Trailer:** zero padding to a whole byte, then the optional **extension section**, then a **CRC-8** (SMBUS, poly 0x07) over every byte before it. A record without a GPU name is 184 bits (23 bytes), so a result link with no GPU name and no extensions is 2 + 23 + 1 = 26 bytes.
+
+### Extension section (added in Plan 7, still v1)
+
+Zero or more entries between the padding and the CRC, each **tag (1 byte), length (1 byte), value (length bytes)**:
+
+- Decoders read every entry and skip tags they don't know (the payload keeps them in `ext`, so a re-encode gives the same link). New **optional** fields can join links this way with no version bump.
+- Tag 0 is reserved (a stray zero byte after the padding still reads as damaged, as before). Tags 1–255 are free; **none is assigned yet**. Assign one here, with its value format, before using it.
+- The version byte changes only for breaking changes: a new fixed field, a reordered table, or a different meaning for an existing bit.
+- `memory_channels` and the other user-filled system fields are **not** in links (see below).
+- Compatibility: v1 links made before the section existed have no bytes after the padding, so they decode exactly as before. `tests/share-codec.test.ts` pins four such codes (result, challenge, comparison, no GPU name) and checks that they decode to identical runs and re-encode to the same string. v1 had not reached production when the section was added, so no deployed decoder rejects entries.
 
 Never in a link: the user-filled system fields, the diagnostics, the result id, the run time of day, or anything else from `BenchResult`.
 
@@ -54,7 +64,7 @@ Never in a link: the user-filled system fields, the diagnostics, the result id, 
 A link is rejected as **"This link looks damaged or edited"** if any of these fail:
 - base64url is malformed or isn't the canonical spelling. The last character's spare bits must be zero, so a single-character edit can't decode to the same bytes.
 - The CRC-8 doesn't match. CRC-8 catches every error burst of 8 bits or fewer, which covers any single-character edit. The tests try every one.
-- Bytes are truncated or trailing, an enum is out of range, or the GPU name isn't valid UTF-8.
+- Bytes are truncated, the padding isn't zero, an extension entry is cut short or uses tag 0, an enum is out of range, or the GPU name isn't valid UTF-8.
 - Plausibility fails. These checks are always true of real runs (see `computeRunStats`: every frame time is at least its share of the wall-clock):
   - 1% low ≤ 5% low ≤ avg, with 0.05 FPS for rounding.
   - The worst frame is no faster than the 1% low.

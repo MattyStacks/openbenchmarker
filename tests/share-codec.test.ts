@@ -11,6 +11,7 @@ import {
   shareBlocker,
   sharedRunFrom,
   toBase64Url,
+  type SharePayload,
   type SharedRun,
 } from "../src/benchmark/share-codec";
 import { emptySystem, type BenchResult } from "../src/benchmark/types";
@@ -244,5 +245,67 @@ describe("invite and comparison links", () => {
     const v = (u: string) => qr(u, { ecc: "M", border: 4 }).version;
     console.log("invite / comparison link length, QR version (ECC M):", JSON.stringify({ invite: [inviteUrl.length, v(inviteUrl)], comparison: [cmpUrl.length, v(cmpUrl)] }));
     expect(v(cmpUrl)).toBeLessThanOrEqual(10);
+  });
+});
+
+// Codes made by the encoder before the extension section existed (Plan 7). They must keep
+// decoding to exactly these runs and re-encode to the same string, forever.
+describe("links made before the extension section", () => {
+  const PHONE_RUN = run({
+    resolution: "1080p", width: 1920, height: 1080, preset: "High", durationS: 30, avgFps: 41.37, p1Low: 30.2, p5Low: 33.9, worstMs: 40.12,
+    frameCount: 1242, timing: "batch-avg", date: "2026-10-21",
+    device: { browser: "safari", browserMajor: 26, os: "ios", deviceType: "phone", webkitEngine: true, gpuLabel: "Apple GPU" },
+  });
+  delete PHONE_RUN.scoreTest;
+  delete PHONE_RUN.score;
+  const BARE_RUN: SharedRun = { ...PHONE_RUN, device: { browser: "other", browserMajor: null, os: "other", deviceType: "unknown", webkitEngine: false, gpuLabel: null } };
+  delete BARE_RUN.timing;
+  const PINNED: [string, SharePayload][] = [
+    ["AQACCAcaAG_iAJQACdgAjiAEMwlEMIjTl05WSURJQSBHZUZvcmNlIFJUWCA1MDgwCQ", { type: "result", runs: [run()] }],
+    ["AUACCAKAACBSACXAAqYB9YAAm1FELUGsyUFwcGxlIEdQVbo", { type: "challenge", runs: [PHONE_RUN] }],
+    ["AYACCAcaAG_iAJQACdgAjiAEMwlEMIjTl05WSURJQSBHZUZvcmNlIFJUWCA1MDgwAggCgAAgUgAlwAKmAfWAAJtRRC1BrMlBcHBsZSBHUFXP", { type: "comparison", runs: [run(), PHONE_RUN] }],
+    ["AQACCAKAACBSACXAAqYB9YAAm0FELAAAAAg", { type: "result", runs: [BARE_RUN] }],
+  ];
+
+  it("decode identically and re-encode to the same code", () => {
+    for (const [code, payload] of PINNED) {
+      const d = decodeShare(code, TODAY);
+      expect(d).toEqual({ ok: true, payload });
+      expect(encodeShare(payload)).toBe(code);
+    }
+  });
+});
+
+describe("extension section", () => {
+  const bytesOf = (code: string) => Array.from(fromBase64Url(code)!);
+  /** A pinned code with extra entries spliced in before its CRC, CRC recomputed. */
+  const withEntries = (code: string, extra: number[]) => {
+    const body = bytesOf(code).slice(0, -1).concat(extra);
+    return toBase64Url([...body, crc8(body)]);
+  };
+  const BASE = encodeShare({ type: "result", runs: [run()] });
+
+  it("unknown entries are skipped by the reader and carried through", () => {
+    const code = withEntries(BASE, [42, 3, 1, 2, 3, 7, 0]);
+    const d = decodeShare(code, TODAY);
+    expect(d.ok && d.payload.runs[0]).toEqual(run());
+    expect(d.ok && d.payload.ext).toEqual([{ tag: 42, value: Uint8Array.from([1, 2, 3]) }, { tag: 7, value: new Uint8Array(0) }]);
+    expect(d.ok && encodeShare(d.payload)).toBe(code);
+  });
+
+  it("works after a comparison's second run too", () => {
+    const code = encodeShare({ type: "comparison", runs: [run(), run({ avgFps: 100, score: 10000, frameCount: 6000, p1Low: 80, p5Low: 90, worstMs: 12.6 })], ext: [{ tag: 9, value: Uint8Array.from([4]) }] });
+    const d = decodeShare(code, TODAY);
+    expect(d.ok && d.payload.runs.length).toBe(2);
+    expect(d.ok && d.payload.ext?.[0].tag).toBe(9);
+  });
+
+  it("a truncated entry, tag 0 or a stray zero byte reads as damaged", () => {
+    for (const extra of [[42], [42, 5, 1, 2], [0, 0], [0]]) expect(decodeShare(withEntries(BASE, extra), TODAY)).toEqual({ ok: false, reason: "damaged" });
+  });
+
+  it("the encoder refuses bad entries", () => {
+    expect(() => encodeShare({ type: "result", runs: [run()], ext: [{ tag: 0, value: new Uint8Array(0) }] })).toThrow();
+    expect(() => encodeShare({ type: "result", runs: [run()], ext: [{ tag: 1, value: new Uint8Array(256) }] })).toThrow();
   });
 });

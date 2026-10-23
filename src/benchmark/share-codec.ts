@@ -10,6 +10,10 @@ import type { PresetId, ResolutionId, ScoreTestId } from "./presets";
 // even after presets, browsers or durations change elsewhere in the code. A trailing CRC-8 catches
 // truncated or mangled links. It is error detection, not security: the format is open, so sharing
 // runs on the honor system.
+//
+// Between the run records and the CRC sits an optional extension section: byte-aligned entries of
+// tag (1 byte), length (1 byte) and value. Decoders skip tags they don't know, so new optional
+// fields can join links without a version bump; the version byte changes only for breaking changes.
 // ---------------------------------------------------------------------------
 
 export const SHARE_SCHEMA_VERSION = 1;
@@ -41,10 +45,18 @@ export interface SharedRun {
   device: DeviceContext;
 }
 
+/** One extension entry. Tag 0 is reserved; no tags are assigned yet (see docs/share-links.md). */
+export interface ShareExtension {
+  tag: number;
+  value: Uint8Array;
+}
+
 export interface SharePayload {
   type: ShareLinkType;
   /** One run for result and challenge links, two for comparison links. */
   runs: SharedRun[];
+  /** Extension entries in link order, unknown ones included; absent when the link has none. */
+  ext?: ShareExtension[];
 }
 
 export type DecodeResult = { ok: true; payload: SharePayload } | { ok: false; reason: "damaged" | "newer-version" };
@@ -129,9 +141,14 @@ class BitReader {
     for (let i = 0; i < n; i++, this.pos++) v = v * 2 + ((this.data[this.pos >> 3] >> (7 - (this.pos & 7))) & 1);
     return v;
   }
-  /** Bits left before the final CRC byte must all be padding (zero). */
-  remainingBits(): number {
-    return this.data.length * 8 - this.pos;
+  /** Skip to the next byte boundary; true when the skipped padding bits were all zero. */
+  alignZero(): boolean {
+    const n = (8 - (this.pos & 7)) & 7;
+    return n === 0 || this.get(n) === 0;
+  }
+  /** Byte offset; only meaningful after alignZero(). */
+  byteOffset(): number {
+    return this.pos >> 3;
   }
 }
 
@@ -267,6 +284,10 @@ export function encodeShare(payload: SharePayload): string {
   w.put(0, 6);
   for (const r of payload.runs) writeRun(w, r);
   const bytes = w.bytes();
+  for (const e of payload.ext ?? []) {
+    if (!(Number.isInteger(e.tag) && e.tag >= 1 && e.tag <= 255) || e.value.length > 255) throw new Error("Bad share extension entry");
+    bytes.push(e.tag, e.value.length, ...e.value);
+  }
   bytes.push(crc8(bytes));
   return toBase64Url(bytes);
 }
@@ -369,10 +390,17 @@ export function decodeShare(s: string, today = new Date()): DecodeResult {
       if (!r || !plausible(r, today)) return { ok: false, reason: "damaged" };
       runs.push(r);
     }
-    // Only zero padding may remain inside the last byte.
-    const left = rd.remainingBits();
-    if (left >= 8 || (left > 0 && rd.get(left) !== 0)) return { ok: false, reason: "damaged" };
-    return { ok: true, payload: { type, runs } };
+    // Zero padding to a byte boundary, then extension entries (if any) up to the CRC.
+    if (!rd.alignZero()) return { ok: false, reason: "damaged" };
+    const ext: ShareExtension[] = [];
+    for (let i = rd.byteOffset(); i < body.length; ) {
+      const tag = body[i];
+      const len = body[i + 1];
+      if (tag === 0 || len === undefined || i + 2 + len > body.length) return { ok: false, reason: "damaged" };
+      ext.push({ tag, value: body.slice(i + 2, i + 2 + len) });
+      i += 2 + len;
+    }
+    return { ok: true, payload: { type, runs, ...(ext.length ? { ext } : {}) } };
   } catch {
     return { ok: false, reason: "damaged" };
   }
