@@ -13,7 +13,7 @@ Principle being audited: everything runs in the browser; the site stores nothing
 | Network requests from app code | None. No `fetch(`, `XMLHttpRequest`, `WebSocket` or `EventSource` in `src/`. The only URLs in the bundle are hyperlinks, catalog metadata and licence/attribution strings (GitHub, opengpubenchmarks.com, threejs.org, schema.org, creativecommons.org); they load nothing unless clicked. |
 | Web fonts / third-party assets | None. System fonts only (`src/style.css`: "System fonts only, no external assets"); no `@font-face`, Google Fonts or CDN assets. Three.js is bundled at build time. |
 | `sessionStorage` / IndexedDB / Cache Storage | Not used anywhere in source or `dist/`. |
-| `localStorage` | `src/app/store.ts` and `src/app/run-guard.ts`, four keys (below). |
+| `localStorage` | `src/app/store.ts`, `src/app/run-guard.ts` and `src/app/history-view.ts`, five keys (below). |
 | Clipboard / Web Share | Only on explicit taps: copy YAML / lookup commands (`src/app/results-view.ts`), and Share / Copy link / Save image (`src/app/share.ts`). Share hands the link, text and card PNG to the system share sheet (`navigator.share`); where that's missing it copies the link and text to the clipboard. The site sends nothing itself. |
 | Share links | `#/r/<payload>`: the whole result encoded (not encrypted) in the URL fragment (`src/benchmark/share-codec.ts`). Browsers never send the fragment in HTTP requests, so opening a link sends nothing about the result to the site. It is decoded and shown only in the recipient's browser. A link carries the measured numbers, settings, run date, browser + version, OS, device type and the GPU name as reported by the browser. It never carries the user-filled `system` fields, the diagnostics or the result id. Anyone with a link can read it. |
 | Share card | Drawn on a 2D canvas in the browser (`renderCard`), QR code generated locally (`uqr`, bundled; no network). |
@@ -26,6 +26,7 @@ Principle being audited: everything runs in the browser; the site stores nothing
 |---|---|---|---|
 | `ogb.results.v1` (`localStorage`) | `src/app/store.ts` | Saved `BenchResult[]` (measured result, user-filled `system`, `diag`, and from Plan 1 the separate `device` field) | Only when the user exports JSON/CSV, downloads/copies YAML, or opens the GitHub submission form |
 | `ogb.config.v1` (`localStorage`) | `src/app/store.ts` | Last-used run config (resolution, preset, duration) | Never |
+| `ogb.historyView.v1` (`localStorage`) | `src/app/history-view.ts` | My Results display preference, `cards` or `table` | Never |
 | `ogb.runInProgress.v1` (`localStorage`) | `src/app/run-guard.ts` | The run currently in progress (resolution, preset, duration, start time, phase). Written before a run and removed when it ends in any way. If it's still there on the next load, the OS closed the page mid-run | Never |
 | `ogb.unfinished.v1` (`localStorage`) | `src/app/run-guard.ts` | Resolution/preset combos that didn't finish on this device (count, last time, phase), used for the "Didn't finish on this device last time" hint. A combo is removed once a run at it finishes | Never |
 

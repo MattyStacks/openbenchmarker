@@ -15,6 +15,7 @@ import {
   mixesMajors,
   sortRuns,
   submissionStatus,
+  tableStatus,
   type FacetKey,
   type Filters,
   type SortKey,
@@ -36,7 +37,26 @@ const FACETS: { key: FacetKey; label: string }[] = [
   { key: "device", label: "Device" },
 ];
 
-const state: { filters: Filters; sort: SortKey; shown: number } = { filters: {}, sort: "newest", shown: PAGE };
+type View = "cards" | "table";
+const VIEW_KEY = "ogb.historyView.v1";
+
+/** Cards are the default; the table is a remembered per-browser choice (display preference only). */
+function loadView(): View {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "table" ? "table" : "cards";
+  } catch {
+    return "cards";
+  }
+}
+function saveView(v: View): void {
+  try {
+    localStorage.setItem(VIEW_KEY, v);
+  } catch {
+    /* storage unavailable: the choice lasts for this page only */
+  }
+}
+
+const state: { filters: Filters; sort: SortKey; shown: number; view: View } = { filters: {}, sort: "newest", shown: PAGE, view: loadView() };
 
 const major = (v: string) => String(v ?? "").split(".")[0];
 const fmtMs = (x: number) => `${x.toFixed(2)} ms`;
@@ -124,6 +144,33 @@ function dnfCard(c: UnfinishedCombo): string {
   </article>`;
 }
 
+/** Table view: many runs at a glance, with what each desktop run still needs to be submitted. */
+function table(rows: readonly BenchResult[], dnf: readonly UnfinishedCombo[]): string {
+  const row = (r: BenchResult) => {
+    const st = tableStatus(r);
+    const v = r.diag ? diagnose(r).verdict : null;
+    const old = major(r.benchmarkVersion) !== major(BENCHMARK_VERSION);
+    return `<tr data-id="${esc(r.id)}">
+      <td>${esc(r.date)}<span class="t-sub">${esc(r.time)}</span></td>
+      <td class="num${old ? " dim" : ""}">v${esc(r.benchmarkVersion)}</td>
+      <td>${esc(r.resolution)}</td><td>${esc(r.preset)}</td>
+      <td class="num">${r.score ?? ""}</td>
+      <td class="num">${round1(r.avgFps).toFixed(1)}</td><td class="num">${round1(r.p1Low).toFixed(1)}</td>
+      <td class="t-dev">${esc(deviceLine(r))}${gpuLine(r) ? `<span class="t-gpu">${esc(gpuLine(r))}</span>` : ""}</td>
+      <td class="t-status">${st.cls === "next" ? `<button type="button" class="linklike st-next" data-act="submit" title="Open the submit section">${esc(st.text)}</button>` : `<span class="st-${st.cls}">${esc(st.text)}</span>`}</td>
+      <td>${v ? `<span class="limit-tag v-${v}">${esc(VERDICT_LABEL[v])}</span>` : ""}</td>
+      <td><div class="t-actions"><a class="btn btn-sm" href="#/result/${encodeURIComponent(r.id)}">Open</a>${canShare(r) ? `<button type="button" class="btn btn-sm" data-act="share">Share</button>` : ""}<button type="button" class="btn btn-sm danger" data-act="delete" aria-label="Delete">✕</button></div></td>
+    </tr>`;
+  };
+  const dnfRow = (c: UnfinishedCombo) => `<tr data-dnf-res="${esc(c.resolution)}" data-dnf-preset="${esc(c.preset)}">
+      <td>${esc(c.lastAt.slice(0, 10))}</td><td></td><td>${esc(c.resolution)}</td><td>${esc(c.preset)}</td><td colspan="4"><span class="badge warn">Didn't finish</span>${c.count > 1 ? ` ${c.count} times on this device` : ""}</td>
+      <td><span class="st-muted">Try a lower resolution</span></td><td></td>
+      <td><div class="t-actions"><button type="button" class="btn btn-sm" data-act="dnf-remove">Remove</button></div></td></tr>`;
+  return `<div class="hist-table-wrap"><table class="hist-table">
+    <thead><tr><th>Date</th><th>Version</th><th><abbr title="Resolution">Res.</abbr></th><th>Preset</th><th>Score</th><th>Avg FPS</th><th>1% low</th><th>Device · GPU <em>(browser)</em></th><th>Submission</th><th>Limit</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+    <tbody>${dnf.map(dnfRow).join("")}${rows.map(row).join("")}</tbody></table></div>`;
+}
+
 function toolbar(all: readonly BenchResult[]): string {
   const groups = FACETS.map(({ key, label }) => {
     const values = facetValues(all, key);
@@ -133,6 +180,7 @@ function toolbar(all: readonly BenchResult[]): string {
       .join("")}</div>`;
   }).join("");
   return `<div class="hist-toolbar">
+    <div class="view-switch" role="group" aria-label="View"><button type="button" data-hist-view="cards" aria-pressed="${state.view === "cards"}">Cards</button><button type="button" data-hist-view="table" aria-pressed="${state.view === "table"}">Table</button></div>
     <label class="sort"><span>Sort</span><select id="hist-sort"><option value="newest"${state.sort === "newest" ? " selected" : ""}>Newest first</option><option value="fps"${state.sort === "fps" ? " selected" : ""}>Highest FPS</option></select></label>
     ${groups ? `<div class="chips">${groups}</div>` : ""}
   </div>`;
@@ -150,7 +198,7 @@ function renderList(): void {
     ${filtered ? `<p class="muted small-print">Showing ${list.length} of ${all.length}. <button type="button" class="linklike" data-act="clear-filters">Clear filters</button></p>` : ""}
     ${mixesMajors(list) ? `<p class="muted small-print">1.x and 2.x measure different workloads, so their FPS can't be compared.</p>` : ""}
     ${list.length || dnf.length ? "" : `<p>No runs match these filters. <button type="button" class="linklike" data-act="clear-filters">Clear filters</button></p>`}
-    <div class="run-cards">${dnf.map(dnfCard).join("")}${shown.map(card).join("")}</div>
+    ${state.view === "table" ? table(shown, dnf) : `<div class="run-cards">${dnf.map(dnfCard).join("")}${shown.map(card).join("")}</div>`}
     ${list.length > shown.length ? `<button type="button" class="btn show-more" data-act="more">Show more (${list.length - shown.length} left)</button>` : ""}`;
 }
 
@@ -170,6 +218,7 @@ export function renderHistory(): void {
     <div id="hist-list"></div>
     <div class="hist-footer">
       ${all.length ? `<button type="button" class="btn" data-act="csv-all">Export all as CSV</button>` : ""}
+      ${all.length ? `<button type="button" class="linklike view-link" data-hist-view="${state.view === "table" ? "cards" : "table"}">${state.view === "table" ? "Card view" : "Table view"}</button>` : ""}
       <button type="button" class="btn danger" data-act="clear-all">Clear my saved results</button>
     </div>`;
   renderList();
@@ -198,6 +247,13 @@ export function renderHistory(): void {
   );
   view.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
+    const viewBtn = t.closest<HTMLElement>("[data-hist-view]");
+    if (viewBtn) {
+      state.view = viewBtn.dataset.histView === "table" ? "table" : "cards";
+      saveView(state.view);
+      renderHistory();
+      return;
+    }
     const chip = t.closest<HTMLButtonElement>(".chip");
     if (chip) {
       const k = chip.dataset.facet as FacetKey;
@@ -210,7 +266,7 @@ export function renderHistory(): void {
     const btn = t.closest<HTMLElement>("[data-act]");
     if (!btn) return;
     const act = btn.dataset.act!;
-    const cardEl = btn.closest<HTMLElement>(".run-card");
+    const cardEl = btn.closest<HTMLElement>("[data-id], [data-dnf-res]");
     const r = cardEl?.dataset.id ? allResults().find((x) => x.id === cardEl.dataset.id) : undefined;
     btn.closest<HTMLDetailsElement>("details.menu")?.removeAttribute("open");
     if (act === "share" && r) {

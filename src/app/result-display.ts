@@ -121,3 +121,12 @@ export function sortRuns(list: readonly BenchResult[], by: SortKey): BenchResult
 export function mixesMajors(list: readonly BenchResult[]): boolean {
   return new Set(list.map((r) => majorOf(r.benchmarkVersion))).size > 1;
 }
+
+/** The table view's Submission column: what a desktop run still needs, worded as a next step. */
+export function tableStatus(r: BenchResult): { cls: "good" | "next" | "muted" | "bad"; text: string } {
+  const s = submissionStatus(r);
+  if (s.kind === "ready") return { cls: "good", text: "✓ Ready to submit" };
+  if (s.kind === "next-step") return { cls: "next", text: `Needs: ${s.missing.join(", ")}` };
+  if (s.kind === "handheld") return { cls: "muted", text: "Share only" };
+  return { cls: "bad", text: s.text };
+}

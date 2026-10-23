@@ -11,6 +11,7 @@ import {
   runClass,
   sortRuns,
   submissionStatus,
+  tableStatus,
 } from "../src/app/result-display";
 
 const dev = (over: Partial<DeviceContext>): DeviceContext => ({ browser: "other", browserMajor: null, os: "other", deviceType: "unknown", webkitEngine: false, gpuLabel: null, ...over });
@@ -81,6 +82,16 @@ describe("display rules table", () => {
     expect(deviceLine(result({ device: DESK, mobile: false }))).toBe("🖥 Edge 141 · Windows");
     expect(deviceLine(result({ device: dev({ browser: "firefox", browserMajor: 132 }) }))).toBe("Firefox 132");
     expect(deviceLine(result({ device: dev({}) }))).toBe("");
+  });
+});
+
+describe("table view Submission column", () => {
+  it("shows what a desktop run needs, never 'missing' for phones", () => {
+    expect(tableStatus(result({ device: DESK, mobile: false, system: READY_SYS }))).toEqual({ cls: "good", text: "✓ Ready to submit" });
+    expect(tableStatus(result({ device: DESK, mobile: false }))).toEqual({ cls: "next", text: "Needs: GPU, OS" });
+    expect(tableStatus(result())).toEqual({ cls: "next", text: "Needs: GPU, OS" });
+    expect(tableStatus(result({ device: IPHONE, mobile: true }))).toEqual({ cls: "muted", text: "Share only" });
+    expect(tableStatus(result({ device: IPHONE, mobile: true, valid: false, invalidReason: "Aborted by user" }))).toEqual({ cls: "bad", text: "Invalid: Aborted by user" });
   });
 });
 
