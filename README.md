@@ -376,9 +376,9 @@ fields from newer versions are kept, and a field the user cleared stays cleared.
 ## Privacy and sharing
 
 Everything runs in the browser. The site stores nothing on a server: no database, no accounts; the
-site sets no cookies and adds no analytics. It's hosted on Cloudflare, which sees requests like any
-host and runs its own delivery and security features (network error reports, bot checks that may
-set a cookie); see the About page. Results live in this browser's localStorage. They leave it only when you
+site sets no cookies and adds no analytics. It's hosted on Cloudflare, which may add its own beacons or other
+technology to keep the site running; nothing in the site's code collects user data. See the About
+page. Results live in this browser's localStorage. They leave it only when you
 share a link, export a file, or submit through GitHub. Share links carry the result in the URL
 fragment, which browsers never send to the server, and sharing is on the honor system (nothing is
 signed or verified). Links are encoded, not encrypted: anyone with a link can read it, like a
