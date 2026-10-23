@@ -117,7 +117,7 @@ Every decoded string goes through `esc()`. A test link whose GPU name was `<img 
 
 ## Share flow
 
-1. **Share result:** if `navigator.canShare({ files })`, the share sheet gets the card PNG plus the text with the link at the end. The link isn't passed as a separate `url`: iOS shows a share that holds a link and an image as "1 Link and 1 Image" with a blank icon, but a single image shows the card as the preview. Otherwise it gets the text and the link. Where there's no share sheet (desktop Firefox, some Linux browsers) or it fails, the text and link are copied to the clipboard with a confirmation. Cancelling the sheet (`AbortError`) shows nothing.
+1. **Share result:** if `navigator.canShare({ files })`, the share sheet gets the card PNG plus the text with the link at the end. The link isn't passed as a separate `url`: iOS shows a share that holds a link and an image as "1 Link and 1 Image" with a blank icon, but a single image shows the card as the preview. (On the tester's iPhone the preview still showed a blank icon after this change; accepted for now, since sharing, the image and Copy link all work.) Otherwise it gets the text and the link. Where there's no share sheet (desktop Firefox, some Linux browsers) or it fails, the text and link are copied to the clipboard with a confirmation. Cancelling the sheet (`AbortError`) shows nothing.
 2. **Copy link** and **Save image** are always next to it. "Preview the share card" shows the PNG.
 3. In My Results, valid rows have a Share button that does step 1.
 
@@ -136,7 +136,7 @@ Share text, e.g.: *"Score: Extreme 14,321: 143.2 FPS avg, 118.4 1% low in the Ne
 
 | Device / browser | Share sheet with image | Text-only / copy fallback | Link opens shared view | QR scans off the card | Notes |
 |---|---|---|---|---|---|
-| iPhone, Safari | | | | | |
+| iPhone, Safari | ✓ (the share sheet's preview icon is blank) | | | | 2026-10-22: Share and Copy link work; the share box layout is fine |
 | Android, Chrome | | | | | |
 | Desktop Chrome | | | | | |
 | Desktop Edge | | | | | |
