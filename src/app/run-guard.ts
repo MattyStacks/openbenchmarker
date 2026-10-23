@@ -84,6 +84,15 @@ export function didNotFinish(resolution: string, preset: string, store = default
   return unfinishedCombos(store).find((c) => c.resolution === resolution && c.preset === preset);
 }
 
+/** Removed from My Results by the user. Same effect as a finished run: the hint goes away. */
+export function removeUnfinished(resolution: string, preset: string, store = defaultStore()): void {
+  markFinished(resolution, preset, store);
+}
+
+export function clearUnfinished(store = defaultStore()): void {
+  write(UNFINISHED_KEY, null, store);
+}
+
 /** A run at this combo finished, so it no longer needs the "didn't finish" hint. */
 export function markFinished(resolution: string, preset: string, store = defaultStore()): void {
   const list = unfinishedCombos(store);

@@ -9,9 +9,30 @@ import { LINUX_ONLY_FIELDS, type BenchResult, type SystemInfo } from "../benchma
 import { validateSubmission } from "../benchmark/validate";
 import { $, esc } from "./dom";
 import { BATCH_MS } from "./env";
+import { deviceLine, gpuLine, isHandheld, runClass } from "./result-display";
 import { bindShareBox, shareBoxHtml } from "./share";
 import { showView } from "./shell";
 import { upsertResult } from "./store";
+
+/**
+ * Hints for the system form. From the run's own recorded diagnostics when present, so a desktop
+ * result opened on a phone shows the desktop's values; the live probe (a throwaway WebGL context in
+ * THIS browser) is only for old results recorded before diagnostics existed.
+ */
+function hintsFor(r: BenchResult): { source: "run" | "live"; rows: [string, string][] } {
+  const d = r.diag;
+  if (d)
+    return {
+      source: "run",
+      rows: [
+        ["WebGL renderer", isMaskedRenderer(d.renderer) ? `hidden by the browser ("${d.renderer}")` : d.renderer],
+        ["Logical CPU threads", d.cpuThreads === null ? "not reported" : String(d.cpuThreads)],
+        ["Browser", d.browser],
+      ],
+    };
+  const h = browserHints();
+  return { source: "live", rows: [["WebGL renderer", h.renderer], ["Logical CPU threads", h.threads], ["User agent", h.ua]] };
+}
 
 function browserHints(): { renderer: string; threads: string; ua: string } {
   let rendererStr = "unavailable";
@@ -98,10 +119,25 @@ function diagPanel(r: BenchResult): string {
   </section>`;
 }
 
+/** Set by openResult so the page can scroll to a section after it renders. */
+let pendingFocus: "submit" | null = null;
+
+/** Open a result page, optionally scrolled to its submit section (My Results' "Submit…"). */
+export function openResult(id: string, focus: "submit" | null = null): void {
+  pendingFocus = focus;
+  const target = `#/result/${encodeURIComponent(id)}`;
+  if (location.hash === target) window.dispatchEvent(new HashChangeEvent("hashchange"));
+  else location.hash = target;
+}
+
 export function renderResults(r: BenchResult): void {
   showView("results");
-  const hints = browserHints();
+  const cls = runClass(r);
+  const handheld = isHandheld(cls);
+  const showSubmit = r.valid && !handheld;
+  const dev = [deviceLine(r), gpuLine(r) ? `${gpuLine(r)} (reported by browser)` : ""].filter(Boolean).join(" · ");
   const view = $("#view-results");
+  const hints = showSubmit ? hintsFor(r) : null;
   const gpuOptions = [
     `<option value="">— Select your exact GPU —</option>`,
     ...GPU_CATALOG.map((g) => `<option value="${esc(g.id)}">${esc(g.name)} (${esc(g.id)})</option>`),
@@ -111,9 +147,9 @@ export function renderResults(r: BenchResult): void {
     <div class="results-head">
       <h1 class="sign">Neon Flythrough result</h1>
       <p class="muted">${esc(r.date)} ${esc(r.time)} · v${esc(r.benchmarkVersion)}</p>
+      ${dev ? `<p class="result-device">${esc(dev)}</p>` : ""}
     </div>
     ${r.valid ? "" : `<div class="banner-invalid" role="alert"><b>INVALID RUN:</b> ${esc(r.invalidReason)}. Saved locally; it can never be submitted.</div>`}
-    ${r.mobile ? `<p class="muted">Mobile run: saved locally and exportable as JSON/CSV. Submissions from phones and tablets aren't accepted yet.</p>` : ""}
     <div class="score-cards">
       ${
         r.score !== undefined
@@ -128,10 +164,25 @@ export function renderResults(r: BenchResult): void {
       <div class="score small"><span>Run settings</span><b class="settings" id="res-settings">${r.scoreTest ? `${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)} · ` : ""}${esc(r.resolution)} (${r.width}×${r.height}) · ${esc(r.preset)} · ${r.durationS} s · ${esc(r.graphicsApi)}</b></div>
     </div>
     ${r.valid && !shareBlocker(sharedRunFrom(r)) ? shareBoxHtml() : ""}
+    <div data-challenge-slot></div>
     ${r.scoreTest && r.score === undefined ? `<p class="muted">Started as ${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)}, but ${r.valid ? "its settings didn't match the locked test" : "the run was invalid"}, so it has no score.</p>` : ""}
-    ${diagPanel(r)}
+    <details class="result-details">
+      <summary>Details: what limited this run, timing and export</summary>
+      ${diagPanel(r)}
     <p class="muted small-print">Uncapped: frames were rendered back-to-back in ~${BATCH_MS} ms batches, with three batches kept queued on the GPU. Average FPS is frames divided by timed wall-clock. ${r.timing === "gpu-timer" ? "Lows and worst frame use each frame's GPU time from timer queries (or its batch average, if larger)." : r.timing === "batch-avg" ? "No GPU timer was available, so lows and worst frame use each batch's average frame time." : "Each frame was timed from submission to GPU completion."} Loop busy ${(r.loopBusy * 100).toFixed(0)}% of timed wall-clock.</p>
+      <div class="row export-row">
+        <button type="button" class="btn" id="exp-json">Export JSON</button>
+        <button type="button" class="btn" id="exp-csv">Export CSV</button>
+      </div>
+    </details>
 
+    ${
+      handheld && r.valid
+        ? `<p class="handheld-note">📱 Phone and tablet runs can be shared, but not submitted: the Open GPU Benchmarks dataset lists desktop and laptop GPUs.</p>`
+        : ""
+    }
+    ${showSubmit ? `<section class="submit-section" id="submit-section" aria-labelledby="submit-title">
+    <h2 class="section-title" id="submit-title">Submit to Open GPU Benchmarks</h2>
     <div class="results-grid">
       <form class="card sys-form" id="sys-form" autocomplete="off">
         <h2><span class="kana" aria-hidden="true">システム</span>System information</h2>
@@ -155,19 +206,17 @@ export function renderResults(r: BenchResult): void {
 
       <div class="card">
         <h2><span class="kana" aria-hidden="true">ヒント</span>Browser hints <span class="muted">(for your eyes only)</span></h2>
-        <p class="muted tiny">Reported by the browser, often masked or generic. Never copied into your system fields: use them to help you pick the right values. The run records the renderer, thread count, battery state and browser separately, labelled as detected (see "What limited this run").</p>
-        <dl class="hints">
-          <dt>WebGL renderer</dt><dd>${esc(hints.renderer)}</dd>
-          <dt>Logical CPU threads</dt><dd>${esc(hints.threads)}</dd>
-          <dt>User agent</dt><dd>${esc(hints.ua)}</dd>
-        </dl>
+        <p class="muted tiny">${
+          hints!.source === "run"
+            ? "Recorded by the browser during this run, often masked or generic."
+            : "Read from this browser now (this result was recorded before the run saved them), often masked or generic."
+        } Never copied into your system fields: use them to help you pick the right values.</p>
+        <dl class="hints">${hints!.rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
         <div id="os-cmds"></div>
 
         <h2><span class="kana" aria-hidden="true">送信</span>Export &amp; submit</h2>
         <div id="val-box" aria-live="polite"></div>
         <div class="row">
-          <button type="button" class="btn" id="exp-json">Export JSON</button>
-          <button type="button" class="btn" id="exp-csv">Export CSV</button>
           <button type="button" class="btn btn-primary" id="exp-yaml">Download YAML</button>
           <button type="button" class="btn" id="copy-yaml">Copy YAML</button>
         </div>
@@ -179,10 +228,17 @@ export function renderResults(r: BenchResult): void {
         <pre class="yaml" id="yaml-preview"></pre>
         <div id="submit-steps"></div>
       </div>
-    </div>`;
+    </div>
+    </section>` : ""}
+    <p class="about-link"><a href="#/about">About sharing &amp; FAQ →</a></p>`;
 
   const shareBox = view.querySelector<HTMLElement>(".share-box");
   if (shareBox) bindShareBox(shareBox, sharedRunFrom(r));
+  $("#exp-json").onclick = () => download(suggestedFileName(r, "json"), toJson(r), "application/json");
+  $("#exp-csv").onclick = () => download(suggestedFileName(r, "csv"), toCsv([r]), "text/csv");
+  const focus = pendingFocus;
+  pendingFocus = null;
+  if (!showSubmit) return;
 
   const form = $<HTMLFormElement>("#sys-form");
   for (const [k, v] of Object.entries(r.system)) {
@@ -235,7 +291,7 @@ export function renderResults(r: BenchResult): void {
     $("#gpu-blocked").hidden = r.system.gpuId !== NOT_LISTED;
     $("#val-box").innerHTML = ok
       ? `<p class="ok">✓ Ready to submit: all required fields valid.</p>`
-      : `<div class="errors"><b>Not submittable yet</b> (local save and JSON/CSV still work):<ul>${errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul></div>`;
+      : `<div class="next-step"><b>Add your system details to submit</b> (saving, sharing and export work anyway):<ul>${errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul></div>`;
     $<HTMLButtonElement>("#exp-yaml").disabled = !ok;
     $<HTMLButtonElement>("#copy-yaml").disabled = !ok;
     const yaml = ok ? toYaml(r) : "";
@@ -258,8 +314,6 @@ export function renderResults(r: BenchResult): void {
     }
   });
   form.addEventListener("submit", (e) => e.preventDefault());
-  $("#exp-json").onclick = () => download(suggestedFileName(r, "json"), toJson(r), "application/json");
-  $("#exp-csv").onclick = () => download(suggestedFileName(r, "csv"), toCsv([r]), "text/csv");
   $("#exp-yaml").onclick = () => validateSubmission(r).length === 0 && download(suggestedFileName(r, "yaml"), toYaml(r), "application/x-yaml");
   $("#copy-yaml").onclick = async () => {
     if (validateSubmission(r).length) return;
@@ -271,4 +325,5 @@ export function renderResults(r: BenchResult): void {
     }
   };
   refresh();
+  if (focus === "submit") requestAnimationFrame(() => $("#submit-section").scrollIntoView({ behavior: "smooth", block: "start" }));
 }

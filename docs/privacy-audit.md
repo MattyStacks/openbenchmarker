@@ -29,7 +29,7 @@ Principle being audited: everything runs in the browser; the site stores nothing
 | `ogb.runInProgress.v1` (`localStorage`) | `src/app/run-guard.ts` | The run currently in progress (resolution, preset, duration, start time, phase). Written before a run and removed when it ends in any way. If it's still there on the next load, the OS closed the page mid-run | Never |
 | `ogb.unfinished.v1` (`localStorage`) | `src/app/run-guard.ts` | Resolution/preset combos that didn't finish on this device (count, last time, phase), used for the "Didn't finish on this device last time" hint. A combo is removed once a run at it finishes | Never |
 
-Clearing site data deletes all of them. There is no server copy to delete.
+Clearing site data deletes all of them. In My Results, "Clear my saved results" removes `ogb.results.v1` and `ogb.unfinished.v1`; the run config stays. My Results filters and sort live in memory only (nothing stored). There is no server copy to delete.
 
 ## Hosting
 

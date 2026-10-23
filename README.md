@@ -370,7 +370,8 @@ src/benchmark/exporter.ts     toYaml / toCsv / toJson / file names
 src/main.ts                   entry: routing, config form (dev-only ?capture hook)
 src/app/run.ts                run controller (warm-up, timed batches, GPU timers, validity)
 src/app/results-view.ts       results page, system form, export & submit
-src/app/history-view.ts       My Results (#/history)
+src/app/history-view.ts       My Results (#/history): card list, filters, sort
+src/app/result-display.ts     how a result is shown, by the device that ran it (pure, tested)
 src/app/home.ts, shell.ts, router.ts, store.ts, hud.ts, env.ts, dom.ts
 src/app/share-env.ts          device detection for display/sharing only (pure, tested)
 src/app/run-guard.ts          crash detection (run-in-progress record), "didn't finish" hints, phone high-res confirmation

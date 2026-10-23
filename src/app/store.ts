@@ -75,6 +75,16 @@ export function removeResult(id: string): void {
   saveHistory(history);
 }
 
+/** "Clear my saved results": every saved result in this browser. */
+export function clearResults(): void {
+  history = [];
+  try {
+    localStorage.removeItem(STORE_KEY);
+  } catch {
+    /* storage unavailable: the in-memory list is cleared anyway */
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Last-used run configuration
 // ---------------------------------------------------------------------------
