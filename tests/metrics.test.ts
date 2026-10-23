@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STALL_MS, computeRunStats, computeStats, hitchStats, graphPoints, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimes, runFrameTimesInto, scoreFor } from "../src/benchmark/metrics";
+import { STALL_MS, computeRunStats, lapChange, lapStats, stability, stabilityBand, computeStats, hitchStats, graphPoints, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimes, runFrameTimesInto, scoreFor } from "../src/benchmark/metrics";
 
 describe("computeStats", () => {
   it("uniform 60 FPS gives 60 avg and 60 lows", () => {
@@ -203,5 +203,50 @@ describe("scoreFor", () => {
     expect(scoreFor(65.12)).toBe(6512);
     expect(scoreFor(0)).toBe(0);
     expect(scoreFor(NaN)).toBe(0);
+  });
+});
+
+describe("stress laps", () => {
+  it("splits batches into laps and gives each its own throughput and 1% low", () => {
+    // Lap 0: 2 batches of 10 frames in 100 ms each (100 FPS). Lap 1: 1 batch of 10 frames in 125 ms (80 FPS).
+    const batches = [batch(10, 100), batch(10, 100), batch(10, 125)];
+    const laps = lapStats(batches, undefined, [0, 2]);
+    expect(laps.map((l) => l.avgFps)).toEqual([100, 80]);
+    expect(laps[0].p1Low).toBeCloseTo(100, 6);
+    expect(laps[1].p1Low).toBeCloseTo(80, 6);
+  });
+
+  it("lines GPU times up with each lap's own frames", () => {
+    const batches = [batch(4, 40), batch(4, 40)];
+    const gpu = [1, 1, 1, 1, 1, 1, 1, 50]; // one slow GPU frame, in lap 1
+    const laps = lapStats(batches, gpu, [0, 1]);
+    expect(laps[0].p1Low).toBeCloseTo(100, 6);
+    expect(laps[1].p1Low).toBeCloseTo(20, 6);
+  });
+
+  it("the laps' frames add up to the whole run", () => {
+    const batches = Array.from({ length: 30 }, (_, i) => batch(5 + (i % 7), 8 + (i % 3)));
+    const laps = lapStats(batches, undefined, [0, 10, 20]);
+    const all = computeRunStats(batches);
+    let frames = 0, ms = 0;
+    for (const [a, b] of [[0, 10], [10, 20], [20, 30]]) for (const x of batches.slice(a, b)) (frames += x.frames), (ms += x.ms);
+    expect(frames).toBe(all.frames);
+    expect((frames * 1000) / ms).toBeCloseTo(all.avgFps, 9);
+    expect(laps).toHaveLength(3);
+  });
+
+  it("stability is slowest lap ÷ fastest lap; change is last ÷ first − 1", () => {
+    const laps = [150, 152, 148, 145, 144, 146].map((avgFps) => ({ avgFps, p1Low: avgFps * 0.8 }));
+    expect(stability(laps)).toBeCloseTo(144 / 152, 9);
+    expect(lapChange(laps)).toBeCloseTo(146 / 150 - 1, 9);
+    expect(stability([])).toBeNull();
+    expect(lapChange(laps.slice(0, 1))).toBeNull();
+  });
+
+  it("bands: 97% and up is steady, below 90% is throttled", () => {
+    expect(stabilityBand(0.97)).toBe("steady");
+    expect(stabilityBand(0.969)).toBe("slowed");
+    expect(stabilityBand(0.9)).toBe("slowed");
+    expect(stabilityBand(0.899)).toBe("throttled");
   });
 });

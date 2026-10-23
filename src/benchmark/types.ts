@@ -1,5 +1,5 @@
 import type { TimingMethod } from "./metrics";
-import type { PresetId, ResolutionId, ScoreTestId } from "./presets";
+import type { PresetId, ResolutionId, ScoreTestId, StressTestId } from "./presets";
 
 export type GraphicsApi = "WebGL2" | "WebGL1";
 
@@ -95,6 +95,12 @@ export interface RunDiagnostics {
   features: { bloom: boolean; msaa: number; shadowMap: number; reflections: number; /** Ray-march steps (absent before 2.2.0). */ volumetrics?: number; fallbackReason: string };
 }
 
+/** One lap of a stress test (one pass of the 96 s flight). */
+export interface LapStat {
+  avgFps: number;
+  p1Low: number;
+}
+
 /** A completed run. Everything outside `system` is measured by the tool. */
 export interface BenchResult {
   id: string;
@@ -128,6 +134,10 @@ export interface BenchResult {
   scoreTest?: ScoreTestId;
   /** Only on valid runs whose settings match `scoreTest` exactly (see scoreFor). */
   score?: number;
+  /** Set when the run was started as a locked stress test (never together with scoreTest). */
+  stressTest?: StressTestId;
+  /** Stress runs only: every lap that finished, in order (an aborted run keeps the ones it completed). */
+  laps?: LapStat[];
   /** Absent on results from before diagnostics were recorded. */
   diag?: RunDiagnostics;
   /** Device context as reported by the browser; display/sharing only, never submitted. Absent before Plan 1. */

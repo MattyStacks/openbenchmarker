@@ -1,3 +1,6 @@
+import { STEADY_STABILITY, THROTTLED_STABILITY } from "./presets";
+import type { LapStat } from "./types";
+
 export interface FrameStats {
   frames: number;
   /** Sum of per-frame times, ms. */
@@ -114,11 +117,15 @@ export function runFrameTimes(batches: readonly TimedBatch[], gpuMs?: ArrayLike<
   return out;
 }
 
-/** runFrameTimes into a reusable buffer (grown when too small); returns the buffer and the count. */
+/**
+ * runFrameTimes into a reusable buffer (grown when too small); returns the buffer and the count.
+ * `gpuOffset` is the index in `gpuMs` of the first batch's first frame (a lap starts mid-run).
+ */
 export function runFrameTimesInto(
   batches: readonly TimedBatch[],
   gpuMs: ArrayLike<number> | undefined,
   out: Float64Array,
+  gpuOffset = 0,
 ): { out: Float64Array; n: number } {
   let n = 0;
   for (const b of batches) {
@@ -130,7 +137,7 @@ export function runFrameTimesInto(
     }
     const avg = b.ms / b.frames;
     for (let k = 0; k < b.frames; k++, n++) {
-      const g = gpuMs ? gpuMs[n] : NaN;
+      const g = gpuMs ? gpuMs[gpuOffset + n] : NaN;
       out[n] = Number.isFinite(g) && g > avg ? g : avg;
     }
   }
@@ -310,6 +317,51 @@ export function liveBreakdown(
   if (n === 0) return { frameMs: 0, cpuMs: 0, gpuBusy: null };
   const frameMs = ms / n;
   return { frameMs, cpuMs: cpu / n, gpuBusy: recentGpuMs !== null && frameMs > 0 ? Math.min(1, recentGpuMs / frameMs) : null };
+}
+
+/**
+ * Per-lap results of a stress run. `starts[k]` is the index of lap k's first batch (starts[0] is 0);
+ * lap k runs to the next start, the last one to the end of `batches`. Pass only finished laps.
+ * Avg FPS is the lap's throughput and the 1% low uses the same per-frame times as the whole run.
+ */
+export function lapStats(batches: readonly TimedBatch[], gpuMs: ArrayLike<number> | undefined, starts: readonly number[]): LapStat[] {
+  const laps: LapStat[] = [];
+  let buf: Float64Array = new Float64Array(0);
+  let frame = 0;
+  let at = 0;
+  for (let k = 0; k < starts.length; k++) {
+    for (; at < starts[k]; at++) frame += batches[at].frames;
+    const lap = batches.slice(starts[k], k + 1 < starts.length ? starts[k + 1] : batches.length);
+    let frames = 0, ms = 0;
+    for (const b of lap)
+      if (b.frames > 0 && b.ms > 0) {
+        frames += b.frames;
+        ms += b.ms;
+      }
+    const r = runFrameTimesInto(lap, gpuMs, buf, frame);
+    buf = r.out;
+    laps.push({ avgFps: ms > 0 ? (frames * 1000) / ms : 0, p1Low: lowFpsSelect(buf, r.n, 0.01) });
+  }
+  return laps;
+}
+
+/** Frame-rate stability: slowest lap avg FPS ÷ fastest (0-1), as in 3DMark's stress tests; null with no laps. */
+export function stability(laps: readonly LapStat[]): number | null {
+  const fps = laps.map((l) => l.avgFps).filter((x) => x > 0);
+  if (fps.length === 0) return null;
+  return Math.min(...fps) / Math.max(...fps);
+}
+
+/** Last lap ÷ first lap − 1 (negative when it got slower); null with fewer than two laps. */
+export function lapChange(laps: readonly LapStat[]): number | null {
+  if (laps.length < 2 || !(laps[0].avgFps > 0)) return null;
+  return laps[laps.length - 1].avgFps / laps[0].avgFps - 1;
+}
+
+export type StabilityBand = "steady" | "slowed" | "throttled";
+
+export function stabilityBand(s: number): StabilityBand {
+  return s >= STEADY_STABILITY ? "steady" : s >= THROTTLED_STABILITY ? "slowed" : "throttled";
 }
 
 export function round1(x: number): number {

@@ -116,3 +116,49 @@ export function matchesScoreTest(t: ScoreTest, preset: string, resolution: strin
   const res = getResolution(t.resolution)!;
   return preset === t.preset && resolution === t.resolution && width === res.width && height === res.height && durationS === t.duration;
 }
+
+/**
+ * One lap of a stress test: the whole flight (JOURNEY_SECONDS in src/engine/world.ts, checked by a
+ * test). Scene time wraps every lap, so every lap renders exactly the same frames.
+ */
+export const STRESS_LAP_SECONDS = 96;
+
+export type StressTestId = "entry" | "extreme";
+
+export interface StressTest {
+  id: StressTestId;
+  name: string;
+  preset: PresetId;
+  resolution: ResolutionId;
+  laps: number;
+}
+
+/**
+ * Long locked runs for sustained performance, like 3DMark's stress tests: the flight repeats as
+ * laps, so the first and last laps are the same workload and a slowdown (heat, power limits) shows.
+ * Entry is the one setting phones and iGPUs can hold for 10 minutes; Extreme loads desktop GPUs.
+ */
+export const STRESS_TESTS: StressTest[] = [
+  { id: "entry", name: "Stress: Entry", preset: "Low", resolution: "720p", laps: 6 },
+  { id: "extreme", name: "Stress: Extreme", preset: "Extreme", resolution: "4K", laps: 6 },
+];
+
+export function getStressTest(id: string | undefined): StressTest | undefined {
+  return STRESS_TESTS.find((t) => t.id === id);
+}
+
+/** Timed seconds of a stress run with `laps` laps. */
+export function stressDuration(laps: number): number {
+  return laps * STRESS_LAP_SECONDS;
+}
+
+/** True when a run's settings and completed laps are exactly the stress test's locked configuration. */
+export function matchesStressTest(t: StressTest, preset: string, resolution: string, width: number, height: number, durationS: number, laps: number): boolean {
+  const res = getResolution(t.resolution)!;
+  return preset === t.preset && resolution === t.resolution && width === res.width && height === res.height && durationS === stressDuration(t.laps) && laps === t.laps;
+}
+
+/** Stability (slowest lap ÷ fastest lap) at or above this is steady: 3DMark's stress-test pass mark. */
+export const STEADY_STABILITY = 0.97;
+/** Below this, performance fell enough to call it throttling. */
+export const THROTTLED_STABILITY = 0.9;
