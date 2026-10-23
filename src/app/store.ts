@@ -1,5 +1,6 @@
 import { DURATIONS, getPreset, getResolution, normalizeResolution, type PresetId, type ResolutionId, type ScoreTestId } from "../benchmark/presets";
-import { emptySystem, unknownDevice, type BenchResult, type BrowserId, type DeviceContext } from "../benchmark/types";
+import { completeSystem } from "../benchmark/fields";
+import { unknownDevice, type BenchResult, type BrowserId, type DeviceContext } from "../benchmark/types";
 import { normalizeGpuLabel } from "./share-env";
 
 // ---------------------------------------------------------------------------
@@ -15,7 +16,7 @@ const BROWSER_BY_NAME: Record<string, BrowserId> = { Brave: "brave", Edge: "edge
  * Fill `device` for results saved before it existed. Only what is safe is
  * inferred: OS from the user-filled `system.os`, browser from the recorded
  * `diag.browser` ("Edge 141"; not "Chrome", which is ambiguous), GPU label from the recorded renderer.
- * Everything else stays unknown; nothing is guessed.
+ * Everything else stays unknown.
  */
 export function migrateDevice(r: BenchResult): DeviceContext {
   if (r.device?.browser) return { ...unknownDevice(), ...r.device };
@@ -32,13 +33,25 @@ export function migrateDevice(r: BenchResult): DeviceContext {
   return d;
 }
 
+/**
+ * Every registry field present (unknown fields kept), plus any marked suggestion for a field the
+ * result never had. Used for new runs and for results saved by older versions.
+ */
+export function withSystem(r: BenchResult, raw: unknown): BenchResult {
+  const { system, suggested } = completeSystem(r, raw as Record<string, unknown> | undefined);
+  const { suggested: _old, ...rest } = r;
+  void _old;
+  return { ...rest, system, ...(suggested.length ? { suggested } : {}) };
+}
+
 function loadHistory(): BenchResult[] {
   try {
     const raw = JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
     return Array.isArray(raw)
       ? raw.map((r) => {
-          const base: BenchResult = { ...r, resolution: normalizeResolution(r.resolution), system: { ...emptySystem(), ...(r.system || {}) } };
-          return { ...base, device: migrateDevice(base) };
+          const base: BenchResult = { ...r, resolution: normalizeResolution(r.resolution) };
+          const withDevice: BenchResult = { ...base, device: migrateDevice(base) };
+          return withSystem(withDevice, r.system);
         })
       : [];
   } catch {

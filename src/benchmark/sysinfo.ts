@@ -25,6 +25,8 @@ const WIN_GPU_KEY = String.raw`HKLM:\SYSTEM\ControlSet001\Control\Class\{4d36e96
 const WIN_CV_KEY = String.raw`HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion`;
 const WIN_MEM_TYPES = "@{20='DDR';21='DDR2';24='DDR3';26='DDR4';30='LPDDR4';34='DDR5';35='LPDDR5'}";
 
+const MEM_CHANNELS_NOTE = "No command reads this reliably. Most desktops run 2 (dual channel) with two or four sticks, and 1 with a single stick. CPU-Z's Memory tab (Windows) or your motherboard manual tells you for sure.";
+
 const WIN = {
   gpu: `Get-ItemProperty '${WIN_GPU_KEY}' -ErrorAction SilentlyContinue | Where-Object { $_.'HardwareInformation.qwMemorySize' } | ForEach-Object { "$($_.DriverDesc) ($([math]::Round($_.'HardwareInformation.qwMemorySize' / 1GB)) GB)" }`,
   osDetail: `$os = Get-CimInstance Win32_OperatingSystem; "$($os.Caption -replace '^Microsoft ','') $((Get-ItemProperty '${WIN_CV_KEY}').DisplayVersion)".Trim()`,
@@ -57,6 +59,7 @@ export const SYSINFO_COMMANDS: Record<"windows" | "linux", OsCommands> = {
       { field: "cpu", label: "CPU", command: WIN.cpu },
       { field: "memoryGb", label: "Memory (GB)", command: WIN.memoryGb, note: "Installed RAM, summed across all modules." },
       { field: "memoryType", label: "Memory type", command: WIN.memoryType, note: "Type and the speed it is running at (e.g. DDR5-6000). If the type comes back blank, check the module label or your BIOS." },
+      { field: "memoryChannels", label: "Memory channels", command: "", note: MEM_CHANNELS_NOTE },
       {
         field: "driver",
         label: "GPU driver (NVIDIA)",
@@ -90,6 +93,7 @@ export const SYSINFO_COMMANDS: Record<"windows" | "linux", OsCommands> = {
         note: "Without sudo, awk '/MemTotal/ {printf \"%d\\n\", $2/1048576 + 0.5}' /proc/meminfo works but reads a little under what is installed.",
       },
       { field: "memoryType", label: "Memory type", command: LINUX.memoryType, note: "Prints e.g. DDR5-6000." },
+      { field: "memoryChannels", label: "Memory channels", command: "", note: MEM_CHANNELS_NOTE },
       { field: "driver", label: "GPU driver", command: LINUX.driver, note: "NVIDIA proprietary prints its version; otherwise the Mesa version (glxinfo is in mesa-utils / mesa-demos)." },
       { field: "mesa", label: "Mesa", command: LINUX.mesa, note: "Leave blank on the NVIDIA proprietary driver." },
       { field: "proton", label: "Proton", command: "", note: "Not applicable: Proton runs Windows games through Steam, and this benchmark runs in your browser. Leave blank." },

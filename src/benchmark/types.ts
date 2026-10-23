@@ -28,7 +28,11 @@ export function unknownDevice(): DeviceContext {
   return { browser: "other", browserMajor: null, os: "other", deviceType: "unknown", webkitEngine: false, gpuLabel: null };
 }
 
-/** Everything the user provides. Every field starts blank; nothing is ever auto-filled. */
+/**
+ * Everything the user provides. Fields start blank, except a marked best guess for details a
+ * browser can't read (listed in BenchResult.suggested; the user can change or clear it).
+ * Field rules live in the registry, src/benchmark/fields.ts.
+ */
 export interface SystemInfo {
   gpuId: string;
   os: string; // "" | "windows" | "linux"
@@ -36,6 +40,8 @@ export interface SystemInfo {
   cpu: string;
   memoryGb: string;
   memoryType: string;
+  /** Whole number of memory channels in use, as digits; upstream memory_channels. */
+  memoryChannels: string;
   driver: string;
   // Linux-only
   distro: string;
@@ -46,11 +52,7 @@ export interface SystemInfo {
   overclocked: string;
 }
 
-export const LINUX_ONLY_FIELDS = ["distro", "kernel", "mesa", "proton"] as const;
-
-export function emptySystem(): SystemInfo {
-  return { gpuId: "", os: "", osDetail: "", cpu: "", memoryGb: "", memoryType: "", driver: "", distro: "", kernel: "", mesa: "", proton: "", overclocked: "" };
-}
+export { LINUX_ONLY_FIELDS, emptySystem } from "./fields";
 
 /**
  * Raw signals behind the "what limited this run" diagnosis, measured or detected by the run.
@@ -136,4 +138,9 @@ export interface BenchResult {
    */
   challenge?: string;
   system: SystemInfo;
+  /**
+   * System fields holding a suggested value (our best guess) the user hasn't confirmed, e.g.
+   * memoryChannels on phones. Editing a field removes it from this list. Absent when none.
+   */
+  suggested?: (keyof SystemInfo)[];
 }

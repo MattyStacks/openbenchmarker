@@ -2,13 +2,13 @@ import { BENCHMARKS, NOT_LISTED, UPSTREAM_ISSUES, findGpu } from "./catalog";
 import { isSoftwareRenderer } from "./diagnose";
 import { scoreFor } from "./metrics";
 import { RESOLUTIONS, getPreset, getScoreTest, matchesScoreTest, standardResolution } from "./presets";
-import { LINUX_ONLY_FIELDS, type BenchResult } from "./types";
+import { LINUX_ONLY_FIELDS, SYSTEM_FIELDS } from "./fields";
+import type { BenchResult } from "./types";
 
 /** Mirrors upstream proof.method for this tool. */
 export const PROOF_METHOD = "other";
 export const RESULT_OSES = ["windows", "linux"] as const;
 const GRAPHICS_APIS = ["WebGL2", "WebGL1"];
-const MAX_MEMORY_GB = 65536;
 
 function finitePositive(x: unknown): x is number {
   return typeof x === "number" && Number.isFinite(x) && x > 0;
@@ -48,12 +48,12 @@ export function validateSubmission(r: BenchResult | null | undefined): string[] 
   if (!os) errors.push("OS: choose windows or linux");
   else if (!(RESULT_OSES as readonly string[]).includes(os)) errors.push(`OS: '${os}' must be exactly windows or linux`);
 
-  const mem = (s.memoryGb ?? "").trim();
-  if (mem && (!/^\d+$/.test(mem) || Number(mem) < 1 || Number(mem) > MAX_MEMORY_GB))
-    errors.push(`Memory: '${mem}' must be a whole number of GB (digits only)`);
-
-  const oc = (s.overclocked ?? "").trim();
-  if (oc && oc !== "yes" && oc !== "no") errors.push(`Overclocked: '${oc}' must be yes, no or blank`);
+  // Optional fields: only a wrong value is reported (registry rules, mirroring upstream checks.py).
+  for (const f of SYSTEM_FIELDS) {
+    const v = String(s[f.key] ?? "").trim();
+    const msg = v && f.validate ? f.validate(v) : null;
+    if (msg) errors.push(msg);
+  }
 
   if (r.score !== undefined) {
     const t = getScoreTest(r.scoreTest);

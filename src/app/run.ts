@@ -12,7 +12,7 @@ import { route } from "./router";
 import { beginRun, endRun, markFinished, setRunPhase } from "./run-guard";
 import { detectDeviceContext, detectDeviceContextAsync } from "./share-env";
 import { app, showView } from "./shell";
-import { upsertResult, type RunConfig } from "./store";
+import { upsertResult, withSystem, type RunConfig } from "./store";
 
 // ---------------------------------------------------------------------------
 // Run controller: warm-up -> timed -> finish, uncapped scheduler
@@ -325,7 +325,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     };
     const valid = reason === "" && st.frames > 0;
     const scored = valid && scoreTest && matchesScoreTest(scoreTest, preset.id, res.id, width, height, cfg.duration);
-    const result: BenchResult = {
+    const measured: BenchResult = {
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       gameId: BENCHMARK.gameId,
       benchmarkVersion: BENCHMARK_VERSION,
@@ -355,6 +355,8 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       device,
       system: emptySystem(),
     };
+    // A brand-new result: registry suggestions (marked) fill what a browser can't read.
+    const result = withSystem(measured, {});
     upsertResult(result);
     if (valid) markFinished(resolution, preset.id);
     cleanup();

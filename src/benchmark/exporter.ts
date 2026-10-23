@@ -2,22 +2,11 @@ import { BENCHMARK, UPSTREAM_REPO } from "./catalog";
 import { diagnose, isMaskedRenderer } from "./diagnose";
 import { round1 } from "./metrics";
 import { WARMUP_SECONDS } from "./presets";
-import type { BenchResult, SystemInfo } from "./types";
+import { SYSTEM_FIELDS, type SystemField } from "./fields";
+import type { BenchResult } from "./types";
 import { PROOF_METHOD, validateSubmission } from "./validate";
 
 const q = (s: string) => JSON.stringify(s); // JSON strings are valid YAML double-quoted scalars
-
-/** Optional system fields in upstream order; blank ones are omitted entirely. */
-const OPTIONAL_TEXT: [keyof SystemInfo, string][] = [
-  ["osDetail", "os_detail"],
-  ["cpu", "cpu"],
-  ["memoryType", "memory_type"],
-  ["driver", "driver"],
-  ["distro", "distro"],
-  ["kernel", "kernel"],
-  ["mesa", "mesa"],
-  ["proton", "proton"],
-];
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const pct1 = (x: number) => Math.round(x * 1000) / 10;
@@ -77,6 +66,12 @@ function detectedLines(r: BenchResult): string[] {
   return lines;
 }
 
+function yamlScalar(f: SystemField, v: string): string {
+  if (f.kind === "digits") return String(Number(v));
+  if (f.kind === "yesno") return String(v === "yes");
+  return f.kind === "choice" ? v : q(v);
+}
+
 /** Upstream submission YAML (block style only). Throws if the result does not validate. */
 export function toYaml(r: BenchResult): string {
   const errors = validateSubmission(r);
@@ -104,12 +99,12 @@ export function toYaml(r: BenchResult): string {
     `    frame_count: ${r.frameCount}`,
     ...runDetailLines(r),
     `system:`,
-    `  os: ${s.os}`,
   ];
-  for (const [key, yamlKey] of OPTIONAL_TEXT) {
-    const v = (s[key] ?? "").trim();
-    if (v) lines.push(`  ${yamlKey}: ${q(v)}`);
-    if (key === "cpu" && s.memoryGb.trim()) lines.push(`  memory_gb: ${Number(s.memoryGb.trim())}`);
+  // Blank optional fields are omitted entirely; a suggested value says so in a comment.
+  for (const f of SYSTEM_FIELDS) {
+    if (f.section !== "system") continue;
+    const v = (s[f.key] ?? "").trim();
+    if (v) lines.push(`  ${f.yaml}: ${yamlScalar(f, v)}${r.suggested?.includes(f.key) ? " # assumed, not confirmed" : ""}`);
   }
   lines.push(`  graphics_api: ${r.graphicsApi} # recorded from the WebGL context the run used`);
   lines.push(...detectedLines(r));
@@ -175,18 +170,8 @@ const CSV_FIELDS: [string, (r: BenchResult) => string | number][] = [
   ["detected_cpu_threads", (r) => r.diag?.cpuThreads ?? ""],
   ["detected_on_battery", (r) => (r.diag?.onBattery != null ? String(r.diag.onBattery) : "")],
   ["detected_browser", (r) => r.diag?.browser ?? ""],
-  ["gpu_id", (r) => r.system.gpuId],
-  ["os", (r) => r.system.os],
-  ["os_detail", (r) => r.system.osDetail],
-  ["cpu", (r) => r.system.cpu],
-  ["memory_gb", (r) => r.system.memoryGb],
-  ["memory_type", (r) => r.system.memoryType],
-  ["driver", (r) => r.system.driver],
-  ["distro", (r) => r.system.distro],
-  ["kernel", (r) => r.system.kernel],
-  ["mesa", (r) => r.system.mesa],
-  ["proton", (r) => r.system.proton],
-  ["overclocked", (r) => r.system.overclocked ?? ""],
+  ...SYSTEM_FIELDS.map((f): [string, (r: BenchResult) => string] => [f.yaml, (r) => r.system?.[f.key] ?? ""]),
+  ["suggested_fields", (r) => (r.suggested ?? []).map((k) => SYSTEM_FIELDS.find((f) => f.key === k)?.yaml ?? k).join(" ")],
 ];
 
 function csvCell(v: string | number): string {

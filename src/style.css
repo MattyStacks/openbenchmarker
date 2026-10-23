@@ -185,6 +185,8 @@ body[data-view="run"] main { flex: 1 1 auto; min-height: 0; }
 .field { display: grid; gap: 6px; border: 0; padding: 0; margin: 0; min-width: 0; }
 .field > span, .field legend { font: 600 12px/1.4 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 6px; }
 .field em { font: normal 11px var(--sans); letter-spacing: 0; text-transform: none; color: var(--dim); margin-left: 4px; }
+.field .suggested-tag { font: 700 10px var(--mono); letter-spacing: 0.08em; color: var(--amber); border: 1px solid var(--amber); border-radius: 4px; padding: 0 5px; margin-left: 6px; }
+.field-help { font-size: 12px; color: var(--muted); line-height: 1.4; }
 select, input { width: 100%; font: inherit; color: var(--text); background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
 select:hover, input:hover { border-color: var(--line-hi); }
 select:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; border-color: var(--cyan); }

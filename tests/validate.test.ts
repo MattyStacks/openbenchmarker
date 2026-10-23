@@ -3,6 +3,7 @@ import { BENCHMARK, GPU_CATALOG, NOT_LISTED } from "../src/benchmark/catalog";
 import { toCsv, toJson, toYaml, suggestedFileName } from "../src/benchmark/exporter";
 import { emptySystem, type BenchResult, type RunDiagnostics } from "../src/benchmark/types";
 import { missingLabels, validateSubmission } from "../src/benchmark/validate";
+import { csvCells } from "./csv";
 
 const GPU = GPU_CATALOG[0].id;
 
@@ -245,9 +246,8 @@ describe("score, diagnostics and detected data", () => {
 
   it("CSV and JSON include score, limit and detected columns", () => {
     const r = scored();
-    // Minimal CSV split that honours quoted cells (the renderer string contains commas).
-    const cells = (l: string) => [...l.matchAll(/("(?:[^"]|"")*"|[^,]*)(?:,|$)/g)].map((m) => m[1].replace(/^"|"$/g, "").replace(/""/g, '"')).slice(0, -1);
-    const [head, row] = toCsv([r]).trim().split("\n").map(cells);
+    // The renderer string contains commas, so split with a real CSV reader.
+    const [head, row] = toCsv([r]).trim().split("\n").map(csvCells);
     expect(row).toHaveLength(head.length);
     expect(row[head.indexOf("detected_webgl_renderer")]).toMatch(/^ANGLE \(NVIDIA, /);
     expect(row[head.indexOf("score")]).toBe("6512");

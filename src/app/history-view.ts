@@ -130,6 +130,7 @@ function details(r: BenchResult): string {
     ["OS version", s.osDetail],
     ["CPU", s.cpu],
     ["Memory", s.memoryGb ? `${s.memoryGb} GB${s.memoryType ? ` ${s.memoryType}` : ""}` : ""],
+    ["Memory channels", s.memoryChannels ? `${s.memoryChannels}${r.suggested?.includes("memoryChannels") ? " (assumed)" : ""}` : ""],
     ["GPU driver", s.driver],
   ].filter(([, x]) => (x ?? "").trim()) as [string, string][];
   return `<dl class="hints">

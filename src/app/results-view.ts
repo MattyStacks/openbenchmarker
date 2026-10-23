@@ -20,7 +20,8 @@ import { clearPending, pendingCode, setPending } from "./challenge";
 import { LABELS, bindCompareBoxes, compareBoxHtml, comparePanelHtml } from "./compare-view";
 import { prefillFromShare } from "./home";
 import { commandsFor } from "../benchmark/sysinfo";
-import { LINUX_ONLY_FIELDS, type BenchResult, type SystemInfo } from "../benchmark/types";
+import { LINUX_ONLY_FIELDS, SYSTEM_FIELDS, fieldFor } from "../benchmark/fields";
+import type { BenchResult, SystemInfo } from "../benchmark/types";
 import { validateSubmission } from "../benchmark/validate";
 import { $, esc } from "./dom";
 import { BATCH_MS } from "./env";
@@ -65,17 +66,8 @@ function browserHints(): { renderer: string; threads: string; ua: string } {
   return { renderer: rendererStr, threads: String(navigator.hardwareConcurrency ?? "unknown"), ua: navigator.userAgent };
 }
 
-export const TEXT_FIELDS: { key: keyof SystemInfo; label: string; placeholder: string; linux?: boolean; inputmode?: string }[] = [
-  { key: "osDetail", label: "OS version", placeholder: "e.g. Windows 11 Pro 24H2" },
-  { key: "cpu", label: "CPU", placeholder: "e.g. AMD Ryzen 7 7800X3D" },
-  { key: "memoryGb", label: "Memory (GB, digits only)", placeholder: "e.g. 32", inputmode: "numeric" },
-  { key: "memoryType", label: "Memory type", placeholder: "e.g. DDR5-6000" },
-  { key: "driver", label: "GPU driver", placeholder: "e.g. 561.09" },
-  { key: "distro", label: "Distro", placeholder: "e.g. Fedora", linux: true },
-  { key: "kernel", label: "Kernel", placeholder: "e.g. 6.11.4", linux: true },
-  { key: "mesa", label: "Mesa", placeholder: "e.g. 24.2.5", linux: true },
-  { key: "proton", label: "Proton", placeholder: "e.g. GE-Proton9-20", linux: true },
-];
+/** Typed-in fields of the system form, from the field registry. */
+const TEXT_FIELDS = SYSTEM_FIELDS.filter((f) => f.kind === "text" || f.kind === "digits");
 
 const fmtMs = (x: number | null | undefined) => (x === null || x === undefined || !Number.isFinite(x) ? "n/a" : `${x.toFixed(2)} ms`);
 const fmtPct = (x: number | null | undefined) => (x === null || x === undefined || !Number.isFinite(x) ? "n/a" : `${Math.round(x * 100)}%`);
@@ -255,7 +247,7 @@ export function renderResults(r: BenchResult): void {
         <label class="field"><span>Graphics API <em>recorded by the run</em></span><input name="graphicsApi" value="${esc(r.graphicsApi)}" readonly aria-readonly="true" /></label>
         ${TEXT_FIELDS.map(
           (f) =>
-            `<label class="field${f.linux ? " linux-only" : ""}"><span>${esc(f.label)} <em>optional${f.linux ? ", Linux only" : ""}</em></span><input name="${f.key}" placeholder="${esc(f.placeholder)}" ${f.inputmode ? `inputmode="${f.inputmode}"` : ""} /></label>`,
+            `<label class="field${f.linux ? " linux-only" : ""}"><span>${esc(f.label)} <em>optional${f.linux ? ", Linux only" : ""}</em> <b class="suggested-tag" data-suggested="${f.key}" hidden>suggested</b></span><input name="${f.key}" placeholder="${esc(f.placeholder ?? "")}" ${f.inputmode ? `inputmode="${f.inputmode}"` : ""}${f.help ? ` aria-describedby="help-${f.key}"` : ""} />${f.help ? `<small class="field-help" id="help-${f.key}">${esc(f.help)}</small>` : ""}</label>`,
         ).join("")}
       </form>
 
@@ -334,7 +326,7 @@ export function renderResults(r: BenchResult): void {
     if (cmdsOs === r.system.os) return;
     cmdsOs = r.system.os;
     const set = commandsFor(r.system.os);
-    const fieldLabel = (f: string) => TEXT_FIELDS.find((t) => t.key === f)?.label ?? (f === "gpu" ? "GPU (above)" : f);
+    const fieldLabel = (f: string) => (f === "gpu" ? "GPU (above)" : (fieldFor(f)?.label ?? f));
     $("#os-cmds").innerHTML = set
       ? `<div class="cmds">
           <h3>Find these values on this ${r.system.os === "windows" ? "PC" : "machine"} <span class="muted">(${esc(set.shell)})</span></h3>
@@ -367,6 +359,7 @@ export function renderResults(r: BenchResult): void {
 
   const refresh = () => {
     renderCommands();
+    form.querySelectorAll<HTMLElement>("[data-suggested]").forEach((t) => (t.hidden = !r.suggested?.includes(t.dataset.suggested as keyof SystemInfo)));
     const errors = validateSubmission(r);
     const ok = errors.length === 0;
     // Linux-only inputs stay visible once filled, so a windows/linux mix can be seen and fixed.
@@ -396,6 +389,11 @@ export function renderResults(r: BenchResult): void {
     const el = e.target as HTMLInputElement | HTMLSelectElement;
     if (el.name in r.system) {
       (r.system as unknown as Record<string, string>)[el.name] = el.value;
+      // Edited (or cleared) by the user: no longer our suggestion.
+      if (r.suggested?.includes(el.name as keyof SystemInfo)) {
+        r.suggested = r.suggested.filter((k) => k !== el.name);
+        if (!r.suggested.length) delete r.suggested;
+      }
       upsertResult(r);
       refresh();
     }
