@@ -169,6 +169,7 @@
               <div class="hud-phase" id="hud-phase" role="status">Preparing…</div>
               <div class="hud-progress"><div id="hud-bar"></div></div>
               <div class="hud-settings" id="hud-settings"></div>
+              <div class="hud-laps" id="hud-laps" hidden></div>
             </div>
             <div class="hud-panel hud-fps">
               <div class="hud-big"><span id="hud-fps">0</span><small>FPS</small></div>
@@ -176,7 +177,7 @@
               <div class="hud-limit" id="hud-limit" role="status">LIMIT · measuring…</div>
               <dl class="hud-stats">
                 <dt>Avg</dt><dd id="hud-avg">–</dd>
-                <dt>1% low</dt><dd id="hud-p1">–</dd>
+                <dt id="hud-p1-label">1% low</dt><dd id="hud-p1">–</dd>
                 <dt>Frames</dt><dd id="hud-frames">0</dd>
                 <dt title="Mean GPU time per frame (timer queries)">GPU</dt><dd id="hud-gpu">–</dd>
                 <dt title="Mean JavaScript time per frame (scene update + draw submission)">CPU</dt><dd id="hud-cpu">–</dd>

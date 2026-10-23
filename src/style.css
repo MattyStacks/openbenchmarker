@@ -253,6 +253,7 @@ body[data-view="run"] { height: 100dvh; overflow: hidden; overscroll-behavior: n
 .hud-progress { height: 5px; background: rgba(255, 255, 255, 0.12); margin: 6px 0; overflow: hidden; }
 .hud-progress div { height: 100%; width: 0; background: linear-gradient(90deg, var(--magenta), var(--violet), var(--cyan)); box-shadow: 0 0 10px rgba(46, 233, 255, 0.7); }
 .hud-settings { font: 12px var(--mono); color: var(--muted); }
+.hud-laps { font: 600 12px var(--mono); color: var(--cyan); overflow-wrap: anywhere; }
 .hud-big { font: 800 42px/1 var(--mono); color: #dffcff; text-shadow: var(--glow-c); }
 .hud-big small { font-size: 14px; margin-left: 4px; color: var(--muted); text-shadow: none; }
 .hud-unlimited { font: 700 10px var(--mono); letter-spacing: 0.15em; color: var(--good); margin: 4px 0 6px; }

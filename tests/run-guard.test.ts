@@ -9,6 +9,7 @@ import {
   markFinished,
   needsHighResWarning,
   saferResolution,
+  setRunLaps,
   setRunPhase,
   takeLeftoverRun,
   unfinishedCombos,
@@ -110,5 +111,28 @@ describe("suggestions and warnings", () => {
     // Already finished at this combo in this browser: no need to ask again.
     expect(needsHighResWarning("4K", "Extreme", true, [{ resolution: "4K", preset: "Extreme" }])).toBe(false);
     expect(needsHighResWarning("4K", "Extreme", true, [{ resolution: "4K", preset: "High" }])).toBe(true);
+  });
+});
+
+describe("stress test leftovers", () => {
+  it("say which lap they reached, suggest no other resolution, and don't flag the combo", () => {
+    const s = memStore();
+    beginRun({ resolution: "720p", preset: "Low", duration: 576, stressTest: "entry" }, T0, s);
+    setRunPhase("timed", s);
+    setRunLaps(1, s);
+    setRunLaps(4, s);
+    const r = takeLeftoverRun(s)!;
+    expect(r).toMatchObject({ stressTest: "entry", lapsDone: 4, phase: "timed" });
+    expect(didNotFinish("720p", "Low", s)).toBeUndefined();
+    const msg = leftoverMessage(r);
+    expect(msg.title).toBe("Your last stress test (Stress: Entry) stopped after lap 4 of 6.");
+    expect(msg.body).toMatch(/overheat/);
+    expect(msg.suggest).toBeNull();
+  });
+
+  it("before the first lap ends, or before timing, says so", () => {
+    const base = { resolution: "4K", preset: "Extreme", duration: 576, stressTest: "extreme", startedAt: T0.toISOString() } as const;
+    expect(leftoverMessage({ ...base, phase: "timed" }).title).toMatch(/stopped during lap 1 of 6\.$/);
+    expect(leftoverMessage({ ...base, phase: "building" }).title).toMatch(/while the city was loading/);
   });
 });

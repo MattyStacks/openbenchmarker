@@ -1,15 +1,15 @@
 import * as THREE from "three";
 import { BENCHMARK, BENCHMARK_VERSION } from "../benchmark/catalog";
 import { browserName, isSoftwareRenderer, liveVerdict, parseBackend } from "../benchmark/diagnose";
-import { computeRunStats, graphPoints, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimesInto, scoreFor, type TimedBatch } from "../benchmark/metrics";
-import { WARMUP_SECONDS, getPreset, getResolution, getScoreTest, matchesScoreTest } from "../benchmark/presets";
+import { computeRunStats, graphPoints, lapStats, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimesInto, scoreFor, type TimedBatch } from "../benchmark/metrics";
+import { STRESS_LAP_SECONDS, WARMUP_SECONDS, getPreset, getResolution, getScoreTest, getStressTest, matchesScoreTest, stressDuration } from "../benchmark/presets";
 import { emptySystem, type BenchResult, type GraphicsApi, type RunDiagnostics } from "../benchmark/types";
 import { makeFlythrough, type Flythrough } from "../engine/scenes";
 import { $, esc, nextFrame } from "./dom";
 import { BATCH_MS, MOBILE } from "./env";
 import { drawGraph } from "./hud";
 import { route } from "./router";
-import { beginRun, endRun, markFinished, setRunPhase } from "./run-guard";
+import { beginRun, endRun, markFinished, setRunLaps, setRunPhase } from "./run-guard";
 import { detectDeviceContext, detectDeviceContextAsync } from "./share-env";
 import { app, showView } from "./shell";
 import { upsertResult, withSystem, type RunConfig } from "./store";
@@ -33,6 +33,8 @@ const BATCH = Number(DEV_PARAMS.get("batch")) || BATCH_MS;
 const PRESENT_ALL = DEV_PARAMS.get("present") === "all";
 /** Dev server only: ?presentHz=N caps how often a frame goes to the canvas (default: every refresh). */
 const PRESENT_HZ = Number(DEV_PARAMS.get("presentHz")) || 0;
+/** Dev server only: ?laps=N runs stress tests with N laps (the result then doesn't match the locked test). */
+const DEV_LAPS = Math.max(0, Math.floor(Number(DEV_PARAMS.get("laps")) || 0));
 /** HUD refresh interval, ms. The loop ticks far more often than this while waiting on the GPU. */
 const HUD_MS = 50;
 /**
@@ -62,6 +64,27 @@ async function onBattery(): Promise<boolean | null> {
   } catch {
     return null;
   }
+}
+
+interface WakeLockLike {
+  release(): Promise<void>;
+}
+
+/** Keep the screen on (Screen Wake Lock API); null where unsupported or refused. Rendering is unaffected. */
+async function screenWakeLock(): Promise<WakeLockLike | null> {
+  try {
+    const nav = navigator as Navigator & { wakeLock?: { request(type: "screen"): Promise<WakeLockLike> } };
+    return nav.wakeLock ? await nav.wakeLock.request("screen") : null;
+  } catch {
+    return null;
+  }
+}
+
+/** "9:36" for HUD times of a minute or more, "42.0" below. */
+function clock(s: number): string {
+  if (s < 60) return s.toFixed(1);
+  const whole = Math.floor(s);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
 /** JS heap in use, MB (Chromium only). */
@@ -100,6 +123,13 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   const preset = getPreset(cfg.preset)!;
   const res = getResolution(cfg.resolution)!;
   const scoreTest = getScoreTest(cfg.scoreTest);
+  const stressTest = getStressTest(cfg.stressTest);
+  const test = scoreTest ?? stressTest;
+  const duration = stressTest && DEV_LAPS ? stressDuration(DEV_LAPS) : cfg.duration;
+  /** Stress runs: laps in the timed phase (0 otherwise). */
+  const lapCount = stressTest ? Math.round(duration / STRESS_LAP_SECONDS) : 0;
+  const lapMs = STRESS_LAP_SECONDS * 1000;
+  const length = lapCount ? `${lapCount} laps · ${clock(duration)}` : `${duration} s`;
   // Sampled at start and when timing begins; both resolve long before the run ends.
   let battery: boolean | null = null;
   const sampleBattery = () => void onBattery().then((b) => b !== null && (battery = battery === true || b));
@@ -114,7 +144,10 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   $("#hud-fps").textContent = "0";
   $("#hud-avg").textContent = $("#hud-p1").textContent = "–";
   $("#hud-frames").textContent = "0";
-  $("#hud-settings").textContent = `${scoreTest ? `${scoreTest.name} · ` : ""}${width}×${height} · ${preset.id} · ${cfg.duration} s`;
+  $("#hud-settings").textContent = `${test ? `${test.name} · ` : ""}${width}×${height} · ${preset.id} · ${length}`;
+  $("#hud-laps").hidden = !lapCount;
+  $("#hud-laps").textContent = "";
+  $("#hud-p1-label").textContent = lapCount ? "Lap 1% low" : "1% low";
   setLimit(null, "measuring…");
   $("#hud-gpu").textContent = $("#hud-cpu").textContent = "–";
   $<HTMLButtonElement>("#abort").disabled = false;
@@ -130,7 +163,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   }
 
   // Cleared when the run ends in any way; still there on the next load = the OS killed the page.
-  beginRun({ resolution, preset: preset.id, duration: cfg.duration, ...(scoreTest ? { scoreTest: scoreTest.id } : {}) });
+  beginRun({ resolution, preset: preset.id, duration, ...(scoreTest ? { scoreTest: scoreTest.id } : {}), ...(stressTest ? { stressTest: stressTest.id } : {}) });
   const canvas = document.createElement("canvas");
   canvas.className = "bench-canvas";
   $("#canvas-host").replaceChildren(canvas);
@@ -165,7 +198,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   }
   if (fly.features.fallbackReason) console.warn(fly.features.fallbackReason);
   setRunPhase("warmup");
-  $("#hud-settings").textContent = `${scoreTest ? `${scoreTest.name} · ` : ""}${width}×${height} · ${preset.id} · ${cfg.duration} s · ${api}`;
+  $("#hud-settings").textContent = `${test ? `${test.name} · ` : ""}${width}×${height} · ${preset.id} · ${length} · ${api}`;
   const info = rendererInfo(gl);
   const maxTextureSize = Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 0;
   const software = isSoftwareRenderer(info.renderer);
@@ -182,6 +215,20 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   let batchFrames = 1;
   let phase: "warmup" | "timed" = "warmup";
   let done = false;
+  /**
+   * Stress runs: index in `timed` of each lap's first batch. A lap ends with the first batch that
+   * completes at or after its 96 s mark, so the laps partition the timed batches.
+   */
+  const lapStarts: number[] = [];
+  /** Timed frames before the current lap (its first frame's index in gpuMs). */
+  let lapFrameStart = 0;
+  /** Live avg FPS of each finished lap (HUD and crash record); the result recomputes them after the drain. */
+  const lapFps: number[] = [];
+  let wakeLock: WakeLockLike | null = null;
+  void screenWakeLock().then((l) => {
+    if (done) void l?.release().catch(() => {});
+    else wakeLock = l;
+  });
   const runStart = performance.now();
   let timedStart = 0;
   let lastStatsAt = 0;
@@ -258,6 +305,8 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     ro.disconnect();
     $("#abort").removeEventListener("click", onAbort);
     cancelAnimationFrame(rafId);
+    void wakeLock?.release().catch(() => {});
+    wakeLock = null;
     channel.port1.onmessage = null;
     channel.port1.close();
     channel.port2.close();
@@ -324,7 +373,10 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       },
     };
     const valid = reason === "" && st.frames > 0;
-    const scored = valid && scoreTest && matchesScoreTest(scoreTest, preset.id, res.id, width, height, cfg.duration);
+    const scored = valid && scoreTest && matchesScoreTest(scoreTest, preset.id, res.id, width, height, duration);
+    // Every lap is finished on a run that went the distance; otherwise the open lap is dropped.
+    const lapsDone = valid ? lapStarts.length : Math.max(0, lapStarts.length - 1);
+    const laps = stressTest ? lapStats(timed.slice(0, lapsDone < lapStarts.length ? lapStarts[lapsDone] : timed.length), gpuMs, lapStarts.slice(0, lapsDone)) : [];
     const measured: BenchResult = {
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       gameId: BENCHMARK.gameId,
@@ -336,7 +388,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       width,
       height,
       preset: preset.id,
-      durationS: cfg.duration,
+      durationS: duration,
       graphicsApi: api,
       avgFps: st.avgFps,
       p1Low: st.p1Low,
@@ -350,6 +402,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       mobile: MOBILE,
       ...(scoreTest ? { scoreTest: scoreTest.id } : {}),
       ...(scored ? { score: scoreFor(st.avgFps) } : {}),
+      ...(stressTest ? { stressTest: stressTest.id, laps } : {}),
       ...(cfg.challenge ? { challenge: cfg.challenge } : {}),
       diag,
       device,
@@ -397,15 +450,19 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       $("#hud-bar").style.width = "0%";
     } else {
       const el = (t - timedStart) / 1000;
-      $("#hud-phase").textContent = `TIMED ${Math.min(el, cfg.duration).toFixed(1)} / ${cfg.duration} s`;
-      $("#hud-bar").style.width = `${Math.min(100, (el / cfg.duration) * 100).toFixed(1)}%`;
+      $("#hud-phase").textContent = lapCount
+        ? `TIMED · LAP ${Math.min(lapStarts.length, lapCount)}/${lapCount} · ${clock(Math.min(el, duration))} / ${clock(duration)}`
+        : `TIMED ${Math.min(el, duration).toFixed(1)} / ${duration} s`;
+      $("#hud-bar").style.width = `${Math.min(100, (el / duration) * 100).toFixed(1)}%`;
       $("#hud-frames").textContent = timedFrames.toString();
       // Keep this cheap: the GPU queue holds only ~2 batches, so a long main-thread task here
       // starves it (a full sort of every frame time grew to ~100 ms on 300k-frame runs).
       if (timedFrames > 0 && lastComplete > timedStart) $("#hud-avg").textContent = ((timedFrames * 1000) / (lastComplete - timedStart)).toFixed(1);
       if (t - lastStatsAt > LIVE_LOWS_MS) {
         lastStatsAt = t;
-        const r = runFrameTimesInto(timed, gpuMs, liveTimes);
+        // Stress runs: the current lap only, so this scan doesn't grow over a 10-minute run.
+        const lap = lapCount ? timed.slice(lapStarts[lapStarts.length - 1] ?? 0) : timed;
+        const r = runFrameTimesInto(lap, gpuMs, liveTimes, lapCount ? lapFrameStart : 0);
         liveTimes = r.out;
         $("#hud-p1").textContent = lowFpsSelect(liveTimes, r.n, 0.01).toFixed(1);
       }
@@ -479,7 +536,22 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     else {
       timed.push(b);
       timedFrames += frames;
+      if (lapCount && lapStarts.length < lapCount && t >= timedStart + lapStarts.length * lapMs) closeLap();
     }
+  }
+
+  /** The batch just recorded ended a lap: note its live FPS and start the next lap. */
+  function closeLap(): void {
+    let frames = 0, ms = 0;
+    for (let i = lapStarts[lapStarts.length - 1]; i < timed.length; i++) {
+      frames += timed[i].frames;
+      ms += timed[i].ms;
+    }
+    lapFps.push(ms > 0 ? (frames * 1000) / ms : 0);
+    lapStarts.push(timed.length);
+    lapFrameStart = timedFrames;
+    setRunLaps(lapFps.length);
+    $("#hud-laps").textContent = `LAPS ${lapFps.map((f) => f.toFixed(1)).join(" · ")}`;
   }
 
   /** Block until the GPU has finished everything queued, then retire it all. */
@@ -509,7 +581,10 @@ export async function startRun(cfg: RunConfig): Promise<void> {
         if (q) gl2.beginQuery(timerExt.TIME_ELAPSED_EXT, q);
       }
       const f0 = performance.now();
-      fly.render((t - runStart) / 1000, undefined, presentDue || PRESENT_ALL);
+      // Stress runs wrap scene time every lap, so every lap renders the same frames. (Other runs
+      // end before 96 s of scene time, where the wrap would change nothing.)
+      const sceneT = (t - runStart) / 1000;
+      fly.render(lapCount ? sceneT % STRESS_LAP_SECONDS : sceneT, undefined, presentDue || PRESENT_ALL);
       presentDue = false;
       renderer.setRenderTarget(null);
       cpuMs += performance.now() - f0;
@@ -540,7 +615,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       while (k < inFlight.length && inFlight[k].fence && gl2!.getSyncParameter(inFlight[k].fence!, gl2!.SYNC_STATUS) === gl2!.SIGNALED) k++;
       if (k) complete(inFlight.splice(0, k), tick0);
 
-      const phaseEnd = phase === "warmup" ? runStart + WARMUP_SECONDS * 1000 : timedStart + cfg.duration * 1000;
+      const phaseEnd = phase === "warmup" ? runStart + WARMUP_SECONDS * 1000 : timedStart + duration * 1000;
       if (tick0 >= phaseEnd) {
         if (phase === "warmup") setRunPhase("timed"); // in the uncounted warm-up tail, before the drain
         const t = drain();
@@ -554,6 +629,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
         timedViewportW = window.innerWidth;
         heapAtTimed = heapMb();
         sampleBattery();
+        if (lapCount) lapStarts.push(0);
       } else if (inFlight.length < (gl2 ? MAX_IN_FLIGHT : 1)) {
         submit(tick0, yieldMs, phaseEnd);
         if (!gl2) drain();

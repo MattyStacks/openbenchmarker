@@ -1,4 +1,4 @@
-import { getResolution, type PresetId, type ResolutionId, type ScoreTestId } from "../benchmark/presets";
+import { getResolution, getStressTest, type PresetId, type ResolutionId, type ScoreTestId, type StressTestId } from "../benchmark/presets";
 
 // ---------------------------------------------------------------------------
 // Crash detection for runs the OS kills (out of memory on phones). A killed page can't run
@@ -17,6 +17,9 @@ export interface InProgressRun {
   preset: PresetId;
   duration: number;
   scoreTest?: ScoreTestId;
+  stressTest?: StressTestId;
+  /** Stress runs: laps finished so far (written once per lap). */
+  lapsDone?: number;
   /** ISO time the run started. */
   startedAt: string;
   phase: RunPhase;
@@ -70,6 +73,12 @@ export function setRunPhase(phase: RunPhase, store = defaultStore()): void {
   if (r) write(IN_PROGRESS_KEY, { ...r, phase }, store);
 }
 
+/** A stress run finished another lap. */
+export function setRunLaps(lapsDone: number, store = defaultStore()): void {
+  const r = read<InProgressRun>(IN_PROGRESS_KEY, store);
+  if (r) write(IN_PROGRESS_KEY, { ...r, lapsDone }, store);
+}
+
 /** The run ended (finished, invalid, aborted, context lost, failed to start, or the page closed normally). */
 export function endRun(store = defaultStore()): void {
   write(IN_PROGRESS_KEY, null, store);
@@ -108,6 +117,9 @@ export function takeLeftoverRun(store = defaultStore()): InProgressRun | null {
   const r = read<InProgressRun>(IN_PROGRESS_KEY, store);
   write(IN_PROGRESS_KEY, null, store);
   if (!r || !getResolution(r.resolution) || typeof r.preset !== "string") return null;
+  // A stress test that stops after minutes is more likely heat or battery than memory: it doesn't
+  // flag the resolution/preset for normal runs.
+  if (r.stressTest) return r;
   const list = unfinishedCombos(store);
   const prev = list.find((c) => c.resolution === r.resolution && c.preset === r.preset);
   const entry: UnfinishedCombo = { resolution: r.resolution, preset: r.preset, count: (prev?.count ?? 0) + 1, lastAt: r.startedAt, lastPhase: r.phase };
@@ -145,6 +157,17 @@ export function needsHighResWarning(r: ResolutionId, preset: PresetId, mobile: b
 }
 
 export function leftoverMessage(r: InProgressRun): { title: string; body: string; suggest: ResolutionId | null } {
+  const stress = getStressTest(r.stressTest);
+  if (stress) {
+    const done = r.lapsDone ?? 0;
+    const when =
+      r.phase === "building" ? "didn't finish while the city was loading" : r.phase === "warmup" ? "didn't finish during the warm-up" : done > 0 ? `stopped after lap ${done} of ${stress.laps}` : `stopped during lap 1 of ${stress.laps}`;
+    return {
+      title: `Your last stress test (${stress.name}) ${when}.`,
+      body: "The browser or OS closed the page. Phones do this when they overheat, run low on battery or run out of memory. Let it cool down, plug it in, keep the screen on and try again.",
+      suggest: null,
+    };
+  }
   const suggest = saferResolution(r.resolution);
   const where = r.phase === "building" ? " while the city was loading" : r.phase === "warmup" ? " during the warm-up" : "";
   const tip = suggest ? `Try ${suggest === "1080p" ? "1080p or 720p" : "720p"}.` : "Try a lighter preset.";
