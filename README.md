@@ -328,7 +328,8 @@ The first PR that uses this benchmark must also add it to upstream `data/games.y
 
 Submitted results join a public dataset under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 ([dataset license](https://github.com/MattyStacks/open-gpu-benchmarks/blob/main/data/LICENSE)), a
-common license for open data: anyone can reuse the data as long as they credit the source.
+common license for open data. We believe benchmark results should be open to everyone, so anyone
+can use, share and build on the data, for any purpose, as long as they credit the source.
 Submitted results stay public, so leave any optional field blank if you'd rather not share it.
 
 ### GPU catalog snapshot

@@ -88,7 +88,7 @@ export function aboutHtml(): string {
         <li><b>Nothing is shared unless you choose to.</b> You decide what goes public, if anything.</li>
         <li><b>We suggest, you decide.</b> To make things easier, we sometimes suggest a value, our best guess, especially for details most people don't know offhand about their device. Suggested values are always marked, and you can change or clear them. We don't take liberties with your data: measured values come from the run, and anything else is yours to confirm.</li>
       </ul>
-      <p>If verified results ever happen, they'll be a separate benchmark that clearly says what it stores. This one stays local-only.</p>
+      <p>If verified results ever happen, they'll be a separate benchmark that clearly says what it stores. This one stays local-only. <a href="#/about/faq-verified">Want one? Tell us →</a></p>
     </section>
 
     <section id="run" class="card about-sec">
@@ -182,7 +182,7 @@ export function aboutHtml(): string {
       <h2>Submitting to Open GPU Benchmarks</h2>
       <p>${ext(OGB_SITE, "Open GPU Benchmarks")} is a free, open dataset of GPU results. Adding your desktop or laptop result is optional, and it helps other people pick a GPU.</p>
       <p><b>Why isn't it one click?</b> This site keeps nothing and has no server, so it can't submit for you. You submit through GitHub yourself, see every field before it's published, and decide what goes in. Your GitHub username is public on the pull request.</p>
-      <p><b>What the license means:</b> submitted results are published under ${ext(CC_BY_DEED, "CC BY 4.0")} (${ext(DATA_LICENSE, "dataset license")}). Anyone can reuse them, including commercially and for AI training, as long as they credit the source. Copies other people make stay public, so leave any optional field blank if you'd rather not share it.</p>
+      <p><b>What the license means:</b> submitted results are published under ${ext(CC_BY_DEED, "CC BY 4.0")} (${ext(DATA_LICENSE, "dataset license")}), one of the most open licenses there is for data. We believe benchmark results are most useful when they're open to everyone, so the data isn't fenced off: anyone can use, share and build on it, for any purpose, as long as they credit the source. Being that open also means no one, including us, can limit who uses it or how. Copies other people make stay public, so leave any optional field blank if you'd rather not share it.</p>
       <p>After a desktop run, the results page shows a short invitation to submit. "Not now" hides it until the page reloads, and nothing is stored.</p>
     </section>
 
@@ -213,7 +213,7 @@ export function aboutHtml(): string {
       ${faq("faq-gpu-missing", "Why isn't my GPU listed, and how do I add it?", `<p>The catalog is new and growing. ${ext(UPSTREAM_ISSUES, "Request it with an issue")} or ${ext(UPSTREAM_TEMPLATES, "add it with a pull request")}. <a href="#/about/gpu">More on adding a GPU.</a></p>`)}
       ${faq("faq-phone-submit", "Can I submit a phone result?", `<p>Not yet. The dataset lists desktop and laptop GPUs. You can still save, share and compare phone results.</p>`)}
       ${faq("faq-crash", "Why did my browser crash on the heaviest settings?", `<p>The heaviest settings need a lot of graphics memory. Some phones and older computers run out, and the browser closes the page to protect itself. Try a lower resolution or preset; the site remembers settings that didn't finish here and warns you next time.</p>`)}
-      ${faq("faq-verified", "Will there ever be verified results?", `<p>Maybe, but it would be a separate benchmark that clearly says what it stores. This one stays local-only.</p>`)}
+      ${faq("faq-verified", "Will there ever be verified results?", `<p>Maybe. It would be a separate benchmark that clearly says what it stores; this one stays local-only. If you'd like to see a verified benchmark, ${ext(`${REPO}/issues`, "request one on GitHub")}. If enough people are interested, we'll work on building one.</p>`)}
     </section>
 
     <p class="about-legal muted tiny">© 2026 the <a href="${REPO}" target="_blank" rel="noopener">Open GPU Benchmarker maintainers</a>. Code released under the MIT License. The Open GPU Benchmarker name and logo aren't covered by the MIT License.</p>
