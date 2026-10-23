@@ -117,7 +117,7 @@ Every decoded string goes through `esc()`. A test link whose GPU name was `<img 
 
 ## Share flow
 
-1. **Share my result:** if `navigator.canShare({ files, url })`, the share sheet gets the card PNG, the text and the link as `url`. Putting the link only inside the text (tried during Plan 3) made some apps send just the picture, so the link always goes as `url`. The iOS share sheet shows "1 Link and 1 Image" with a plain icon, which is accepted. Otherwise it gets the text and the link. Where there's no share sheet (desktop Firefox, some Linux browsers) or it fails, the text and link are copied to the clipboard with a confirmation. Cancelling the sheet (`AbortError`) shows nothing.
+1. **Share my result** (and every other Share button) gives the share sheet the **link** (`url`) and a line of text, and **never attaches the card image**. Attaching the image made iOS Messages and other apps send only the picture, so the link got lost; that happened twice. The card is offered on its own through **Save image**. Guarded by `tests/share-keeps-link.test.ts` (part of `npm test`) and `npm run check:share`, which clicks every Share button at phone and desktop width. Where there's no share sheet (desktop Firefox, some Linux browsers) or it fails, the text and link are copied to the clipboard with a confirmation. Cancelling the sheet (`AbortError`) shows nothing.
 2. **Copy link** and **Save image** are always next to it. "Preview the share card" shows the PNG.
 3. In My Results, valid rows have a Share button that does step 1.
 
@@ -147,7 +147,7 @@ QR scan test: show the card full-screen on one device and scan it with another p
 
 ## Comparisons (Plan 5, revised after testing)
 
-Sharing comes first: **Share my result** is the main button and always sends the **link** (`url`), with the card image where the browser can share files. Comparing is a visible, separate option on every screen, on desktop as well as phones. You can compare against someone else's run or against one of your own earlier runs, in any browser or on any device. The numbers always show however far apart they are; only a different major benchmark version hides the %.
+Sharing comes first: **Share my result** is the main button and always sends the **link** (`url`) and text, never an attached image (use Save image for the card). Comparing is a visible, separate option on every screen, on desktop as well as phones. You can compare against someone else's run or against one of your own earlier runs, in any browser or on any device. The numbers always show however far apart they are; only a different major benchmark version hides the %.
 
 ```
 Any shared link (Share my result, an invite, or a comparison)
@@ -162,7 +162,7 @@ Result page, comparison first: Side by side (Compared with | This run), % and no
 ```
 
 Where you can compare:
-- **Home, "Compare":** paste a shared link or code, or pick one of your saved runs. The same settings get selected, the banner appears, and your next run shows side by side.
+- **Home, "Compare with another run"** (below Run settings, collapsed until opened): paste a shared link or code, or pick one of your saved runs. The same settings get selected, the banner appears, and your next run shows side by side.
 - **Results page, "Compare this run"** (under the share box): paste a link or code, or pick one of your runs. The panel opens in place, with **Share the comparison**.
 - **My Results:** a **Compare** button on every card and in every table row. It opens the same box under the card, or as a full-width row in the table. **Open a shared result** is a visible input at the top.
 - **Shared views:** **Compare with mine** is always shown. It uses your saved runs with the same settings and major version; if there are none it says so.

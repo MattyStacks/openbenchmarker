@@ -331,31 +331,33 @@ export function shareCode(p: SharePayload): string {
   return encodeShare(p);
 }
 
-/** Card, text and file name for a payload. */
-function assets(p: SharePayload, url: string): { canvas: HTMLCanvasElement; text: string; title: string; name: string } {
+/** Share text and title for a payload (no DOM needed). */
+export function shareTexts(p: SharePayload): { text: string; title: string } {
   const [a, b] = p.runs;
-  if (p.type === "comparison")
-    return { canvas: renderComparisonCard(a, b, url), text: comparisonText(a, b), title: "Neon Flythrough comparison", name: cardFileName(b).replace(".png", "_comparison.png") };
-  if (p.type === "challenge") return { canvas: renderCard(a, url, "invite"), text: inviteText(a), title: "Neon Flythrough: compare with this run", name: cardFileName(a) };
-  return { canvas: renderCard(a, url), text: shareText(a), title: "Neon Flythrough result", name: cardFileName(a) };
+  if (p.type === "comparison") return { text: comparisonText(a, b), title: "Neon Flythrough comparison" };
+  if (p.type === "challenge") return { text: inviteText(a), title: "Neon Flythrough: compare with this run" };
+  return { text: shareText(a), title: "Neon Flythrough result" };
 }
 
-/** The card PNG for a payload (Save image, previews). */
+/** The card PNG for a payload: Save image and previews only, never attached to a link share. */
 export function payloadCard(p: SharePayload): File {
   const url = payloadUrl(p);
-  const { canvas, name } = assets(p, url);
-  return canvasPng(canvas, name);
+  const [a, b] = p.runs;
+  if (p.type === "comparison") return canvasPng(renderComparisonCard(a, b, url), cardFileName(b).replace(".png", "_comparison.png"));
+  return canvasPng(p.type === "challenge" ? renderCard(a, url, "invite") : renderCard(a, url), cardFileName(a));
 }
 
 /**
- * One tap: the system share sheet with the card image where the browser can share files, else the
- * link and text, else copy both to the clipboard. The card and link are built synchronously and
- * navigator.share is called before any await, so Safari still counts it as part of the tap.
+ * Every Share button in the site goes through here. It shares the LINK (as `url`) and a line of text,
+ * and never attaches the card image: when a file is attached, iOS Messages and other apps often send
+ * only the picture and drop the link. The card is offered separately (Save image), the one place where
+ * an image on its own is what the person asked for. Without a share sheet, the text and link are
+ * copied to the clipboard. navigator.share is called before any await, so Safari counts it as part
+ * of the tap. tests/share-keeps-link.test.ts and scripts/check-share.mjs guard this.
  */
-export function sharePayload(p: SharePayload): { url: string; file: File; done: Promise<ShareOutcome> } {
+export function sharePayload(p: SharePayload): { url: string; done: Promise<ShareOutcome> } {
   const url = payloadUrl(p);
-  const { canvas, text, title, name } = assets(p, url);
-  const file = canvasPng(canvas, name);
+  const { text, title } = shareTexts(p);
   const copy = async (): Promise<ShareOutcome> => {
     try {
       await navigator.clipboard.writeText(`${text}\n${url}`);
@@ -364,23 +366,18 @@ export function sharePayload(p: SharePayload): { url: string; file: File; done: 
       return "failed";
     }
   };
-  const viaSheet = (data: ShareData): Promise<ShareOutcome> =>
-    navigator.share(data).then(
+  let done: Promise<ShareOutcome>;
+  if (typeof navigator.share === "function")
+    done = navigator.share({ title, text, url }).then(
       () => "shared" as const,
       (e: unknown) => ((e as Error)?.name === "AbortError" ? ("cancelled" as const) : copy()),
     );
-  let done: Promise<ShareOutcome>;
-  // The link always travels as `url`, so it reaches the other person whatever the app does with the
-  // image. (Putting it only inside the text made some apps send just the picture.) iOS then shows
-  // "1 Link and 1 Image" with a plain icon in the share sheet, which is accepted.
-  if (typeof navigator.share === "function" && navigator.canShare?.({ files: [file], url })) done = viaSheet({ files: [file], title, text, url });
-  else if (typeof navigator.share === "function") done = viaSheet({ title, text, url });
   else done = copy();
-  return { url, file, done };
+  return { url, done };
 }
 
 /** Share one result (Plan 3's Share). */
-export function shareRun(r: SharedRun): { url: string; file: File; done: Promise<ShareOutcome> } {
+export function shareRun(r: SharedRun): { url: string; done: Promise<ShareOutcome> } {
   return sharePayload({ type: "result", runs: [r] });
 }
 
@@ -413,7 +410,7 @@ export function shareBoxHtml(): string {
 }
 
 const OUTCOME_TEXT: Record<ShareOutcome, string> = {
-  shared: "Shared ✓",
+  shared: "Shared ✓ (link and text). Use Save image if you'd like the card too.",
   cancelled: "",
   copied: "Link and text copied ✓ Paste them anywhere. Use Save image for the card.",
   failed: "Couldn't share or copy here. Use Copy link or Save image.",

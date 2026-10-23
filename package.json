@@ -19,6 +19,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "check:share": "node scripts/check-share.mjs",
     "deploy": "npm run build && wrangler deploy",
     "preview:deploy": "npm run build && wrangler preview --name share-results",
     "refresh-catalog": "node scripts/refresh-catalog.mjs"

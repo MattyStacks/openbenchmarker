@@ -27,6 +27,7 @@ npm run build      # type-check + production build into dist/
 npm run preview    # serve dist/ locally
 npm run deploy     # build + wrangler deploy (production)
 npm run preview:deploy  # build + upload a preview version (does not promote it)
+npm run check:share     # after a build: every Share button must pass the link (Playwright)
 ```
 
 ### Testing on a phone (LAN) and preview deploys
