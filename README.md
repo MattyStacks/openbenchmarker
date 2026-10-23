@@ -253,8 +253,16 @@ This tool feeds a public dataset, so:
 - **Measured** by the run: FPS stats, resolution, preset, benchmark id and version,
   date, and the **graphics API** read from the WebGL context that was actually
   created (shown read-only on the results form).
-- **Provided** by the user: everything else. All fields start blank. Nothing is
-  guessed or auto-filled. Example values appear only as grey placeholders.
+- **Provided** by the user: everything else. To make things easier, we sometimes suggest a
+  value, our best guess, especially for details most people don't know offhand about their
+  device. Suggested values are always marked, and you can change or clear them. We don't take
+  liberties with your data: measured values come from the run, and anything else is yours to
+  confirm. Fields start blank (example values appear only as grey placeholders) unless a
+  suggestion applies. Today there is one: `memory_channels` is `4` on phone and tablet runs,
+  because browsers can't detect it. It's listed in the result's `suggested` field, shown as
+  "4 (assumed)" in My Results, exported in CSV (`suggested_fields`) and JSON, and commented
+  `# assumed, not confirmed` in submission YAML. Editing the field removes the mark. Rules live
+  in the field registry, `src/benchmark/fields.ts`.
 - **Detected** by the browser: WebGL renderer/vendor, ANGLE backend, CPU thread count, battery
   state and browser version. They are stored in a separate, labelled `detected:` block, for the
   diagnosis only. They **never** fill in the GPU or any `system:` field. A software-rendered run

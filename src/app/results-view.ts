@@ -228,7 +228,7 @@ export function renderResults(r: BenchResult): void {
     <div class="results-grid">
       <form class="card sys-form" id="sys-form" autocomplete="off">
         <h2><span class="kana" aria-hidden="true">システム</span>System information</h2>
-        <p class="muted">Only you can provide these. Nothing here is guessed or auto-filled; grey text is just an example.</p>
+        <p class="muted">Only you can confirm these; grey text is just an example. To make things easier, we sometimes suggest a value, our best guess, for details most people don't know offhand. Suggested values are always marked, and you can change or clear them. Measured values come from the run. <a href="#/about/faq-suggested">Why?</a></p>
         <label class="field"><span>GPU <em>required</em></span><select name="gpuId">${gpuOptions}</select></label>
         <p class="muted tiny">The catalog is new and growing: ${GPU_CATALOG.length} GPU${GPU_CATALOG.length === 1 ? "" : "s"} as of ${esc(CATALOG_SNAPSHOT_DATE)} (<a href="${UPSTREAM_REPO}/tree/main/data/gpus" target="_blank" rel="noopener">catalog</a>). Don't see yours? Choose "My GPU isn't listed".</p>
         <div id="gpu-blocked" class="blocked" hidden>
