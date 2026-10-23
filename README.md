@@ -8,8 +8,8 @@ flight through a dense, rain-soaked cyberpunk megacity. The camera dives between
 towers to just above the street traffic, flies under sky bridges, weaves through the
 streets, rides between stacked sky-lanes of flying cars, and climbs over the rooftops for
 a skyline that runs out to the horizon. It reports **Average FPS** and **1% Low FPS**, a
-3DMark-style **score** on the two fixed score runs, and a diagnosis of what limited the run
-(GPU, CPU, driver/browser).
+3DMark-style **score** on the two fixed score runs, a **stability %** on the two ~10-minute
+stress tests, and a diagnosis of what limited the run (GPU, CPU, driver/browser).
 You can keep results in your browser or submit them to
 [Open GPU Benchmarks](https://opengpubenchmarks.com/).
 
@@ -26,7 +26,7 @@ npm test           # Vitest unit tests
 npm run build      # type-check + production build into dist/
 npm run preview    # serve dist/ locally
 npm run deploy     # build + wrangler deploy (production)
-npm run preview:deploy  # build + upload a preview version (does not promote it)
+npm run preview:deploy -- <name>  # build + upload a preview at <name>.opengpubenchmarker.com
 npm run check:share     # after a build: every Share button must pass the link (Playwright)
 ```
 
@@ -43,19 +43,19 @@ only for layout, run flow and results rendering; test share/clipboard paths on
 `localhost` or on a preview deploy:
 
 ```sh
-npm run preview:deploy   # after `npm test` and `npm run build` pass locally
+npm run preview:deploy -- stress-tests   # after `npm test` and `npm run build` pass locally
 ```
 
-That runs `wrangler preview --name share-results` (Worker Previews; `previews = {}`
-and `previews_enabled = true` on the route in `wrangler.toml`). The Preview is
-served at `https://share-results.opengpubenchmarker.com` (the custom domain is
-set to "Production and Preview") and at
-`https://share-results-openbenchmarker.mattys.workers.dev`. A Preview never
+That runs `wrangler preview --name stress-tests` (Worker Previews; `previews = {}`
+and `previews_enabled = true` on the route in `wrangler.toml`). Name each preview after
+its feature branch. The Preview is served at `https://stress-tests.opengpubenchmarker.com`
+(the custom domain is set to "Production and Preview") and at
+`https://stress-tests-openbenchmarker.mattys.workers.dev`. A Preview never
 touches production: `opengpubenchmarker.com` changes only on `npm run deploy`.
 Previews are public, like the site itself; `public/_headers` marks preview
 subdomains `noindex`. A Preview is a different origin, so it has its own
 localStorage and does not see results saved on production. Remove it with
-`npx wrangler preview delete --name share-results`. See [docs/privacy-audit.md](docs/privacy-audit.md)
+`npx wrangler preview delete --name stress-tests`. See [docs/privacy-audit.md](docs/privacy-audit.md)
 for what the site does and does not store or send.
 
 **Sharing.** A valid result can be shared as a link (`#/r/<payload>`) plus a share
@@ -98,6 +98,38 @@ or an overclock, raises it. FPS, the 1%/5% lows and the diagnosis are shown next
 - A CPU-limited run still gets its score. It is never stopped or hidden, but it is labelled, and
   the diagnosis says what held it back. Score: Entry is often CPU-limited on fast GPUs. Score:
   Extreme is meant to be GPU-limited.
+
+## Stress tests
+
+Two long locked runs for sustained performance (thermal throttling, power limits), like
+3DMark's stress tests. They use the score runs' settings and repeat the whole 96 s flight as laps:
+
+| Stress test     | Preset  | Resolution      | Laps | Timed     |
+|-----------------|---------|-----------------|-----:|----------:|
+| Stress: Entry   | Low     | 720p (1280×720) | 6    | 576 s ≈ 10 min |
+| Stress: Extreme | Extreme | 4K (3840×2160)  | 6    | 576 s ≈ 10 min |
+
+- **Every lap is the same workload.** Scene time wraps every 96 s on stress runs (`t mod 96`), so
+  traffic, drones and rain repeat exactly and lap 6 renders the same frames as lap 1. Other runs
+  end before 96 s of scene time, so the wrap never applies to them.
+- **Stability = slowest lap avg FPS ÷ fastest lap avg FPS**, the 3DMark definition. 97% or more
+  is "steady" (3DMark's pass mark), 90–97% "slowed a little", below 90% "throttled". The results
+  page also shows the average over all laps, first → last lap, a lap chart and a lap table
+  (avg FPS and 1% low per lap).
+- **Two tests, not one.** Extreme 4K is what fully loads a desktop GPU long enough to heat it;
+  Low 720p is the setting phones and iGPUs can hold for 10 minutes (uncapped, it still fully
+  loads a phone's chip). A single middle setting would be too light for one and too heavy for
+  the other. Stress: Entry on a fast desktop GPU is usually CPU-limited, so a drop there points
+  at the CPU; the reading says so.
+- A browser can't read temperatures or clocks, so the verdict comes from frame rates alone.
+- Stress runs are saved, shared (the link carries every lap, see
+  [docs/share-links.md](docs/share-links.md)) and compared like other runs, but **never
+  submitted** to Open GPU Benchmarks: their average includes throttled laps. "Copy run report
+  (YAML)" gives the same details for pasting.
+- The run keeps the screen awake (Screen Wake Lock API, every run), and the crash record notes
+  each finished lap, so a phone that shuts the page down from heat says how far it got.
+- Dev server only: `?laps=N` runs a stress test with N laps for testing; the result doesn't
+  match the locked test, so it has no stability and can't be shared.
 
 ## What limited this run (diagnostics)
 

@@ -22,7 +22,7 @@ export const EXAMPLE_LINK = `https://opengpubenchmarker.com/#/r/${EXAMPLE_CODE}`
 export const STORAGE_KEYS: [string, "localStorage" | "sessionStorage", string, string][] = [
   ["ogb.results.v1", "localStorage", "My Results: your saved runs, the system details you typed in, and (on compared runs) the code of the run you compared with.", "When you delete a result or use Clear my saved results in My Results."],
   ["ogb.config.v1", "localStorage", "The resolution, preset and run length you picked last, so they're ready next time.", "Updated when you start a custom run; cleared with site data."],
-  ["ogb.runInProgress.v1", "localStorage", "A note that a run has started (settings, start time and stage), so if the browser crashes mid-run the next visit can tell you.", "Removed as soon as the run ends in any way."],
+  ["ogb.runInProgress.v1", "localStorage", "A note that a run has started (settings, start time, stage and, for stress tests, laps finished), so if the browser crashes mid-run the next visit can tell you.", "Removed as soon as the run ends in any way."],
   ["ogb.unfinished.v1", "localStorage", "Settings that didn't finish on this device last time, for the \"Didn't finish here last time\" hint.", "When a run at those settings finishes, or with Clear my saved results."],
   ["ogb.historyView.v1", "localStorage", "Whether My Results shows cards or a table.", "Cleared with site data."],
   ["ogb.challenge.v1", "sessionStorage", "The share code of a run you chose to compare with, kept in this tab so a reload or crash doesn't lose it.", "When the comparison appears on your result, when you press Stop comparing, or when the tab closes."],
@@ -41,6 +41,7 @@ function linkRows(r: SharedRun): [string, string, string][] {
     ["Resolution", `${r.resolution} (${r.width}×${r.height})`, "The size the scene was drawn at."],
     ["Preset", r.preset, "The graphics settings."],
     ["Run length", `${r.durationS} s`, "How long the timed part lasted."],
+    ["Stress test", r.stress ? `${r.stress.laps.length} laps` : "none", "Stress tests carry each lap's average FPS, so the link can show stability (slowest lap ÷ fastest)."],
     ["Score run", r.scoreTest ? `${getScoreTest(r.scoreTest)?.name ?? r.scoreTest}, score ${r.score}` : "none", "Locked score runs carry their score (average FPS × 100)."],
     ["Average FPS", r.avgFps.toFixed(2), "The headline number."],
     ["1% and 5% low FPS", `${fps(r.p1Low)} / ${fps(r.p5Low)}`, "How smooth the slowest moments were."],
@@ -213,6 +214,7 @@ export function aboutHtml(): string {
       ${faq("faq-delete", "Can I delete my results?", `<p>Yes. Delete one result or all of them in <a href="#/history">My Results</a>, or clear this site's data in your browser. There's no other copy. Links you already shared and results you already submitted aren't affected.</p>`)}
       ${faq("faq-gpu-missing", "Why isn't my GPU listed, and how do I add it?", `<p>The catalog is new and growing. ${ext(UPSTREAM_ISSUES, "Request it with an issue")} or ${ext(UPSTREAM_TEMPLATES, "add it with a pull request")}. <a href="#/about/gpu">More on adding a GPU.</a></p>`)}
       ${faq("faq-phone-submit", "Can I submit a phone result?", `<p>Not yet. The dataset lists desktop and laptop GPUs. You can still save, share and compare phone results.</p>`)}
+      ${faq("faq-stress", "What do the stress tests measure?", `<p>Whether your device keeps its speed when it's busy for a while. Stress: Entry and Stress: Extreme fly the same 96 s path 6 times, about 10 minutes. Every lap draws exactly the same frames, so if a later lap is slower, the device slowed itself down: usually because it got hot (thermal throttling), hit a power limit or switched to a battery saver.</p><p><b>Stability</b> is the slowest lap's average FPS divided by the fastest lap's. 97% or more counts as steady, the same mark 3DMark's stress tests use. A browser can't read temperatures or clock speeds, so this comes from the frame rate alone. Stress tests can be shared and compared, but not submitted to Open GPU Benchmarks.</p>`)}
       ${faq("faq-crash", "Why did my browser crash on the heaviest settings?", `<p>The heaviest settings need a lot of graphics memory. Some phones and older computers run out, and the browser closes the page to protect itself. Try a lower resolution or preset; the site remembers settings that didn't finish here and warns you next time.</p>`)}
       ${faq("faq-verified", "Will there ever be verified results?", `<p>Maybe. It would be a separate benchmark that clearly says what it stores; this one stays local-only. If you'd like to see a verified benchmark, ${ext(`${REPO}/issues`, "request one on GitHub")}. If enough people are interested, we'll work on building one.</p>`)}
     </section>

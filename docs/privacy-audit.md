@@ -31,7 +31,7 @@ Principle being audited: everything runs in the browser; the site stores nothing
 | `ogb.config.v1` (`localStorage`) | `src/app/store.ts` | Last-used run config (resolution, preset, duration) | Never |
 | `ogb.challenge.v1` (`sessionStorage`) | `src/app/challenge.ts` | Pending comparison (share code) for this tab | Never |
 | `ogb.historyView.v1` (`localStorage`) | `src/app/history-view.ts` | My Results display preference, `cards` or `table` | Never |
-| `ogb.runInProgress.v1` (`localStorage`) | `src/app/run-guard.ts` | The run currently in progress (resolution, preset, duration, start time, phase). Written before a run and removed when it ends in any way. If it's still there on the next load, the OS closed the page mid-run | Never |
+| `ogb.runInProgress.v1` (`localStorage`) | `src/app/run-guard.ts` | The run currently in progress (resolution, preset, duration, start time, phase; for stress tests, the test and laps finished). Written before a run and removed when it ends in any way. If it's still there on the next load, the OS closed the page mid-run | Never |
 | `ogb.unfinished.v1` (`localStorage`) | `src/app/run-guard.ts` | Resolution/preset combos that didn't finish on this device (count, last time, phase), used for the "Didn't finish on this device last time" hint. A combo is removed once a run at it finishes | Never |
 
 Clearing site data deletes all of them. In My Results, "Clear my saved results" removes `ogb.results.v1` and `ogb.unfinished.v1`; the run config stays. My Results filters and sort live in memory only (nothing stored). There is no server copy to delete.

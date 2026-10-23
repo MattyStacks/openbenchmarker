@@ -39,9 +39,9 @@ rendering, likely integrated GPU, and battery state. Still missing:
 - Real GPU and CPU clocks, temperatures, power draw and VRAM use. These could come from an
   optional native companion app, or from pasting `nvidia-smi` / GPU-Z / MangoHud output the page
   parses.
-- Thermal throttling. This would need a fixed scene segment repeated at the start and end of a
-  run, so frame times can be compared like for like (the flight changes over time, so today's
-  trend isn't comparable).
+- Why a stress test slowed down. The stress tests (6 identical laps) now show *that* a device
+  throttled, but not whether heat, a power limit or a battery saver caused it; that needs
+  temperatures, clocks and power from outside the browser.
 - Whether the PCIe link runs at full width/speed, and whether resizable BAR is on.
 - A "CPU stress" mode that times the scene update alone without rendering, to separate CPU
   speed from GPU speed even more cleanly.
