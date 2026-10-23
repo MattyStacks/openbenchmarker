@@ -1,6 +1,10 @@
 import { BENCHMARK_VERSION, BENCHMARKS } from "../benchmark/catalog";
 import { getScoreTest } from "../benchmark/presets";
-import { decodeShare, type SharedRun } from "../benchmark/share-codec";
+import { decodeShare, encodeShare, extractShareCode, sharedRunFrom, type SharedRun } from "../benchmark/share-codec";
+import { setPending } from "./challenge";
+import { matchLocal } from "./compare";
+import { LABELS, comparePanelHtml } from "./compare-view";
+import { allResults } from "./store";
 import { $, esc } from "./dom";
 import { prefillFromShare } from "./home";
 import { deviceLabel, settingsLabel } from "./share";
@@ -45,6 +49,64 @@ function runBlock(r: SharedRun, label = ""): string {
   </section>`;
 }
 
+/** "Have a code?": open a share code (or a pasted link) without a link. Nothing is sent anywhere. */
+export function haveCodeHtml(open = false): string {
+  return `<details class="have-code"${open ? " open" : ""}>
+    <summary>Have a code?</summary>
+    <form class="have-code-form" data-have-code>
+      <label class="visually-hidden" for="have-code-input">Share code or link</label>
+      <input id="have-code-input" name="code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste a code or link, e.g. AQAC…" />
+      <button type="submit" class="btn">Open</button>
+    </form>
+    <p class="muted tiny">A code is the end of a share link. It's read in this browser; nothing is sent anywhere.</p>
+  </details>`;
+}
+
+/** Delegated: any [data-have-code] form inside root. */
+export function bindHaveCode(root: HTMLElement): void {
+  root.addEventListener("submit", (e) => {
+    const form = (e.target as HTMLElement).closest<HTMLFormElement>("[data-have-code]");
+    if (!form) return;
+    e.preventDefault();
+    const code = extractShareCode(String(new FormData(form).get("code") ?? ""));
+    location.hash = `#/r/${code || "-"}`;
+  });
+}
+
+/** Viewer's saved runs that match, as a picker + panel. Local only. */
+function compareWithMine(view: HTMLElement, target: SharedRun): void {
+  const matches = matchLocal(allResults(), target);
+  const slot = view.querySelector<HTMLElement>("[data-mine-slot]");
+  const btn = view.querySelector<HTMLButtonElement>("[data-compare-mine]");
+  if (!slot || !btn) return;
+  if (!matches.length) {
+    btn.remove();
+    return;
+  }
+  const show = (id: string) => {
+    const mine = matches.find((m) => m.id === id) ?? matches[0];
+    const picker =
+      matches.length > 1
+        ? `<label class="field cmp-pick"><span>Your saved run</span><select data-mine-pick>${matches
+            .map((m) => `<option value="${esc(m.id)}"${m.id === mine.id ? " selected" : ""}>${esc(m.date)} ${esc(m.time)} · ${m.avgFps.toFixed(1)} FPS · ${m.durationS} s</option>`)
+            .join("")}</select></label>`
+        : "";
+    slot.innerHTML = picker + comparePanelHtml(target, sharedRunFrom(mine), LABELS.mine);
+    slot.querySelector<HTMLSelectElement>("[data-mine-pick]")?.addEventListener("change", (e) => show((e.target as HTMLSelectElement).value));
+  };
+  btn.addEventListener("click", () => {
+    btn.hidden = true;
+    show(matches[0].id);
+    slot.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+/** "Set up the same test": settings selected and the comparison pending; nothing starts. */
+function setUp(target: SharedRun): void {
+  setPending(encodeShare({ type: "challenge", runs: [target] }));
+  prefillFromShare(target);
+}
+
 export function renderShared(payload: string): void {
   showView("shared");
   const view = $("#view-shared");
@@ -54,23 +116,53 @@ export function renderShared(payload: string): void {
       <div class="banner-invalid" role="alert">${
         d.reason === "newer-version"
           ? "<b>This link was made by a newer version of the site.</b> Reload the page to get the latest version, then open the link again."
-          : "<b>This link looks damaged or edited.</b> Part of it may have been cut off when it was copied. Ask for the link again, or open it from the original message."
+          : "<b>This link or code looks damaged or edited.</b> Part of it may have been cut off when it was copied. Ask for it again, or open it from the original message."
       }</div>
+      ${haveCodeHtml(true)}
       <div class="row"><a class="btn btn-primary" href="#/">Run the benchmark</a></div>`;
+    bindHaveCode(view);
     return;
   }
   const { type, runs } = d.payload;
   const first = runs[0];
-  view.innerHTML = `
-    <div class="results-head">
-      <h1 class="sign">${type === "comparison" ? "Shared comparison" : "Shared result"}</h1>
-      <p class="muted">Neon Flythrough · ${esc(settingsLabel(first))}</p>
-    </div>
-    ${runs.map((r, i) => runBlock(r, runs.length > 1 ? `Run ${i + 1}` : "")).join("")}
-    <p class="honor-note">Shared on the honor system. Measured in the sharer's browser; nothing is stored or verified. <a href="#/about">How sharing works →</a></p>
-    <div class="shared-cta">
-      <button type="button" class="btn btn-primary btn-start" id="shared-run">Run the same test <span aria-hidden="true">▶</span></button>
-      <p class="muted tiny">Opens the benchmark with ${esc(settingsLabel(first))} selected. Your result stays in your browser unless you share it.</p>
-    </div>`;
-  $("#shared-run").addEventListener("click", () => prefillFromShare(first));
+  const mineBtn = `<button type="button" class="btn" data-compare-mine>Compare with mine</button>`;
+  const honor = `<p class="honor-note">Shared on the honor system. Measured in the sharer's browser; nothing is stored or verified. <a href="#/about">How sharing works →</a></p>`;
+  if (type === "comparison") {
+    view.innerHTML = `
+      <div class="results-head"><h1 class="sign">Shared comparison</h1><p class="muted">Neon Flythrough · two runs side by side</p></div>
+      ${comparePanelHtml(runs[0], runs[1], LABELS.link)}
+      <details class="result-details"><summary>Both runs in full</summary>${runBlock(runs[0], "Shared run")}${runBlock(runs[1], "Compared run")}</details>
+      ${honor}
+      <div class="shared-cta">
+        <button type="button" class="btn btn-primary btn-start" data-setup>Set up the same test <span aria-hidden="true">▶</span></button>
+        <p class="muted tiny">Selects ${esc(settingsLabel(first))} so you can compare your own run with the shared run. Nothing starts until you press Start.</p>
+        ${mineBtn}
+      </div>
+      <div data-mine-slot></div>`;
+  } else if (type === "challenge") {
+    view.innerHTML = `
+      <div class="results-head"><h1 class="sign">Compare with this run</h1><p class="muted">Neon Flythrough · ${esc(settingsLabel(first))}</p></div>
+      ${runBlock(first)}
+      ${honor}
+      <div class="shared-cta">
+        <button type="button" class="btn btn-primary btn-start" data-setup>Set up the same test <span aria-hidden="true">▶</span></button>
+        <p class="muted tiny">Selects ${esc(settingsLabel(first))}. Press Start when you're ready, on any device or browser, and you'll see both runs side by side. Your result stays in your browser unless you share it.</p>
+        ${mineBtn}
+      </div>
+      <div data-mine-slot></div>`;
+  } else {
+    view.innerHTML = `
+      <div class="results-head"><h1 class="sign">Shared result</h1><p class="muted">Neon Flythrough · ${esc(settingsLabel(first))}</p></div>
+      ${runBlock(first)}
+      ${honor}
+      <div class="shared-cta">
+        <button type="button" class="btn btn-primary btn-start" id="shared-run">Run the same test <span aria-hidden="true">▶</span></button>
+        <p class="muted tiny">Opens the benchmark with ${esc(settingsLabel(first))} selected. Your result stays in your browser unless you share it.</p>
+        ${mineBtn}
+      </div>
+      <div data-mine-slot></div>`;
+    $("#shared-run").addEventListener("click", () => prefillFromShare(first));
+  }
+  view.querySelector("[data-setup]")?.addEventListener("click", () => setUp(first));
+  compareWithMine(view, first);
 }

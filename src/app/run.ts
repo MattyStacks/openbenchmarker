@@ -350,6 +350,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       mobile: MOBILE,
       ...(scoreTest ? { scoreTest: scoreTest.id } : {}),
       ...(scored ? { score: scoreFor(st.avgFps) } : {}),
+      ...(cfg.challenge ? { challenge: cfg.challenge } : {}),
       diag,
       device,
       system: emptySystem(),

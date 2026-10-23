@@ -377,3 +377,16 @@ export function decodeShare(s: string, today = new Date()): DecodeResult {
     return { ok: false, reason: "damaged" };
   }
 }
+
+/**
+ * The code from whatever someone pasted: a bare code, "#/r/<code>", or a full link from any host.
+ * Chat apps add spaces, line breaks and trailing punctuation; all of that is dropped. Returns ""
+ * when there's nothing that looks like a code (decodeShare then reports it as damaged).
+ */
+export function extractShareCode(text: string): string {
+  const s = String(text ?? "").replace(/\s+/g, "");
+  const m = /#\/r\/([A-Za-z0-9_-]+)/.exec(s);
+  if (m) return m[1];
+  const bare = /^[A-Za-z0-9_-]+/.exec(s.replace(/^[<("'`]+/, ""));
+  return bare ? bare[0] : "";
+}

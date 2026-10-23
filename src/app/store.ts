@@ -94,6 +94,8 @@ export interface RunConfig {
   duration: number;
   /** Set only for a locked score test run; never saved as the last-used custom config. */
   scoreTest?: ScoreTestId;
+  /** Share code of the run being compared with ("Set up the same test"); copied onto the result. */
+  challenge?: string;
 }
 
 export function loadConfig(): RunConfig {

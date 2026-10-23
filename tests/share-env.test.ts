@@ -98,6 +98,10 @@ describe("normalizeGpuLabel (reported by browser)", () => {
     expect(normalizeGpuLabel("ANGLE (Apple, Apple M2 Pro, Metal)", "Apple")).toBe("Apple M2 Pro");
   });
 
+  it("handles commas inside nested parentheses (software renderers)", () => {
+    expect(normalizeGpuLabel("ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)", "Google Inc. (Google)")).toBe("SwiftShader Device (Subzero)");
+  });
+
   it("keeps plain and generic labels, caps at ~40 chars", () => {
     expect(normalizeGpuLabel("Apple GPU")).toBe("Apple GPU");
     expect(normalizeGpuLabel("Mali-G710 MC10")).toBe("Mali-G710 MC10");

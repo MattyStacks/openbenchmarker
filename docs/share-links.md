@@ -1,4 +1,4 @@
-# Share links and share card
+# Share links, codes, comparisons and share cards
 
 A valid result can be shared as `https://opengpubenchmarker.com/#/r/<payload>` plus a card image. Browsers never send the URL fragment (`#…`) in HTTP requests, so opening a link sends nothing about the result to the site. The page decodes it in the recipient's browser. Link previews keep the generic `og-image.png`; the card carries the result visually.
 
@@ -144,3 +144,69 @@ Share text, e.g.: *"Score: Extreme 14,321: 143.2 FPS avg, 118.4 1% low in the Ne
 | Desktop Firefox | — | copy | | | no Web Share |
 
 QR scan test: show the card full-screen on one device and scan it with another phone's camera. Then do the same with a screenshot of the card sent through iMessage or Discord (the thumbnail and the opened image).
+
+## Comparisons (Plan 5)
+
+Sharing comes first. **Share my result** is the only big button. Comparing is optional, offered as a quiet "Or share an invite to compare" link, and works without anyone else: you can compare two of your own runs (two browsers, two settings, before and after a driver update). The wording is neutral: no "beat", no "friend".
+
+```
+Results page / My Results ⋯
+ ├─ Share my result        → type=result     (card: result)
+ └─ Share an invite to compare → type=challenge  (card: result + "RUN THE SAME TEST & COMPARE")
+        │ someone opens it (or you, in another browser)
+        ▼
+   Shared view "Compare with this run"  [Set up the same test]   ← nothing starts
+        ▼
+   Home: same settings selected + banner "Comparing with 142.3 FPS avg … Press Start when you're ready"
+        │ Start (phone high-res warning applies) — the run carries the code (RunConfig.challenge)
+        ▼
+   Result page: Side by side (shared run | your run), % difference, notes
+        │ Share the comparison
+        ▼
+   type=comparison: runs[0] = shared run, runs[1] = compared run  (card: two columns)
+        ▼
+   Shared view: both side by side  [Set up the same test]  [Compare with mine]
+```
+
+- **Link types.** `challenge` is shown as "an invite to compare". In a `comparison` link, `runs[0]` is the shared run and `runs[1]` the compared run.
+- **Notes** (`src/app/compare.ts`):
+  - different settings: "Not like-for-like"
+  - a different major version: the FPS can't be compared, so the % is hidden
+  - a different minor or patch version: numbers may differ slightly
+  - same GPU and OS but a different browser: "this compares browsers"
+  - same browser but a different GPU
+  - within 0.5%: "about the same"
+- **Storage.** The pending comparison is kept in `sessionStorage` `ogb.challenge.v1` for this tab only, so it survives a reload or crash (the crash notice offers "Back to the comparison"). The result keeps the compared-with code in its `challenge` field so you can look at it again later. It's stripped from JSON export.
+- **Compare with mine** (shared views) and **Compare with another of my runs** (My Results ⋯) only use runs saved in this browser.
+
+**Two-result links** (production origin, ECC M): two runs with typical GPU names are about 165 characters (QR version 9). With two 40-character GPU names, 181 characters (QR version 10). An invite with a 40-character GPU name is 122 characters (version 7). Rendered invite and comparison cards decode with jsQR at 1200, 600 and 420 px wide.
+
+```
+Comparison card (1200×630, neutral: the faster run only gets a small ▲ %)
+1440P · ULTRA · 60 S · V2.2.0                          ┌──QR──┐
+SHARED RUN            COMPARED RUN                     │      │
+142.3                 155.0                            └──────┘
+AVG FPS               AVG FPS ▲ 8.9%                Scan for both runs
+1% low 118.4          1% low 121.0
+NVIDIA GeForce RTX 5080   NVIDIA GeForce RTX 5080
+Chrome 141 · Windows      Edge 141 · Windows
+8.9% apart · Same GPU and OS, different browser: this compares browsers
+opengpubenchmarker.com   Shared on the honor system
+```
+
+## Share codes
+
+A code is just the end of a link: the part after `#/r/`. **Copy code** (share box, My Results ⋯) copies only that part, for places where a link is awkward. **Have a code?** (My Results, and the damaged-link page) opens any of these:
+- a bare code
+- `#/r/<code>`
+- a full link from any host
+
+Spaces, line breaks and trailing punctuation that chat apps add are ignored (`extractShareCode`). The code is decoded in the browser and nothing is sent anywhere. A bad code shows "damaged or edited".
+
+### Demo on two phones (preview)
+1. Phone A: run 720p Low → **Or share an invite to compare** → send it in Messages.
+2. Phone B: open it → **Set up the same test** (settings selected, banner, nothing starts) → **Start**.
+3. Phone B: **Side by side** appears under the scores → **Share the comparison** → send it back.
+4. Phone A: open it → both runs side by side → **Compare with mine**.
+
+**Browser comparison on one PC:** run in Edge → invite → open the link in Chrome → Set up → Start. The notes say "Same GPU and OS, different browser: this compares browsers".

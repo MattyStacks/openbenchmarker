@@ -1,7 +1,8 @@
 import { encode as qrEncode } from "uqr";
-import { encodeShare, type SharedRun } from "../benchmark/share-codec";
+import { encodeShare, type SharedRun, type SharePayload } from "../benchmark/share-codec";
 import type { DeviceContext } from "../benchmark/types";
 import { getScoreTest } from "../benchmark/presets";
+import { SAME_PCT, apartLabel, compareRuns, comparisonText, inviteText } from "./compare";
 import { esc } from "./dom";
 
 // ---------------------------------------------------------------------------
@@ -67,18 +68,12 @@ function spaced(ctx: CanvasRenderingContext2D, px: number): void {
   if ("letterSpacing" in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${px}px`;
 }
 
-/**
- * Draws the 1200×630 card (the link-preview shape: shows uncropped in iMessage, Discord and X).
- * System fonts only, the same stacks as the site, so there is nothing to wait for before drawing.
- * Synchronous on purpose: the share button can build the PNG inside the tap, which Safari needs.
- */
-export function renderCard(r: SharedRun, url: string): HTMLCanvasElement {
+/** A blank 1200×630 card: night-sky background with neon glows and a frame, as on the site. */
+function newCard(): { c: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const c = document.createElement("canvas");
   c.width = CARD_W;
   c.height = CARD_H;
   const ctx = c.getContext("2d")!;
-
-  // Night-sky background with neon glows, as on the site.
   const bg = ctx.createLinearGradient(0, 0, CARD_W, CARD_H);
   bg.addColorStop(0, "#1a0d3a");
   bg.addColorStop(1, "#0a0718");
@@ -104,19 +99,87 @@ export function renderCard(r: SharedRun, url: string): HTMLCanvasElement {
   ctx.beginPath();
   ctx.roundRect(20, 20, CARD_W - 40, CARD_H - 40, 22);
   ctx.stroke();
-
-  const X = 64;
-  const TEXT_W = 700;
   ctx.textBaseline = "alphabetic";
+  return { c, ctx };
+}
 
-  // Eyebrow
+const X = 64;
+
+function eyebrow(ctx: CanvasRenderingContext2D, text: string, maxW = 700): void {
   spaced(ctx, 4);
   ctx.fillStyle = "#ffb340";
   ctx.font = `700 22px ${MONO}`;
-  ctx.fillText(`NEON FLYTHROUGH · v${r.benchmarkVersion}`, X, 86);
+  let t = text;
+  while (t.length > 8 && ctx.measureText(t).width > maxW) t = t.slice(0, -2);
+  ctx.fillText(t === text ? t : `${t.trimEnd()}…`, X, 86);
+  spaced(ctx, 0);
+}
+
+function footer(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = "#2ee9ff";
+  ctx.font = `800 28px ${SANS}`;
+  ctx.fillText("opengpubenchmarker.com", X, 590);
+  const siteW = ctx.measureText("opengpubenchmarker.com").width;
+  ctx.fillStyle = "#8a82b4";
+  ctx.font = `500 18px ${SANS}`;
+  ctx.fillText("Shared on the honor system", X + siteW + 22, 590);
+}
+
+/**
+ * QR code on a white panel, top right. ECC M (15%) keeps the code small enough (version 5–7 for one
+ * run, up to 10 for two) to scan off a phone screen or screenshot; the 4-module quiet zone is part
+ * of the panel. `label` (invite cards) sits above the panel.
+ */
+function qrPanel(ctx: CanvasRenderingContext2D, url: string, caption: string, label = ""): void {
+  const qr = qrEncode(url, { ecc: "M", border: 4 });
+  const PANEL = 330;
+  const px = CARD_W - 64 - PANEL;
+  const py = label ? 104 : 92;
+  const mod = Math.floor(PANEL / qr.size);
+  const side = mod * qr.size;
+  if (label) {
+    spaced(ctx, 1);
+    ctx.fillStyle = "#2ee9ff";
+    const fitted = fitText(ctx, label, PANEL, "800", 20, 14);
+    ctx.textAlign = "center";
+    ctx.fillText(fitted, px + PANEL / 2, py - 18);
+    ctx.textAlign = "start";
+    spaced(ctx, 0);
+  }
+  ctx.save();
+  ctx.shadowColor = "rgba(46,233,255,0.55)";
+  ctx.shadowBlur = 26;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.roundRect(px, py, PANEL, PANEL, 14);
+  ctx.fill();
+  ctx.restore();
+  const ox = px + Math.floor((PANEL - side) / 2);
+  const oy = py + Math.floor((PANEL - side) / 2);
+  ctx.fillStyle = "#0a0718";
+  for (let row = 0; row < qr.size; row++)
+    for (let col = 0; col < qr.size; col++) if (qr.data[row][col]) ctx.fillRect(ox + col * mod, oy + row * mod, mod, mod);
+  ctx.fillStyle = "#b6aedc";
+  ctx.font = `600 20px ${SANS}`;
+  ctx.textAlign = "center";
+  ctx.fillText(caption, px + PANEL / 2, py + PANEL + 38);
+  ctx.textAlign = "start";
+}
+
+export type CardVariant = "result" | "invite";
+
+/**
+ * Draws the 1200×630 card (the link-preview shape: shows uncropped in iMessage, Discord and X).
+ * System fonts only, the same stacks as the site, so there is nothing to wait for before drawing.
+ * Synchronous on purpose: the share button can build the PNG inside the tap, which Safari needs.
+ * The invite variant adds "RUN THE SAME TEST & COMPARE" above the QR code.
+ */
+export function renderCard(r: SharedRun, url: string, variant: CardVariant = "result"): HTMLCanvasElement {
+  const { c, ctx } = newCard();
+  const TEXT_W = 700;
+  eyebrow(ctx, `NEON FLYTHROUGH · v${r.benchmarkVersion}`);
 
   // Average FPS, large, with a magenta glow.
-  spaced(ctx, 0);
   const avg = fps(r.avgFps);
   ctx.font = `800 172px ${SANS}`;
   ctx.save();
@@ -172,41 +235,64 @@ export function renderCard(r: SharedRun, url: string): HTMLCanvasElement {
   ctx.fillStyle = "#b6aedc";
   ctx.fillText(fitText(ctx, `${browserLabel(r.device)} · ${osLabel(r.device)} · ${r.date}`, TEXT_W, "500", 24, 18), X, y);
 
-  // Footer
-  ctx.fillStyle = "#2ee9ff";
-  ctx.font = `800 28px ${SANS}`;
-  ctx.fillText("opengpubenchmarker.com", X, 590);
-  const siteW = ctx.measureText("opengpubenchmarker.com").width;
-  ctx.fillStyle = "#8a82b4";
-  ctx.font = `500 18px ${SANS}`;
-  ctx.fillText("Shared on the honor system", X + siteW + 22, 590);
+  footer(ctx);
+  if (variant === "invite") qrPanel(ctx, url, "Scan to run it and compare", "RUN THE SAME TEST & COMPARE");
+  else qrPanel(ctx, url, "Scan for the full result");
+  return c;
+}
 
-  // QR code on a white panel. ECC M (15%) keeps the code small enough (version 5–7) to scan off a
-  // phone screen or screenshot; the 4-module quiet zone is part of the panel.
-  const qr = qrEncode(url, { ecc: "M", border: 4 });
-  const PANEL = 330;
-  const px = CARD_W - 64 - PANEL;
-  const py = 92;
-  const mod = Math.floor(PANEL / qr.size);
-  const side = mod * qr.size;
-  ctx.save();
-  ctx.shadowColor = "rgba(46,233,255,0.55)";
-  ctx.shadowBlur = 26;
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.roundRect(px, py, PANEL, PANEL, 14);
-  ctx.fill();
-  ctx.restore();
-  const ox = px + Math.floor((PANEL - side) / 2);
-  const oy = py + Math.floor((PANEL - side) / 2);
-  ctx.fillStyle = "#0a0718";
-  for (let row = 0; row < qr.size; row++)
-    for (let col = 0; col < qr.size; col++) if (qr.data[row][col]) ctx.fillRect(ox + col * mod, oy + row * mod, mod, mod);
-  ctx.fillStyle = "#b6aedc";
-  ctx.font = `600 20px ${SANS}`;
-  ctx.textAlign = "center";
-  ctx.fillText("Scan for the full result", px + PANEL / 2, py + PANEL + 38);
-  ctx.textAlign = "start";
+/**
+ * Two runs side by side. Neutral: neither side is styled as the winner; the faster one only gets a
+ * small "▲ 8.9%". `a` is the shared run, `b` the compared run (the link's runs[0] and runs[1]).
+ */
+export function renderComparisonCard(a: SharedRun, b: SharedRun, url: string): HTMLCanvasElement {
+  const { c, ctx } = newCard();
+  const cmp = compareRuns(a, b);
+  const same = cmp.likeForLike;
+  eyebrow(ctx, `${same ? settingsLabel(a) : "Settings differ"} · v${b.benchmarkVersion}`.toUpperCase());
+  const COL_W = 330;
+  const fasterB = cmp.pct !== null && cmp.pct >= SAME_PCT;
+  const fasterA = cmp.pct !== null && cmp.pct <= -SAME_PCT;
+  ([[a, "SHARED RUN", fasterA], [b, "COMPARED RUN", fasterB]] as const).forEach(([r, label, faster], i) => {
+    const x = X + i * (COL_W + 24);
+    spaced(ctx, 3);
+    ctx.fillStyle = "#b6aedc";
+    ctx.font = `700 18px ${MONO}`;
+    ctx.fillText(label, x, 140);
+    spaced(ctx, 0);
+    const avg = fps(r.avgFps);
+    ctx.save();
+    ctx.shadowColor = i ? "rgba(46,233,255,0.7)" : "rgba(255,62,219,0.7)";
+    ctx.shadowBlur = 24;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `800 ${avg.length > 6 ? 76 : 92}px ${SANS}`;
+    ctx.fillText(avg, x - 3, 236);
+    ctx.restore();
+    spaced(ctx, 2);
+    ctx.fillStyle = "#2ee9ff";
+    ctx.font = `700 18px ${MONO}`;
+    ctx.fillText("AVG FPS", x, 268);
+    spaced(ctx, 0);
+    if (faster && cmp.pct !== null) {
+      ctx.fillStyle = "#4dffb4";
+      ctx.font = `700 20px ${SANS}`;
+      ctx.fillText(`▲ ${Math.abs(cmp.pct).toFixed(1)}%`, x + 110, 268);
+    }
+    ctx.fillStyle = "#f0ecff";
+    ctx.font = `700 26px ${SANS}`;
+    ctx.fillText(`1% low ${fps(r.p1Low)}`, x, 314);
+    ctx.fillText(fitText(ctx, r.device.gpuLabel ?? "GPU hidden by the browser", COL_W, "600", 24, 16), x, 360);
+    ctx.fillStyle = "#b6aedc";
+    ctx.fillText(fitText(ctx, `${browserLabel(r.device)} · ${osLabel(r.device)}`, COL_W, "500", 20, 15), x, 392);
+    if (!same) ctx.fillText(fitText(ctx, settingsLabel(r), COL_W, "500", 20, 15), x, 422);
+  });
+  // One neutral line under both: how far apart, and the most useful note.
+  const apart = apartLabel(cmp);
+  const note = cmp.notes.find((n) => /browser|GPU/.test(n)) ?? (same ? "Same settings" : "Settings differ, so not like-for-like");
+  ctx.fillStyle = "#f0ecff";
+  ctx.fillText(fitText(ctx, [apart ? apart[0].toUpperCase() + apart.slice(1) : "", note.replace(/\s*\(.*?\)/, "").replace(/\.$/, "")].filter(Boolean).join(" · "), 700, "600", 24, 16), X, 500);
+  footer(ctx);
+  qrPanel(ctx, url, "Scan for both runs");
   return c;
 }
 
@@ -235,16 +321,41 @@ export function saveImage(file: File): void {
 
 export type ShareOutcome = "shared" | "cancelled" | "copied" | "failed";
 
+/** Link for any payload (result, invite to compare, comparison), on the current origin. */
+export function payloadUrl(p: SharePayload): string {
+  return `${location.origin}/#/r/${encodeShare(p)}`;
+}
+
+/** Just the code (the end of the link), for pasting where a link is awkward. */
+export function shareCode(p: SharePayload): string {
+  return encodeShare(p);
+}
+
+/** Card, text and file name for a payload. */
+function assets(p: SharePayload, url: string): { canvas: HTMLCanvasElement; text: string; title: string; name: string } {
+  const [a, b] = p.runs;
+  if (p.type === "comparison")
+    return { canvas: renderComparisonCard(a, b, url), text: comparisonText(a, b), title: "Neon Flythrough comparison", name: cardFileName(b).replace(".png", "_comparison.png") };
+  if (p.type === "challenge") return { canvas: renderCard(a, url, "invite"), text: inviteText(a), title: "Neon Flythrough: compare with this run", name: cardFileName(a) };
+  return { canvas: renderCard(a, url), text: shareText(a), title: "Neon Flythrough result", name: cardFileName(a) };
+}
+
+/** The card PNG for a payload (Save image, previews). */
+export function payloadCard(p: SharePayload): File {
+  const url = payloadUrl(p);
+  const { canvas, name } = assets(p, url);
+  return canvasPng(canvas, name);
+}
+
 /**
  * One tap: the system share sheet with the card image where the browser can share files, else the
  * link and text, else copy both to the clipboard. The card and link are built synchronously and
  * navigator.share is called before any await, so Safari still counts it as part of the tap.
  */
-export function shareRun(r: SharedRun): { url: string; file: File; done: Promise<ShareOutcome> } {
-  const url = shareUrl(r);
-  const file = canvasPng(renderCard(r, url), cardFileName(r));
-  const text = shareText(r);
-  const title = "Neon Flythrough result";
+export function sharePayload(p: SharePayload): { url: string; file: File; done: Promise<ShareOutcome> } {
+  const url = payloadUrl(p);
+  const { canvas, text, title, name } = assets(p, url);
+  const file = canvasPng(canvas, name);
   const copy = async (): Promise<ShareOutcome> => {
     try {
       await navigator.clipboard.writeText(`${text}\n${url}`);
@@ -267,17 +378,36 @@ export function shareRun(r: SharedRun): { url: string; file: File; done: Promise
   return { url, file, done };
 }
 
+/** Share one result (Plan 3's Share). */
+export function shareRun(r: SharedRun): { url: string; file: File; done: Promise<ShareOutcome> } {
+  return sharePayload({ type: "result", runs: [r] });
+}
+
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ----- share UI (results page and My Results) -----
-/** Share box for the results page: one-tap Share, card preview, Save image, Copy link and the note. */
+/**
+ * Share box for the results page. Share my result is the one big action; Copy link, Copy code and
+ * Save image sit under it. Comparing is optional and offered as a quiet link, never as a rival button.
+ */
 export function shareBoxHtml(): string {
   return `<div class="share-box">
     <div class="share-actions">
-      <button type="button" class="btn btn-primary btn-share" data-share>Share result</button>
+      <button type="button" class="btn btn-primary btn-share" data-share>Share my result</button>
       <button type="button" class="btn" data-copy-link>Copy link</button>
+      <button type="button" class="btn" data-copy-code>Copy code</button>
       <button type="button" class="btn" data-save-card>Save image</button>
     </div>
     <p class="share-status" role="status" aria-live="polite" data-share-status></p>
     <p class="muted tiny">${esc(SHARE_NOTE)}</p>
+    <p class="invite-line"><button type="button" class="linklike" data-share-invite>Or share an invite to compare</button><span class="muted tiny"> Someone (or you, in another browser) runs the same test, and you see both side by side.</span></p>
     <details data-card-preview><summary>Preview the share card</summary></details>
   </div>`;
 }
@@ -289,7 +419,7 @@ const OUTCOME_TEXT: Record<ShareOutcome, string> = {
   failed: "Couldn't share or copy here. Use Copy link or Save image.",
 };
 
-/** Wire a share box (or any element with [data-share] etc.) for one run. */
+/** Wire a share box for one run. */
 export function bindShareBox(root: HTMLElement, r: SharedRun): void {
   const status = root.querySelector<HTMLElement>("[data-share-status]");
   const say = (text: string, bad = false) => {
@@ -297,19 +427,24 @@ export function bindShareBox(root: HTMLElement, r: SharedRun): void {
     status.textContent = text;
     status.classList.toggle("bad", bad);
   };
+  const result: SharePayload = { type: "result", runs: [r] };
   root.querySelector("[data-share]")?.addEventListener("click", () => {
-    const { done } = shareRun(r);
-    void done.then((o) => say(OUTCOME_TEXT[o], o === "failed"));
+    void sharePayload(result).done.then((o) => say(OUTCOME_TEXT[o], o === "failed"));
+  });
+  root.querySelector("[data-share-invite]")?.addEventListener("click", () => {
+    void sharePayload({ type: "challenge", runs: [r] }).done.then((o) => say(o === "shared" ? "Invite shared ✓" : OUTCOME_TEXT[o], o === "failed"));
   });
   root.querySelector("[data-copy-link]")?.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl(r));
-      say("Link copied ✓");
-    } catch {
-      say(`Copy this link: ${shareUrl(r)}`, true);
-    }
+    const url = payloadUrl(result);
+    if (await copyText(url)) say("Link copied ✓");
+    else say(`Copy this link: ${url}`, true);
   });
-  root.querySelector("[data-save-card]")?.addEventListener("click", () => saveImage(canvasPng(renderCard(r, shareUrl(r)), cardFileName(r))));
+  root.querySelector("[data-copy-code]")?.addEventListener("click", async () => {
+    const code = shareCode(result);
+    if (await copyText(code)) say("Code copied ✓ Anyone can paste it into “Have a code?” on My Results.");
+    else say(`Copy this code: ${code}`, true);
+  });
+  root.querySelector("[data-save-card]")?.addEventListener("click", () => saveImage(payloadCard(result)));
   const details = root.querySelector<HTMLDetailsElement>("[data-card-preview]");
   details?.addEventListener("toggle", () => {
     if (!details.open || details.querySelector("img")) return;
@@ -318,7 +453,7 @@ export function bindShareBox(root: HTMLElement, r: SharedRun): void {
     img.alt = `Share card: ${r.avgFps.toFixed(1)} FPS average at ${settingsLabel(r)}`;
     img.width = CARD_W;
     img.height = CARD_H;
-    img.src = renderCard(r, shareUrl(r)).toDataURL("image/png");
+    img.src = renderCard(r, payloadUrl(result)).toDataURL("image/png");
     details.append(img);
   });
 }

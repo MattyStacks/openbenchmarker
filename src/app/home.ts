@@ -4,6 +4,8 @@ import { MOBILE } from "./env";
 import { startRun } from "./run";
 import { didNotFinish, leftoverMessage, needsHighResWarning, type InProgressRun } from "./run-guard";
 import type { SharedRun } from "../benchmark/share-codec";
+import { clearPending, pendingCode, pendingRun } from "./challenge";
+import { browserLabel, settingsLabel } from "./share";
 import { app } from "./shell";
 import { allResults, loadConfig, saveConfig, type RunConfig } from "./store";
 
@@ -47,15 +49,17 @@ function confirmHighRes(cfg: RunConfig): Promise<"run" | "switch" | "cancel"> {
   });
 }
 
-/** Every run starts here: the phone warning (if needed), then the run. */
+/** Every run starts here: the phone warning (if needed), then the run. A pending comparison rides along. */
 async function launch(cfg: RunConfig): Promise<void> {
   if (app.running) return;
+  const compareWith = pendingCode();
+  if (compareWith) cfg = { ...cfg, challenge: compareWith };
   const finished = allResults().filter((r) => r.valid).map((r) => ({ resolution: r.resolutionId, preset: r.preset }));
   if (needsHighResWarning(cfg.resolution, cfg.preset, MOBILE, finished)) {
     const choice = await confirmHighRes(cfg);
     if (choice === "cancel") return;
     if (choice === "switch") {
-      cfg = { resolution: "1080p", preset: cfg.preset, duration: cfg.duration };
+      cfg = { resolution: "1080p", preset: cfg.preset, duration: cfg.duration, ...(cfg.challenge ? { challenge: cfg.challenge } : {}) };
       setRadio("resolution", "1080p");
       saveConfig(cfg);
     }
@@ -92,9 +96,18 @@ function refreshRunHints(): void {
     const want = `${shareTarget.resolution} · ${shareTarget.preset} · ${shareTarget.duration} s`;
     const same = shareTarget.resolution === res && shareTarget.preset === preset && String(shareTarget.duration) === String(fd.get("duration"));
     target.classList.toggle("differs", !same);
+    // The comparison banner already says which settings are selected; only flag a mismatch then.
+    if (same && pendingRun()) target.hidden = true;
     target.textContent = same
       ? `Same settings as the shared result (${want}).`
       : `Not like-for-like: the shared result used ${want}. Your result won't compare directly.`;
+  }
+  const banner = $("#compare-banner");
+  const cmp = pendingRun();
+  banner.hidden = !cmp;
+  if (cmp) {
+    const who = [browserLabel(cmp.device), cmp.device.gpuLabel].filter(Boolean).join(" · ");
+    banner.innerHTML = `<p><b>Comparing with ${cmp.avgFps.toFixed(1)} FPS avg</b> · ${esc(who)} (${esc(settingsLabel(cmp))}). Press Start when you're ready; you'll see both runs side by side.</p><button type="button" class="linklike" data-stop-compare>Stop comparing</button>`;
   }
   const note = $("#cfg-dnf");
   const dnf = didNotFinish(res, preset);
@@ -112,7 +125,7 @@ function showLeftoverNotice(r: InProgressRun): void {
   const box = $("#run-notice");
   box.innerHTML = `<p><b>${esc(msg.title)}</b></p><p>${esc(msg.body)}</p><div class="row">${
     msg.suggest ? `<button type="button" class="btn btn-primary" data-act="safer">Run at ${esc(msg.suggest)}</button>` : ""
-  }<button type="button" class="btn" data-act="dismiss">Dismiss</button></div>`;
+  }${pendingCode() ? `<button type="button" class="btn" data-act="back-compare">Back to the comparison</button>` : ""}<button type="button" class="btn" data-act="dismiss">Dismiss</button></div>`;
   box.hidden = false;
   box.addEventListener("click", (e) => {
     const act = (e.target as HTMLElement).closest<HTMLElement>("[data-act]")?.dataset.act;
@@ -123,6 +136,9 @@ function showLeftoverNotice(r: InProgressRun): void {
       setRadio("resolution", cfg.resolution);
       saveConfig(cfg);
       void launch(cfg);
+    } else if (act === "back-compare") {
+      const code = pendingCode();
+      if (code) location.hash = `#/r/${code}`;
     }
   });
 }
@@ -143,6 +159,12 @@ export function buildConfigForm(leftover: InProgressRun | null = null): void {
   $("#cfg-duration").innerHTML = DURATIONS.map((d) => radio("duration", d, d === cfg.duration, `${d} s`)).join("");
   const form = $<HTMLFormElement>("#config");
   form.addEventListener("change", refreshRunHints);
+  form.addEventListener("click", (e) => {
+    if (!(e.target as HTMLElement).closest("[data-stop-compare]")) return;
+    clearPending();
+    shareTarget = null;
+    refreshRunHints();
+  });
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     if (app.running) return;

@@ -3,14 +3,17 @@ import { download, gamesYamlEntry, suggestedFileName, toCsv, toJson, toYaml } fr
 import { VERDICT_LABEL, diagnose, isMaskedRenderer } from "../benchmark/diagnose";
 import { round1 } from "../benchmark/metrics";
 import { getScoreTest } from "../benchmark/presets";
-import { shareBlocker, sharedRunFrom } from "../benchmark/share-codec";
+import { decodeShare, encodeShare, shareBlocker, sharedRunFrom, type SharedRun } from "../benchmark/share-codec";
+import { clearPending, pendingCode, setPending } from "./challenge";
+import { LABELS, comparePanelHtml } from "./compare-view";
+import { prefillFromShare } from "./home";
 import { commandsFor } from "../benchmark/sysinfo";
 import { LINUX_ONLY_FIELDS, type BenchResult, type SystemInfo } from "../benchmark/types";
 import { validateSubmission } from "../benchmark/validate";
 import { $, esc } from "./dom";
 import { BATCH_MS } from "./env";
 import { deviceLine, gpuLine, isHandheld, runClass } from "./result-display";
-import { bindShareBox, shareBoxHtml } from "./share";
+import { bindShareBox, sharePayload, shareBoxHtml } from "./share";
 import { showView } from "./shell";
 import { upsertResult } from "./store";
 
@@ -119,6 +122,24 @@ function diagPanel(r: BenchResult): string {
   </section>`;
 }
 
+/** The run this result was compared with ("Set up the same test"), decoded from the saved code. */
+function comparedWith(r: BenchResult): SharedRun | null {
+  if (!r.challenge) return null;
+  const d = decodeShare(r.challenge);
+  return d.ok ? d.payload.runs[d.payload.type === "comparison" ? 1 : 0] : null;
+}
+
+function comparisonSection(r: BenchResult, other: SharedRun): string {
+  if (!r.valid || shareBlocker(sharedRunFrom(r)))
+    return `<section class="compare-panel"><h2 class="cmp-title">Side by side</h2><p>Your run was invalid, so it can't be compared with the shared run (${other.avgFps.toFixed(1)} FPS avg).</p><button type="button" class="btn" data-compare-again>Set up again</button></section>`;
+  return comparePanelHtml(
+    other,
+    sharedRunFrom(r),
+    LABELS.shared,
+    `<div class="row"><button type="button" class="btn" data-share-comparison>Share the comparison</button><span class="share-status" role="status" data-cmp-status></span></div>`,
+  );
+}
+
 /** Set by openResult so the page can scroll to a section after it renders. */
 let pendingFocus: "submit" | null = null;
 
@@ -136,6 +157,9 @@ export function renderResults(r: BenchResult): void {
   const handheld = isHandheld(cls);
   const showSubmit = r.valid && !handheld;
   const dev = [deviceLine(r), gpuLine(r) ? `${gpuLine(r)} (reported by browser)` : ""].filter(Boolean).join(" · ");
+  const other = comparedWith(r);
+  // The comparison is now on its result: the pending one (this tab) is done.
+  if (r.challenge && pendingCode() === r.challenge) clearPending();
   const view = $("#view-results");
   const hints = showSubmit ? hintsFor(r) : null;
   const gpuOptions = [
@@ -163,6 +187,7 @@ export function renderResults(r: BenchResult): void {
       <div class="score small"><span>Frames timed</span><b id="res-frames">${r.frameCount}</b></div>
       <div class="score small"><span>Run settings</span><b class="settings" id="res-settings">${r.scoreTest ? `${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)} · ` : ""}${esc(r.resolution)} (${r.width}×${r.height}) · ${esc(r.preset)} · ${r.durationS} s · ${esc(r.graphicsApi)}</b></div>
     </div>
+    ${other ? comparisonSection(r, other) : ""}
     ${r.valid && !shareBlocker(sharedRunFrom(r)) ? shareBoxHtml() : ""}
     <div data-challenge-slot></div>
     ${r.scoreTest && r.score === undefined ? `<p class="muted">Started as ${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)}, but ${r.valid ? "its settings didn't match the locked test" : "the run was invalid"}, so it has no score.</p>` : ""}
@@ -232,6 +257,18 @@ export function renderResults(r: BenchResult): void {
     </section>` : ""}
     <p class="about-link"><a href="#/about">About sharing &amp; FAQ →</a></p>`;
 
+  if (other) {
+    view.querySelector("[data-share-comparison]")?.addEventListener("click", () => {
+      const status = view.querySelector<HTMLElement>("[data-cmp-status]");
+      void sharePayload({ type: "comparison", runs: [other, sharedRunFrom(r)] }).done.then((o) => {
+        if (status) status.textContent = o === "shared" ? "Shared ✓" : o === "copied" ? "Link and text copied ✓" : o === "failed" ? "Couldn't share here." : "";
+      });
+    });
+    view.querySelector("[data-compare-again]")?.addEventListener("click", () => {
+      setPending(encodeShare({ type: "challenge", runs: [other] }));
+      prefillFromShare(other);
+    });
+  }
   const shareBox = view.querySelector<HTMLElement>(".share-box");
   if (shareBox) bindShareBox(shareBox, sharedRunFrom(r));
   $("#exp-json").onclick = () => download(suggestedFileName(r, "json"), toJson(r), "application/json");

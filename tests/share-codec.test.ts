@@ -5,6 +5,7 @@ import {
   crc8,
   decodeShare,
   encodeShare,
+  extractShareCode,
   fromBase64Url,
   plausible,
   shareBlocker,
@@ -200,5 +201,48 @@ describe("link length and QR size", () => {
     expect(noGpu.length).toBeLessThan(80);
     expect(v(withGpu)).toBeLessThanOrEqual(6);
     expect(v(cmp)).toBeLessThanOrEqual(10);
+  });
+});
+
+describe("share codes (just the end of the link)", () => {
+  const code = encodeShare({ type: "result", runs: [run()] });
+
+  it("finds the code in anything someone might paste", () => {
+    for (const pasted of [
+      code,
+      `  ${code}\n`,
+      `${code.slice(0, 20)}\n${code.slice(20)}`, // chat app wrapped it
+      `#/r/${code}`,
+      `https://opengpubenchmarker.com/#/r/${code}`,
+      `https://share-results.opengpubenchmarker.com/#/r/${code}.`,
+      `http://192.168.1.20:5173/#/r/${code}`,
+      `<https://opengpubenchmarker.com/#/r/${code}>`,
+      `"${code}"`,
+    ])
+      expect(extractShareCode(pasted)).toBe(code);
+    expect(decodeShare(extractShareCode(`  ${code.slice(0, 20)}\n${code.slice(20)} `), TODAY).ok).toBe(true);
+  });
+
+  it("junk gives nothing usable", () => {
+    expect(extractShareCode("")).toBe("");
+    expect(extractShareCode("   ")).toBe("");
+    expect(decodeShare(extractShareCode("hello there"), TODAY).ok).toBe(false);
+    expect(decodeShare(extractShareCode("https://example.com/page"), TODAY).ok).toBe(false);
+  });
+});
+
+describe("invite and comparison links", () => {
+  const long = (g: string) => run({ device: { ...run().device, gpuLabel: g } });
+  it("keep their order and stay scannable with long GPU names", () => {
+    const a = long("NVIDIA GeForce RTX 5090 Laptop GPU Extr");
+    const b = { ...long("AMD Radeon RX 9070 XT"), avgFps: 99.5, p1Low: 80, p5Low: 90, worstMs: 13, frameCount: 5980, score: 9950 };
+    const cmp = encodeShare({ type: "comparison", runs: [a, b] });
+    const d = decodeShare(cmp, TODAY);
+    expect(d.ok && d.payload.runs.map((r) => r.device.gpuLabel)).toEqual([a.device.gpuLabel, b.device.gpuLabel]);
+    const inviteUrl = SITE + encodeShare({ type: "challenge", runs: [a] });
+    const cmpUrl = SITE + cmp;
+    const v = (u: string) => qr(u, { ecc: "M", border: 4 }).version;
+    console.log("invite / comparison link length, QR version (ECC M):", JSON.stringify({ invite: [inviteUrl.length, v(inviteUrl)], comparison: [cmpUrl.length, v(cmpUrl)] }));
+    expect(v(cmpUrl)).toBeLessThanOrEqual(10);
   });
 });

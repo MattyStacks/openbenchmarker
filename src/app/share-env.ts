@@ -90,6 +90,22 @@ export function parseDeviceType(ua: string, os: OsId, maxTouchPoints = 0): Devic
   return "unknown";
 }
 
+/** Split on commas that aren't inside parentheses: "Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), driver". */
+function splitTopLevel(s: string): string[] {
+  const out: string[] = [];
+  let depth = 0, cur = "";
+  for (const ch of s) {
+    if (ch === "(") depth++;
+    else if (ch === ")") depth = Math.max(0, depth - 1);
+    if (ch === "," && depth === 0) {
+      out.push(cur);
+      cur = "";
+    } else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
 const BACKEND_TAIL = /^(?:D3D\d+|Vulkan|OpenGL(?: ES)?(?: \d+(?:\.\d+)*)?|Metal|Direct3D\d+)$/i;
 
 /**
@@ -103,10 +119,13 @@ export function normalizeGpuLabel(renderer: string | null | undefined, vendor?: 
   if (!s || isMaskedRenderer(s)) return null;
   const angle = /^ANGLE \((.*)\)$/.exec(s);
   if (angle) {
-    const parts = angle[1].split(",").map((x) => x.trim()).filter(Boolean);
+    const parts = splitTopLevel(angle[1]).map((x) => x.trim()).filter(Boolean);
     while (parts.length > 1 && BACKEND_TAIL.test(parts[parts.length - 1])) parts.pop();
     // Parts are typically [vendor, "GPU (0x..) Backend ...", backend]; pick the longest GPU part.
     s = parts.length ? parts.reduce((a, b) => (b.length > a.length ? b : a)) : "";
+    // Some backends wrap the device name: "Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x…))".
+    const wrapped = /^(?:Vulkan|OpenGL(?: ES)?|Metal|Direct3D\d*|D3D\d+)[\d. ]*\((.*)\)$/i.exec(s);
+    if (wrapped) s = wrapped[1];
     s = s.replace(/\s*\((?:0x[0-9a-fA-F]+|\d+)\)\s*/g, " ").trim();
     s = s.replace(/\s+(?:Direct3D\d+|D3D\d+|Vulkan|OpenGL(?: ES)?|Metal)\b.*$/i, "").trim();
     s = s.replace(/\s+vs_\d+_\d+.*$/i, "").trim();

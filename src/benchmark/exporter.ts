@@ -204,7 +204,10 @@ export function toCsv(results: BenchResult[]): string {
 export function toJson(r: BenchResult): string {
   const errors = validateSubmission(r);
   const diagnosis = r.diag ? diagnose(r) : undefined;
-  return JSON.stringify({ ...r, diagnosis, submittable: errors.length === 0, blockingIssues: errors }, null, 2) + "\n";
+  // The compared-with run belongs to someone else (or another session): not part of this export.
+  const { challenge: _compared, ...own } = r;
+  void _compared;
+  return JSON.stringify({ ...own, diagnosis, submittable: errors.length === 0, blockingIssues: errors }, null, 2) + "\n";
 }
 
 export function suggestedFileName(r: BenchResult, ext: "yaml" | "json" | "csv"): string {

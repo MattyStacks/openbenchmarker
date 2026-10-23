@@ -130,5 +130,10 @@ export interface BenchResult {
   diag?: RunDiagnostics;
   /** Device context as reported by the browser; display/sharing only, never submitted. Absent before Plan 1. */
   device?: DeviceContext;
+  /**
+   * The shared run this one was compared with (its share-link code, link type "challenge"), kept so
+   * the comparison can be looked at again. Local only: never submitted, stripped from JSON export.
+   */
+  challenge?: string;
   system: SystemInfo;
 }

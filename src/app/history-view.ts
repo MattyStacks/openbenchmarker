@@ -3,7 +3,10 @@ import { download, suggestedFileName, toCsv, toJson, toYaml } from "../benchmark
 import { VERDICT_LABEL, diagnose } from "../benchmark/diagnose";
 import { round1 } from "../benchmark/metrics";
 import { getScoreTest } from "../benchmark/presets";
-import { sharedRunFrom } from "../benchmark/share-codec";
+import { decodeShare, sharedRunFrom } from "../benchmark/share-codec";
+import { otherRunsFor } from "./compare";
+import { LABELS, comparePanelHtml } from "./compare-view";
+import { bindHaveCode, haveCodeHtml } from "./shared-view";
 import type { BenchResult } from "../benchmark/types";
 import { $, esc } from "./dom";
 import {
@@ -22,7 +25,7 @@ import {
 } from "./result-display";
 import { openResult } from "./results-view";
 import { clearUnfinished, removeUnfinished, unfinishedCombos, type UnfinishedCombo } from "./run-guard";
-import { shareRun } from "./share";
+import { copyText, shareCode, sharePayload, shareRun } from "./share";
 import { showView } from "./shell";
 import { allResults, clearResults, reloadResults, removeResult } from "./store";
 
@@ -61,9 +64,17 @@ const state: { filters: Filters; sort: SortKey; shown: number; view: View } = { 
 const major = (v: string) => String(v ?? "").split(".")[0];
 const fmtMs = (x: number) => `${x.toFixed(2)} ms`;
 
+/** Average FPS of the run this one was compared with, for the "compared with" badge. */
+function comparedFps(r: BenchResult): string {
+  if (!r.challenge) return "";
+  const d = decodeShare(r.challenge);
+  return d.ok ? d.payload.runs[d.payload.type === "comparison" ? 1 : 0].avgFps.toFixed(1) : "";
+}
+
 function badges(r: BenchResult): string {
   const old = major(r.benchmarkVersion) !== major(BENCHMARK_VERSION);
-  return `<span class="badge${old ? " old" : ""}">v${esc(r.benchmarkVersion)}</span>${r.valid ? "" : `<span class="badge bad">Invalid</span>`}`;
+  const vs = comparedFps(r);
+  return `<span class="badge${old ? " old" : ""}">v${esc(r.benchmarkVersion)}</span>${vs ? `<span class="badge cmp" title="Compared with a shared run">vs ${vs}</span>` : ""}${r.valid ? "" : `<span class="badge bad">Invalid</span>`}`;
 }
 
 function card(r: BenchResult): string {
@@ -100,6 +111,8 @@ function card(r: BenchResult): string {
         <summary class="btn" aria-label="More actions for this result">⋯</summary>
         <div class="menu-list">
           <a href="#/result/${encodeURIComponent(r.id)}">Open full result</a>
+          ${canShare(r) ? `<button type="button" data-act="code">Copy code</button><button type="button" data-act="invite">Share an invite to compare</button>` : ""}
+          ${r.valid ? `<button type="button" data-act="compare-mine">Compare with another of my runs</button>` : ""}
           <button type="button" data-act="json">Export JSON</button>
           <button type="button" data-act="csv">Export CSV</button>
           ${yamlOk ? `<button type="button" data-act="yaml">Download YAML</button><button type="button" data-act="submit">Submit…</button>` : ""}
@@ -209,11 +222,17 @@ export function renderHistory(): void {
   const dnf = unfinishedCombos();
   if (!all.length && !dnf.length) {
     view.innerHTML = `<div class="results-head"><h1 class="sign">My Results</h1></div>
-      <div class="empty-state"><p><b>No runs yet.</b> Results you run are saved here, in this browser only.</p><a class="btn btn-primary btn-start" href="#/">Start benchmark <span aria-hidden="true">▶</span></a></div>`;
+      <div class="empty-state"><p><b>No runs yet.</b> Results you run are saved here, in this browser only.</p><a class="btn btn-primary btn-start" href="#/">Start benchmark <span aria-hidden="true">▶</span></a></div>
+      ${haveCodeHtml()}`;
+    if (!view.dataset.codeBound) {
+      view.dataset.codeBound = "1";
+      bindHaveCode(view);
+    }
     return;
   }
   view.innerHTML = `
     <div class="results-head"><h1 class="sign">My Results</h1><p class="muted">Stored only in this browser. Nothing is uploaded unless you share, export or submit a result.</p></div>
+    ${haveCodeHtml()}
     ${all.length ? toolbar(all) : ""}
     <div id="hist-list"></div>
     <div class="hist-footer">
@@ -222,8 +241,21 @@ export function renderHistory(): void {
       <button type="button" class="btn danger" data-act="clear-all">Clear my saved results</button>
     </div>`;
   renderList();
+  if (!view.dataset.codeBound) {
+    view.dataset.codeBound = "1";
+    bindHaveCode(view);
+  }
   if (view.dataset.bound) return;
   view.dataset.bound = "1";
+  view.addEventListener("change", (e) => {
+    const sel = e.target as HTMLSelectElement;
+    if (!sel.matches("[data-self-pick]")) return;
+    const box = sel.closest<HTMLElement>(".self-compare");
+    const mine = allResults().find((x) => x.id === box?.dataset.for);
+    const other = allResults().find((x) => x.id === sel.value);
+    const panel = box?.querySelector<HTMLElement>("[data-self-panel]");
+    if (mine && other && panel) panel.innerHTML = selfPanel(other, mine);
+  });
   view.addEventListener("change", (e) => {
     const el = e.target as HTMLSelectElement;
     if (el.id !== "hist-sort") return;
@@ -269,7 +301,21 @@ export function renderHistory(): void {
     const cardEl = btn.closest<HTMLElement>("[data-id], [data-dnf-res]");
     const r = cardEl?.dataset.id ? allResults().find((x) => x.id === cardEl.dataset.id) : undefined;
     btn.closest<HTMLDetailsElement>("details.menu")?.removeAttribute("open");
-    if (act === "share" && r) {
+    if (act === "code" && r) {
+      void copyText(shareCode({ type: "result", runs: [sharedRunFrom(r)] })).then((ok) => flash(btnFor(cardEl, "share"), ok ? "Code copied ✓" : "Copy failed"));
+    } else if (act === "invite" && r) {
+      void sharePayload({ type: "challenge", runs: [sharedRunFrom(r)] }).done.then((o) => o !== "cancelled" && flash(btnFor(cardEl, "share"), o === "shared" ? "Invite shared ✓" : o === "copied" ? "Invite copied ✓" : "Couldn't share"));
+    } else if (act === "compare-mine" && r && cardEl) {
+      openSelfCompare(cardEl, r);
+    } else if (act === "close-self") {
+      btn.closest(".self-compare")?.remove();
+    } else if (act === "share-self") {
+      const box = btn.closest<HTMLElement>(".self-compare");
+      const mine = allResults().find((x) => x.id === box?.dataset.for);
+      const other = allResults().find((x) => x.id === box?.querySelector<HTMLSelectElement>("[data-self-pick]")?.value);
+      if (mine && other && canShare(mine) && canShare(other))
+        void sharePayload({ type: "comparison", runs: [sharedRunFrom(other), sharedRunFrom(mine)] }).done.then((o) => o !== "cancelled" && flash(btn, o === "shared" ? "Shared ✓" : o === "copied" ? "Copied ✓" : "Couldn't share"));
+    } else if (act === "share" && r) {
       // Built and handed to the share sheet inside the tap (Safari needs that).
       void shareRun(sharedRunFrom(r)).done.then((o) => {
         if (o === "cancelled") return;
@@ -304,4 +350,41 @@ export function renderHistory(): void {
       renderHistory();
     }
   });
+}
+
+// ----- Compare with another of my runs (no one else needed) -----
+function btnFor(cardEl: HTMLElement | null, act: string): HTMLElement | null {
+  return cardEl?.querySelector<HTMLElement>(`[data-act="${act}"]`) ?? cardEl?.querySelector<HTMLElement>(".menu > summary") ?? null;
+}
+
+function flash(el: HTMLElement | null, text: string): void {
+  if (!el) return;
+  const was = el.textContent;
+  el.textContent = text;
+  setTimeout(() => (el.textContent = was), 2200);
+}
+
+function selfPanel(other: BenchResult, mine: BenchResult): string {
+  const share = canShare(other) && canShare(mine) ? `<button type="button" class="linklike" data-act="share-self">Share this comparison</button>` : "";
+  return comparePanelHtml(sharedRunFrom(other), sharedRunFrom(mine), LABELS.self, share);
+}
+
+/** A picker of my other valid runs (same settings first) and the side-by-side panel, under the card. */
+function openSelfCompare(cardEl: HTMLElement, mine: BenchResult): void {
+  document.querySelectorAll(".self-compare").forEach((x) => x.remove());
+  const others = otherRunsFor(allResults(), mine);
+  const box = document.createElement("div");
+  box.className = "self-compare";
+  box.dataset.for = mine.id;
+  box.innerHTML = others.length
+    ? `<div class="self-head"><label class="field cmp-pick"><span>Compare this run with</span><select data-self-pick>${others
+        .map(
+          ({ run: o, sameSettings }) =>
+            `<option value="${esc(o.id)}">${esc(o.date)} ${esc(o.time)} · ${o.avgFps.toFixed(1)} FPS · ${esc(o.resolution)} ${esc(o.preset)}${sameSettings ? "" : " · different settings"}</option>`,
+        )
+        .join("")}</select></label><button type="button" class="btn" data-act="close-self">Close</button></div>
+      <div data-self-panel>${selfPanel(others[0].run, mine)}</div>`
+    : `<div class="self-head"><p>No other valid runs to compare with yet. Run the benchmark again, maybe in another browser, and it shows up here.</p><button type="button" class="btn" data-act="close-self">Close</button></div>`;
+  (cardEl.closest("tr") ?? cardEl).insertAdjacentElement("afterend", box);
+  box.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
