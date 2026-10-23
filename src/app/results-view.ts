@@ -205,7 +205,6 @@ export function renderResults(r: BenchResult): void {
       <div class="score small"><span>Run settings</span><b class="settings" id="res-settings">${r.scoreTest ? `${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)} · ` : ""}${esc(r.resolution)} (${r.width}×${r.height}) · ${esc(r.preset)} · ${r.durationS} s · ${esc(r.graphicsApi)}</b></div>
     </div>
     ${r.valid && !shareBlocker(sharedRunFrom(r)) ? shareBoxHtml() : ""}
-    ${r.valid && !shareBlocker(sharedRunFrom(r)) ? compareBoxHtml(r) : ""}
     ${r.scoreTest && r.score === undefined ? `<p class="muted">Started as ${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)}, but ${r.valid ? "its settings didn't match the locked test" : "the run was invalid"}, so it has no score.</p>` : ""}
     <details class="result-details" open>
       <summary>Details: what limited this run, timing and export</summary>
@@ -216,6 +215,7 @@ export function renderResults(r: BenchResult): void {
         <button type="button" class="btn" id="exp-csv">Export CSV</button>
       </div>
     </details>
+    ${r.valid && !shareBlocker(sharedRunFrom(r)) ? compareBoxHtml(r) : ""}
 
     ${
       handheld && r.valid
