@@ -1,6 +1,7 @@
 import { sharedRunFrom, type SharedRun } from "../benchmark/share-codec";
 import type { BenchResult } from "../benchmark/types";
 import { browserLabel, osLabel, settingsLabel } from "./share";
+import { stabilityPct } from "./stress-view";
 
 // ---------------------------------------------------------------------------
 // Comparing two runs, worded neutrally: comparing browsers or devices is as valid a use as
@@ -11,7 +12,8 @@ import { browserLabel, osLabel, settingsLabel } from "./share";
 export const SAME_PCT = 0.5;
 
 const major = (v: string) => v.split(".")[0];
-const sameSettings = (a: SharedRun, b: SharedRun) => a.resolution === b.resolution && a.preset === b.preset && a.durationS === b.durationS;
+const sameSettings = (a: SharedRun, b: SharedRun) =>
+  a.resolution === b.resolution && a.preset === b.preset && a.durationS === b.durationS && a.stress?.test === b.stress?.test;
 
 export interface Comparison {
   /** How much faster (+) or slower (−) run B was than run A, in %; null when the versions can't be compared. */
@@ -47,6 +49,7 @@ export function compareRuns(a: SharedRun, b: SharedRun, labels = { a: "the share
     if (browserDiffers) notes.push(`Different browsers: ${browserLabel(da)} vs ${browserLabel(db)}.`);
     if (sameBrowser && gpuKnown && !sameGpu) notes.push(`Same browser, different GPU (${da.gpuLabel} vs ${db.gpuLabel}).`);
   }
+  if (a.stress && b.stress) notes.push(`Stability: ${stabilityPct(b)} for ${labels.b.toLowerCase()}, ${stabilityPct(a)} for ${labels.a} (slowest lap ÷ fastest).`);
   if (majorsDiffer || !(a.avgFps > 0)) return { pct: null, verdict: "", notes, likeForLike };
   const pct = ((b.avgFps - a.avgFps) / a.avgFps) * 100;
   const verdict =
@@ -87,7 +90,15 @@ export function apartLabel(c: Comparison): string {
  */
 export function matchLocal(list: readonly BenchResult[], run: SharedRun): BenchResult[] {
   return list
-    .filter((r) => r.valid && major(r.benchmarkVersion) === major(run.benchmarkVersion) && r.resolutionId === run.resolution && r.preset === run.preset && r.durationS === run.durationS)
+    .filter(
+      (r) =>
+        r.valid &&
+        major(r.benchmarkVersion) === major(run.benchmarkVersion) &&
+        r.resolutionId === run.resolution &&
+        r.preset === run.preset &&
+        r.durationS === run.durationS &&
+        r.stressTest === run.stress?.test,
+    )
     .sort((x, y) => `${y.date} ${y.time}`.localeCompare(`${x.date} ${x.time}`));
 }
 
@@ -104,6 +115,7 @@ const who = (r: SharedRun) => [r.device.gpuLabel, browserLabel(r.device)].filter
 
 /** Share text for an invite to compare (link type "challenge"). Neutral: no "beat", no "friend". */
 export function inviteText(r: SharedRun): string {
+  if (r.stress) return `${stabilityPct(r)} stability and ${r.avgFps.toFixed(1)} FPS avg over ${settingsLabel(r)} in the Neon Flythrough browser GPU benchmark's stress test (${who(r)}). Run the same test on your device or browser and compare:`;
   return `${r.avgFps.toFixed(1)} FPS avg at ${settingsLabel(r)} in the Neon Flythrough browser GPU benchmark (${who(r)}). Run the same test on your device or browser and compare:`;
 }
 
@@ -112,7 +124,8 @@ export function comparisonText(a: SharedRun, b: SharedRun): string {
   const c = compareRuns(a, b);
   const settings = c.likeForLike ? settingsLabel(a) : `${settingsLabel(a)} vs ${settingsLabel(b)}`;
   const apart = apartLabel(c);
-  return `Neon Flythrough at ${settings}: ${b.avgFps.toFixed(1)} vs ${a.avgFps.toFixed(1)} FPS avg${apart ? ` (${apart})` : ""}. ${who(b)} vs ${who(a)}. Compare your own:`;
+  const stab = a.stress && b.stress ? ` Stability ${stabilityPct(b)} vs ${stabilityPct(a)}.` : "";
+  return `Neon Flythrough at ${settings}: ${b.avgFps.toFixed(1)} vs ${a.avgFps.toFixed(1)} FPS avg${apart ? ` (${apart})` : ""}.${stab} ${who(b)} vs ${who(a)}. Compare your own:`;
 }
 
 /** Short device text for a comparison column: "Edge 141 · Windows". */

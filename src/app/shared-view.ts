@@ -1,5 +1,5 @@
 import { BENCHMARK_VERSION, BENCHMARKS, OGB_SITE } from "../benchmark/catalog";
-import { getScoreTest } from "../benchmark/presets";
+import { getScoreTest, getStressTest } from "../benchmark/presets";
 import { decodeShare, encodeShare, extractShareCode, sharedRunFrom, type SharedRun } from "../benchmark/share-codec";
 import { setPending } from "./challenge";
 import { matchLocal } from "./compare";
@@ -9,6 +9,7 @@ import { $, esc } from "./dom";
 import { prefillFromShare } from "./home";
 import { deviceLabel, settingsLabel } from "./share";
 import { showView } from "./shell";
+import { lapsSectionHtml, stressCardsHtml } from "./stress-view";
 
 // ---------------------------------------------------------------------------
 // Shared link view (#/r/<payload>): read-only, decoded entirely in this browser.
@@ -19,11 +20,14 @@ const major = (v: string) => v.split(".")[0];
 function runBlock(r: SharedRun, label = ""): string {
   const name = BENCHMARKS.find((b) => b.gameId === r.gameId)?.name ?? r.gameId;
   const test = getScoreTest(r.scoreTest);
+  const stress = getStressTest(r.stress?.test);
   return `<section class="shared-run">
     ${label ? `<h2 class="shared-label">${esc(label)}</h2>` : ""}
     <div class="score-cards">
       ${
-        r.score !== undefined
+        stress && r.stress
+          ? stressCardsHtml(stress, r.stress.laps, r.avgFps)
+          : r.score !== undefined
           ? `<div class="score hero-score"><span>${esc(test?.name ?? "Score")}</span><b>${r.score}</b><span class="score-test">${r.avgFps.toFixed(1)} FPS × 100</span></div>
         <div class="score"><span>Average FPS</span><b>${r.avgFps.toFixed(1)}</b></div>`
           : `<div class="score hero-score"><span>Average FPS</span><b>${r.avgFps.toFixed(1)}</b></div>`
@@ -32,8 +36,9 @@ function runBlock(r: SharedRun, label = ""): string {
       <div class="score small"><span>5% Low FPS</span><b>${r.p5Low.toFixed(1)}</b></div>
       <div class="score small"><span>Worst frame</span><b>${r.worstMs.toFixed(2)} ms</b></div>
       <div class="score small"><span>Frames timed</span><b>${r.frameCount}</b></div>
-      <div class="score small"><span>Run settings</span><b class="settings">${test ? `${esc(test.name)} · ` : ""}${esc(r.resolution)} (${r.width}×${r.height}) · ${esc(r.preset)} · ${r.durationS} s · ${esc(r.graphicsApi)}</b></div>
+      <div class="score small"><span>Run settings</span><b class="settings">${test ? `${esc(test.name)} · ` : ""}${stress ? `${esc(stress.name)} · ` : ""}${esc(r.resolution)} (${r.width}×${r.height}) · ${esc(r.preset)} · ${r.stress ? `${r.stress.laps.length} laps · ` : ""}${r.durationS} s · ${esc(r.graphicsApi)}</b></div>
     </div>
+    ${r.stress ? lapsSectionHtml(r.stress.laps) : ""}
     <dl class="hints shared-facts">
       <dt>Benchmark</dt><dd>${esc(name)} v${esc(r.benchmarkVersion)}</dd>
       <dt>Run date</dt><dd>${esc(r.date)}</dd>

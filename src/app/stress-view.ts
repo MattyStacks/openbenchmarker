@@ -1,5 +1,6 @@
 import { lapChange, stability, stabilityBand, type StabilityBand } from "../benchmark/metrics";
 import { STEADY_STABILITY, getStressTest, matchesStressTest, type StressTest } from "../benchmark/presets";
+import type { SharedRun } from "../benchmark/share-codec";
 import type { BenchResult } from "../benchmark/types";
 import { esc } from "./dom";
 
@@ -17,6 +18,12 @@ export const changeText = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x * 
 export function completedStress(r: BenchResult): StressTest | undefined {
   const t = getStressTest(r.stressTest);
   return t && r.valid && matchesStressTest(t, r.preset, r.resolution, r.width, r.height, r.durationS, r.laps?.length ?? 0) ? t : undefined;
+}
+
+/** "96.4%": a shared stress run's stability; "" for other runs. */
+export function stabilityPct(r: SharedRun): string {
+  const s = r.stress ? stabilityOf(r.stress.laps) : null;
+  return s === null ? "" : pctText(s);
 }
 
 /** Stability of a list of lap avg FPS values; null when there are none. */
@@ -37,7 +44,13 @@ export function stressReading(lapFps: readonly number[], cpuLimited = false): St
   const band = stabilityBand(s);
   const drop = pctText(1 - s);
   const change = lapChange(lapFps.map((avgFps) => ({ avgFps, p1Low: 0 })));
-  const trend = change !== null && change <= -(1 - STEADY_STABILITY) ? ` The last lap was ${changeText(change)} against the first.` : "";
+  // Say how the last lap compares with the first, unless that's the same drop (fastest first, slowest last).
+  const trend =
+    change === null || change > -(1 - STEADY_STABILITY)
+      ? ""
+      : Math.abs(-change - (1 - s)) < 0.0005
+        ? " It got slower from the first lap to the last."
+        : ` The last lap was ${pctText(-change)} slower than the first.`;
   const text: Record<StabilityBand, [string, string]> = {
     steady: ["Steady: no sign of throttling", `The slowest lap was within ${drop} of the fastest, so performance held for the whole run.`],
     slowed: [
@@ -65,47 +78,59 @@ function niceStep(span: number, count: number): number {
 const fmt = (x: number) => (x >= 1000 ? Math.round(x).toLocaleString("en-US") : x.toFixed(1));
 
 /**
- * Lap avg FPS as a line with a marker per lap. The y axis always spans at least 95%–101% of the
- * fastest lap, so a steady run looks flat and a real drop stands out, whatever the FPS. The hairline
- * marks 97% of the fastest lap (the steady threshold). Hover a marker for its value.
+ * One drawing of the lap chart, `W` wide in SVG units. The page shows each at about 1:1 (see
+ * lapChartSvg), so the 12 px labels stay 12 px on screen.
  */
-export function lapChartSvg(lapFps: readonly number[], label = "Average FPS per lap"): string {
+function lapPlot(lapFps: readonly number[], W: number, cls: string): string {
   const n = lapFps.length;
-  if (n === 0) return "";
-  const W = 560, H = 190, L = 52, R = 64, T = 14, B = 30;
+  const H = 180, L = 52, R = 28, T = 16, B = 28;
   const max = Math.max(...lapFps), min = Math.min(...lapFps);
   const hi = max * 1.01;
   const lo = Math.min(min, max * 0.95);
-  const step = niceStep(hi - lo, 3);
   const x = (i: number) => (n === 1 ? L + (W - L - R) / 2 : L + (i * (W - L - R)) / (n - 1));
   const y = (v: number) => T + ((hi - v) * (H - T - B)) / (hi - lo);
+  const f = (v: number) => v.toFixed(1);
+  const steadyY = y(max * STEADY_STABILITY);
+  // The 97% line is labelled on the axis like a tick; value ticks that would touch it are dropped.
+  const step = niceStep(hi - lo, 3);
   const ticks: string[] = [];
   for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step)
-    ticks.push(`<line class="lc-grid" x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/><text class="lc-tick" x="${L - 8}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${fmt(v)}</text>`);
-  const steadyY = y(max * STEADY_STABILITY).toFixed(1);
-  const pts = lapFps.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    if (Math.abs(y(v) - steadyY) >= 14)
+      ticks.push(`<line class="lc-grid" x1="${L}" x2="${W - R}" y1="${f(y(v))}" y2="${f(y(v))}"/><text class="lc-tick" x="${L - 8}" y="${f(y(v) + 4)}" text-anchor="end">${fmt(v)}</text>`);
+  const pts = lapFps.map((v, i) => `${f(x(i))},${f(y(v))}`).join(" ");
   const marks = lapFps
     .map(
       (v, i) =>
-        `<g class="lc-pt" tabindex="0"><title>Lap ${i + 1}: ${fmt(v)} FPS</title><circle class="lc-hit" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="14"/><circle class="lc-dot" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="5"/></g>` +
-        `<text class="lc-tick" x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="middle">Lap ${i + 1}</text>`,
+        `<g class="lc-pt" tabindex="0"><title>Lap ${i + 1}: ${fmt(v)} FPS</title><circle class="lc-hit" cx="${f(x(i))}" cy="${f(y(v))}" r="14"/><circle class="lc-dot" cx="${f(x(i))}" cy="${f(y(v))}" r="5"/></g>` +
+        `<text class="lc-tick" x="${f(x(i))}" y="${H - 6}" text-anchor="middle">${n > 8 ? i + 1 : `Lap ${i + 1}`}</text>`,
     )
     .join("");
-  // Direct labels on the first and last laps only; the table and tooltips carry the rest.
-  const ends = [0, n - 1]
-    .filter((i, k, a) => a.indexOf(i) === k)
-    .map((i) => `<text class="lc-val" x="${(x(i) + (i === n - 1 ? 10 : 0)).toFixed(1)}" y="${(y(lapFps[i]) - 12).toFixed(1)}" text-anchor="${i === n - 1 && n > 1 ? "start" : "middle"}">${fmt(lapFps[i])}</text>`)
+  // Direct labels on the first and last laps only, above their markers and anchored inward (clear of
+  // the axis labels); the table and tooltips carry the rest.
+  const ends = [...new Set([0, n - 1])]
+    .map((i) => `<text class="lc-val" x="${f(x(i))}" y="${f(y(lapFps[i]) - 12)}" text-anchor="${n === 1 ? "middle" : i === 0 ? "start" : "end"}">${fmt(lapFps[i])}</text>`)
     .join("");
-  const s = stabilityOf(lapFps)!;
-  return `<figure class="lap-chart">
-  <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(`${label}: ${lapFps.map((v, i) => `lap ${i + 1} ${fmt(v)}`).join(", ")}. Stability ${pctText(s)}.`)}">
+  return `<svg class="${cls}" viewBox="0 0 ${W} ${H}" aria-hidden="true">
     ${ticks.join("")}
-    <line class="lc-steady" x1="${L}" x2="${W - R}" y1="${steadyY}" y2="${steadyY}"/>
-    <text class="lc-tick" x="${W - R + 6}" y="${(Number(steadyY) + 4).toFixed(1)}">97%</text>
+    <line class="lc-steady" x1="${L}" x2="${W - R}" y1="${f(steadyY)}" y2="${f(steadyY)}"/>
+    <text class="lc-tick lc-steady-label" x="${L - 8}" y="${f(steadyY + 4)}" text-anchor="end">97%</text>
     <polyline class="lc-line" points="${pts}"/>
     ${marks}${ends}
-  </svg>
-  <figcaption>${esc(label)}. The faint line is 97% of the fastest lap: laps above it count as steady.</figcaption>
+  </svg>`;
+}
+
+/**
+ * Lap avg FPS as a line with a marker per lap. The y axis always spans at least 95%–101% of the
+ * fastest lap, so a steady run looks flat and a real drop stands out, whatever the FPS. The hairline
+ * marks 97% of the fastest lap (the steady threshold). Hover a marker for its value. Drawn twice,
+ * narrow for phones and wide for larger screens; CSS shows one.
+ */
+export function lapChartSvg(lapFps: readonly number[], label = "Average FPS per lap"): string {
+  if (lapFps.length === 0) return "";
+  const s = stabilityOf(lapFps)!;
+  return `<figure class="lap-chart" role="img" aria-label="${esc(`${label}: ${lapFps.map((v, i) => `lap ${i + 1} ${fmt(v)}`).join(", ")}. Stability ${pctText(s)}.`)}">
+  ${lapPlot(lapFps, 340, "lc-narrow")}${lapPlot(lapFps, 640, "lc-wide")}
+  <figcaption>${esc(label)}. The faint line marked 97% is 97% of the fastest lap: laps above it count as steady.</figcaption>
 </figure>`;
 }
 
@@ -127,7 +152,7 @@ export function stressCardsHtml(test: StressTest, lapFps: readonly number[], avg
   const change = lapChange(lapFps.map((avgFps) => ({ avgFps, p1Low: 0 })));
   return `<div class="score hero-score"><span>${esc(test.name)} · stability</span><b id="res-stability">${pctText(s)}</b><span class="score-test">slowest lap ÷ fastest lap</span></div>
       <div class="score"><span>Average FPS (all laps)</span><b id="res-avg">${avgFps.toFixed(1)}</b></div>
-      <div class="score"><span>Lap 1 → lap ${lapFps.length}</span><b>${fmt(lapFps[0])} → ${fmt(lapFps[lapFps.length - 1])}</b>${change !== null ? `<span class="score-test">${changeText(change)}</span>` : ""}</div>`;
+      <div class="score"><span>Last lap (lap ${lapFps.length})</span><b>${fmt(lapFps[lapFps.length - 1])}</b><span class="score-test">lap 1: ${fmt(lapFps[0])}${change !== null ? ` · ${changeText(change)}` : ""}</span></div>`;
 }
 
 /** The laps section: reading, chart and table. */

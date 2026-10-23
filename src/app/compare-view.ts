@@ -6,6 +6,7 @@ import { sharePayload } from "./share";
 import { compareRuns, deviceSummary } from "./compare";
 import { esc } from "./dom";
 import { settingsLabel } from "./share";
+import { lapChartSvg, stabilityPct } from "./stress-view";
 
 // ---------------------------------------------------------------------------
 // The side-by-side panel, used on the result page (a comparison you set up), shared comparison
@@ -34,6 +35,7 @@ function column(r: SharedRun, heading: string, faster: boolean): string {
     <span class="cmp-label">${esc(heading)}</span>
     <b class="cmp-fps">${r.avgFps.toFixed(1)}</b><span class="cmp-unit">avg FPS</span>
     <dl class="cmp-facts">
+      ${r.stress ? `<dt>Stability</dt><dd>${stabilityPct(r)}</dd>` : ""}
       <dt>1% low</dt><dd>${r.p1Low.toFixed(1)}</dd>
       <dt>5% low</dt><dd>${r.p5Low.toFixed(1)}</dd>
       <dt>Worst frame</dt><dd>${r.worstMs.toFixed(2)} ms</dd>
@@ -55,6 +57,13 @@ export function comparePanelHtml(a: SharedRun, b: SharedRun, labels: PanelLabels
     <h2 class="cmp-title">Side by side</h2>
     ${c.verdict ? `<p class="cmp-verdict">${esc(c.verdict)}</p>` : ""}
     <div class="cmp-cols">${column(a, labels.colA, fasterA)}${column(b, labels.colB, fasterB)}</div>
+    ${
+      a.stress || b.stress
+        ? `<div class="cmp-laps">${([[a, labels.colA], [b, labels.colB]] as const)
+            .map(([r, col]) => (r.stress ? lapChartSvg(r.stress.laps, `${col}: average FPS per lap`) : ""))
+            .join("")}</div>`
+        : ""
+    }
     ${c.notes.length ? `<ul class="cmp-notes">${c.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
     <p class="muted tiny">Each run was measured in its own browser and shared on the honor system.</p>
     ${extra}

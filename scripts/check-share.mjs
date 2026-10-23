@@ -84,6 +84,40 @@ for (const width of [390, 1280]) {
   await clickShare("comparison result: Share the comparison", "[data-share-comparison]");
   await clickShare("comparison result: Share this run only", "[data-share-only]");
 
+  // A stress test result: Share my result, the compare box, and its shared link page (lap chart, no sideways scroll).
+  await page.evaluate(() => {
+    const rs = JSON.parse(localStorage.getItem("ogb.results.v1"));
+    const laps = [152.1, 151.8, 150.2, 148.9, 147.5, 146.7].map((avgFps) => ({ avgFps, p1Low: avgFps * 0.8 }));
+    rs.push({ ...rs[0], id: "stress", time: "19:00", resolutionId: "4K", resolution: "4K", width: 3840, height: 2160, preset: "Extreme", durationS: 576,
+      avgFps: 149.53, p1Low: 120.3, p5Low: 131, worstMs: 11.2, frameCount: 86130, stressTest: "extreme", laps, challenge: undefined });
+    localStorage.setItem("ogb.results.v1", JSON.stringify(rs));
+  });
+  await page.goto(`${base}/#/result/stress`);
+  await page.reload();
+  await clickShare("stress result: Share my result", "[data-share]");
+  const stressLink = (await last())?.url ?? "";
+  checks++;
+  const stressPage = await page.evaluate(() => ({
+    stability: document.querySelector("#res-stability")?.textContent,
+    dots: document.querySelectorAll(".lap-chart .lc-wide .lc-dot").length,
+    submit: !!document.querySelector("#submit-section"),
+    hscroll: document.documentElement.scrollWidth > window.innerWidth,
+  }));
+  if (stressPage.stability !== "96.4%" || stressPage.dots !== 6 || stressPage.submit || stressPage.hscroll)
+    failures.push(`${width}px stress result page: ${JSON.stringify(stressPage)}`);
+  await page.locator(".compare-box [data-cmp-pick] button").click();
+  await clickShare("stress result: Compare box → Share the comparison", ".compare-box [data-cmp-share]");
+  await page.goto(stressLink.replace(/^https?:\/\/[^/]+/, base));
+  await page.reload();
+  checks++;
+  const shared = await page.evaluate(() => ({
+    view: !document.querySelector("#view-shared").hidden,
+    stability: document.querySelector("#view-shared .hero-score b")?.textContent,
+    dots: document.querySelectorAll("#view-shared .lap-chart .lc-wide .lc-dot").length,
+    hscroll: document.documentElement.scrollWidth > window.innerWidth,
+  }));
+  if (!shared.view || shared.stability !== "96.4%" || shared.dots !== 6 || shared.hscroll) failures.push(`${width}px shared stress link: ${JSON.stringify(shared)}`);
+
   // My Results: card Share, then table row Share.
   await page.goto(`${base}/#/history`);
   await page.reload();

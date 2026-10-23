@@ -1,9 +1,10 @@
 import { encode as qrEncode } from "uqr";
 import { encodeShare, type SharedRun, type SharePayload } from "../benchmark/share-codec";
 import type { DeviceContext } from "../benchmark/types";
-import { getScoreTest } from "../benchmark/presets";
+import { getScoreTest, getStressTest } from "../benchmark/presets";
 import { SAME_PCT, apartLabel, compareRuns, comparisonText, inviteText } from "./compare";
 import { esc } from "./dom";
+import { stabilityPct } from "./stress-view";
 
 // ---------------------------------------------------------------------------
 // Sharing: link, share text, share card (canvas PNG with a QR code) and the share flow.
@@ -38,12 +39,18 @@ export function deviceLabel(d: DeviceContext): string {
 }
 
 const fps = (x: number) => x.toFixed(1);
-export const settingsLabel = (r: SharedRun) => `${r.resolution} · ${r.preset} · ${r.durationS} s`;
-const scoreLabel = (r: SharedRun) => (r.score !== undefined ? `${getScoreTest(r.scoreTest)?.name ?? "Score"} ${r.score.toLocaleString("en-US")}` : "");
+export const settingsLabel = (r: SharedRun) => `${r.resolution} · ${r.preset} · ${r.stress ? `${r.stress.laps.length} laps` : `${r.durationS} s`}`;
+const stressName = (r: SharedRun) => getStressTest(r.stress?.test)?.name ?? "Stress test";
+const scoreLabel = (r: SharedRun) =>
+  r.stress ? `${stressName(r)} · ${fps(r.avgFps)} FPS avg` : r.score !== undefined ? `${getScoreTest(r.scoreTest)?.name ?? "Score"} ${r.score.toLocaleString("en-US")}` : "";
 
 /** One line that reads well in iMessage, Discord, Reddit and X (well under 280 with the link). */
 export function shareText(r: SharedRun): string {
   const gpu = r.device.gpuLabel ? ` on ${r.device.gpuLabel}` : "";
+  if (r.stress) {
+    const laps = r.stress.laps;
+    return `${stressName(r)}: ${stabilityPct(r)} stability over ${laps.length} laps (${fps(laps[0])} → ${fps(laps[laps.length - 1])} FPS) in the Neon Flythrough browser GPU benchmark (${r.resolution} · ${r.preset})${gpu}. Measured in my browser, shared on the honor system:`;
+  }
   const score = r.score !== undefined ? `${scoreLabel(r)}: ` : "";
   return `${score}${fps(r.avgFps)} FPS avg, ${fps(r.p1Low)} 1% low in the Neon Flythrough browser GPU benchmark (${settingsLabel(r)})${gpu}. Measured in my browser, shared on the honor system:`;
 }
@@ -179,9 +186,10 @@ export function renderCard(r: SharedRun, url: string, variant: CardVariant = "re
   const TEXT_W = 700;
   eyebrow(ctx, `NEON FLYTHROUGH · v${r.benchmarkVersion}`);
 
-  // Average FPS, large, with a magenta glow.
-  const avg = fps(r.avgFps);
-  ctx.font = `800 172px ${SANS}`;
+  // Average FPS (stress runs: stability), large, with a magenta glow.
+  const laps = r.stress?.laps;
+  const avg = laps ? stabilityPct(r) : fps(r.avgFps);
+  ctx.font = `800 ${laps ? 150 : 172}px ${SANS}`;
   ctx.save();
   ctx.shadowColor = "rgba(255,62,219,0.85)";
   ctx.shadowBlur = 34;
@@ -192,11 +200,12 @@ export function renderCard(r: SharedRun, url: string, variant: CardVariant = "re
   spaced(ctx, 3);
   ctx.fillStyle = "#2ee9ff";
   ctx.font = `700 30px ${MONO}`;
-  ctx.fillText("AVG FPS", X + avgW + 12, 240);
+  ctx.fillText(laps ? "STABILITY" : "AVG FPS", X + avgW + 12, 240);
 
-  // Lows
+  // Lows (stress runs: the first and last lap)
   let lx = X;
-  for (const [label, value] of [["1% LOW", fps(r.p1Low)], ["5% LOW", fps(r.p5Low)]]) {
+  const row = laps ? [["LAP 1", fps(laps[0])], [`LAP ${laps.length}`, fps(laps[laps.length - 1])]] : [["1% LOW", fps(r.p1Low)], ["5% LOW", fps(r.p5Low)]];
+  for (const [label, value] of row) {
     spaced(ctx, 2);
     ctx.fillStyle = "#b6aedc";
     ctx.font = `700 20px ${MONO}`;
@@ -212,7 +221,7 @@ export function renderCard(r: SharedRun, url: string, variant: CardVariant = "re
   ctx.fillStyle = "#f0ecff";
   ctx.fillText(fitText(ctx, settingsLabel(r), TEXT_W, "700", 36, 26), X, 412);
   let y = 412;
-  if (r.score !== undefined) {
+  if (r.score !== undefined || laps) {
     y += 40;
     ctx.fillStyle = "#ff3edb";
     ctx.fillText(fitText(ctx, scoreLabel(r), TEXT_W, "700", 30, 22), X, y);
@@ -280,7 +289,7 @@ export function renderComparisonCard(a: SharedRun, b: SharedRun, url: string): H
     }
     ctx.fillStyle = "#f0ecff";
     ctx.font = `700 26px ${SANS}`;
-    ctx.fillText(`1% low ${fps(r.p1Low)}`, x, 314);
+    ctx.fillText(r.stress ? `Stability ${stabilityPct(r)}` : `1% low ${fps(r.p1Low)}`, x, 314);
     ctx.fillText(fitText(ctx, r.device.gpuLabel ?? "GPU hidden by the browser", COL_W, "600", 24, 16), x, 360);
     ctx.fillStyle = "#b6aedc";
     ctx.fillText(fitText(ctx, `${browserLabel(r.device)} · ${osLabel(r.device)}`, COL_W, "500", 20, 15), x, 392);

@@ -109,3 +109,33 @@ describe("the compared-with run stays local", () => {
     expect(j.avgFps).toBe(142.3);
   });
 });
+
+describe("stress runs", () => {
+  const LAPS = [152.1, 151.8, 150.2, 148.9, 147.5, 146.7];
+  const stress = (laps = LAPS, over: Partial<BenchResult> = {}) =>
+    br({ resolutionId: "4K", resolution: "4K", width: 3840, height: 2160, preset: "Extreme", durationS: 576, stressTest: "extreme", avgFps: 149.5, laps: laps.map((avgFps) => ({ avgFps, p1Low: avgFps * 0.8 })), ...over });
+
+  it("compare like-for-like only with the same stress test, and show both stabilities", () => {
+    const mine = sharedRunFrom(stress());
+    const theirs = sharedRunFrom(stress([160, 150, 140, 138, 137, 136], { avgFps: 143.5 }));
+    const c = compareRuns(theirs, mine);
+    expect(c.likeForLike).toBe(true);
+    expect(c.notes).toContain("Stability: 96.4% for your run, 85.0% for the shared run (slowest lap ÷ fastest).");
+    // A 60 s Extreme score run isn't the same test.
+    const score = sharedRunFrom(br({ resolutionId: "4K", resolution: "4K", width: 3840, height: 2160, preset: "Extreme", durationS: 60 }));
+    expect(compareRuns(score, mine).likeForLike).toBe(false);
+    expect(compareRuns(score, mine).notes[0]).toBe("Not like-for-like: the shared run used 4K · Extreme · 60 s, your run used 4K · Extreme · 6 laps.");
+  });
+
+  it("match only saved runs of the same stress test", () => {
+    const shared = sharedRunFrom(stress());
+    const list = [stress(LAPS, { id: "s" }), br({ id: "plain" }), br({ id: "x", resolutionId: "4K", resolution: "4K", width: 3840, height: 2160, preset: "Extreme", durationS: 576 })];
+    expect(matchLocal(list, shared).map((r) => r.id)).toEqual(["s"]);
+  });
+
+  it("invite and comparison text lead with stability", () => {
+    const s = sharedRunFrom(stress());
+    expect(inviteText(s)).toMatch(/^96\.4% stability and 149\.5 FPS avg over 4K · Extreme · 6 laps/);
+    expect(comparisonText(s, s)).toMatch(/Stability 96\.4% vs 96\.4%\./);
+  });
+});

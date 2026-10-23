@@ -59,7 +59,8 @@ describe("stress reading", () => {
     const slowed = stressReading(LAPS)!;
     expect(slowed.band).toBe("slowed");
     expect(slowed.body).toMatch(/3\.6% below the fastest/);
-    expect(slowed.body).toMatch(/The last lap was −3\.6% against the first/);
+    expect(slowed.body).toMatch(/It got slower from the first lap to the last\./);
+    expect(stressReading([150, 152, 148, 144, 147, 145])!.body).toMatch(/The last lap was 3\.3% slower than the first\./);
     const throttled = stressReading([300, 260, 240, 230, 225, 222], true)!;
     expect(throttled.band).toBe("throttled");
     expect(throttled.body).toMatch(/thermal throttling/);
@@ -77,7 +78,8 @@ describe("stress reading", () => {
 describe("lap chart and table", () => {
   it("draws one marker and label per lap, with a value tooltip and an accessible summary", () => {
     const svg = lapChartSvg(LAPS);
-    expect(svg.match(/class="lc-dot"/g)).toHaveLength(6);
+    expect(svg.match(/class="lc-dot"/g)).toHaveLength(12); // drawn narrow and wide
+    expect(svg.match(/<svg class="lc-(narrow|wide)"/g)).toHaveLength(2);
     expect(svg).toMatch(/<title>Lap 6: 146\.7 FPS<\/title>/);
     expect(svg).toMatch(/aria-label="Average FPS per lap: lap 1 152\.1, .*Stability 96\.4%\."/);
     expect(svg).not.toMatch(/NaN|Infinity/);
@@ -92,5 +94,17 @@ describe("lap chart and table", () => {
     expect(t.match(/<tr>/g)).toHaveLength(7);
     expect(t).toMatch(/<td>Lap 6<\/td><td class="num">146\.7<\/td><td class="num">−3\.6%<\/td><td class="num">117\.4<\/td>/);
     expect(lapTableHtml(LAPS)).not.toMatch(/1% low/);
+  });
+});
+
+describe("sharing a stress run", () => {
+  it("the share text leads with stability and the first and last lap", async () => {
+    const { shareText, settingsLabel } = await import("../src/app/share");
+    const { sharedRunFrom } = await import("../src/benchmark/share-codec");
+    const r = sharedRunFrom(stressResult({ device: { browser: "edge", browserMajor: 141, os: "windows", deviceType: "desktop", webkitEngine: false, gpuLabel: "NVIDIA GeForce RTX 5080" } }));
+    expect(settingsLabel(r)).toBe("4K · Extreme · 6 laps");
+    expect(shareText(r)).toBe(
+      "Stress: Extreme: 96.4% stability over 6 laps (152.1 → 146.7 FPS) in the Neon Flythrough browser GPU benchmark (4K · Extreme) on NVIDIA GeForce RTX 5080. Measured in my browser, shared on the honor system:",
+    );
   });
 });

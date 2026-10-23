@@ -82,14 +82,19 @@ let shareTarget: { resolution: string; preset: string; duration: number } | null
 
 /** "Run the same test" from a shared link: select its settings and bring the form into view. */
 export function prefillFromShare(r: SharedRun): void {
-  shareTarget = { resolution: r.resolution, preset: r.preset, duration: r.durationS };
+  // A stress test is started from its own button; the custom form can't run it.
+  shareTarget = r.stress ? null : { resolution: r.resolution, preset: r.preset, duration: r.durationS };
   setRadio("resolution", r.resolution);
   setRadio("preset", r.preset);
   setRadio("duration", r.durationS);
   location.hash = "#/";
   refreshRunHints();
-  const scoreBtn = r.score !== undefined ? document.querySelector<HTMLElement>(`#score-runs [data-test="${r.scoreTest}"]`) : null;
-  document.querySelectorAll("#score-runs .is-target").forEach((b) => b.classList.remove("is-target"));
+  const scoreBtn = r.stress
+    ? document.querySelector<HTMLElement>(`#stress-runs [data-stress="${r.stress.test}"]`)
+    : r.score !== undefined
+      ? document.querySelector<HTMLElement>(`#score-runs [data-test="${r.scoreTest}"]`)
+      : null;
+  document.querySelectorAll("#score-runs .is-target, #stress-runs .is-target").forEach((b) => b.classList.remove("is-target"));
   scoreBtn?.classList.add("is-target");
   requestAnimationFrame(() => (scoreBtn ?? $("#config")).scrollIntoView({ behavior: "smooth", block: "start" }));
 }
@@ -117,7 +122,7 @@ function refreshRunHints(): void {
   banner.hidden = !cmp;
   if (cmp) {
     const who = [browserLabel(cmp.device), cmp.device.gpuLabel].filter(Boolean).join(" · ");
-    banner.innerHTML = `<p><b>Comparing with ${cmp.avgFps.toFixed(1)} FPS avg</b> · ${esc(who)} (${esc(settingsLabel(cmp))}). Press Start when you're ready; you'll see both runs side by side.</p><button type="button" class="linklike" data-stop-compare>Stop comparing</button>`;
+    banner.innerHTML = `<p><b>Comparing with ${cmp.avgFps.toFixed(1)} FPS avg</b> · ${esc(who)} (${esc(settingsLabel(cmp))}). ${cmp.stress ? `Press ${esc(STRESS_TESTS.find((t) => t.id === cmp.stress!.test)?.name ?? "the stress test")} below the score runs` : "Press Start"} when you're ready; you'll see both runs side by side.</p><button type="button" class="linklike" data-stop-compare>Stop comparing</button>`;
   }
   const note = $("#cfg-dnf");
   const dnf = didNotFinish(res, preset);
