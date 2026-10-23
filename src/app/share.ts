@@ -269,7 +269,7 @@ export function shareRun(r: SharedRun): { url: string; file: File; done: Promise
 /** Share box for the results page: one-tap Share, card preview, Save image, Copy link and the note. */
 export function shareBoxHtml(): string {
   return `<div class="share-box">
-    <div class="row">
+    <div class="share-actions">
       <button type="button" class="btn btn-primary btn-share" data-share>Share result</button>
       <button type="button" class="btn" data-copy-link>Copy link</button>
       <button type="button" class="btn" data-save-card>Save image</button>

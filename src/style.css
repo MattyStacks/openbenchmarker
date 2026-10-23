@@ -414,9 +414,17 @@ table.history { width: 100%; border-collapse: collapse; font-size: 14px; }
 
 /* Sharing: results-page share box, shared-link view, "run the same test" note. */
 .share-box { margin: 16px 0; padding: 14px 16px; border: 1px solid var(--line-hi); border-radius: 10px; background: var(--glass); display: grid; gap: 10px; }
-.share-box .row .btn { min-height: 48px; }
-.share-box .btn-share { flex: 1 1 220px; font-size: 17px; }
-.share-status { font-size: 14px; color: var(--good); min-height: 1.4em; }
+.share-box p { margin: 0; }
+/* Phones: Share result full width, Copy link and Save image side by side underneath. */
+.share-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.share-actions .btn { min-height: 48px; }
+.share-actions .btn-share { grid-column: 1 / -1; font-size: 17px; }
+@media (min-width: 640px) {
+  .share-actions { grid-template-columns: 2fr 1fr 1fr; }
+  .share-actions .btn-share { grid-column: auto; }
+}
+.share-status { font-size: 14px; color: var(--good); }
+.share-status:empty { display: none; }
 .share-status.bad { color: var(--warn); }
 .share-box details summary { cursor: pointer; color: var(--muted); }
 .share-box img.card-preview { display: block; width: 100%; max-width: 600px; height: auto; margin-top: 10px; border-radius: 8px; border: 1px solid var(--line); }
