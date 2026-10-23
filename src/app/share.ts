@@ -404,7 +404,7 @@ export function shareBoxHtml(): string {
       <button type="button" class="btn" data-save-card>Save image</button>
     </div>
     <p class="share-status" role="status" aria-live="polite" data-share-status></p>
-    <p class="muted tiny">${esc(SHARE_NOTE)}</p>
+    <p class="muted tiny">${esc(SHARE_NOTE)} <a href="#/about/sharing">How sharing works →</a></p>
     <details data-card-preview><summary>Preview the share card</summary></details>
   </div>`;
 }

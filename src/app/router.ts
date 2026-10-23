@@ -1,3 +1,4 @@
+import { renderAbout } from "./about-view";
 import { renderHistory } from "./history-view";
 import { renderResults } from "./results-view";
 import { renderShared } from "./shared-view";
@@ -15,5 +16,7 @@ export function route(): void {
   const shared = h.match(/^#\/r\/(.+)$/);
   if (shared) return renderShared(shared[1]);
   if (h === "#/history") return renderHistory();
+  const about = h.match(/^#\/about(?:\/([\w-]+))?$/);
+  if (about) return renderAbout(about[1] ?? null);
   showView("home");
 }

@@ -46,7 +46,7 @@
         "isAccessibleForFree": true,
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
         "license": "https://opensource.org/license/mit",
-        "author": { "@type": "Person", "name": "MattyStacks", "url": "https://github.com/MattyStacks" },
+        "author": { "@type": "Organization", "name": "Open GPU Benchmarker maintainers", "url": "https://github.com/MattyStacks/openbenchmarker" },
         "sameAs": ["https://github.com/MattyStacks/openbenchmarker"]
       }
     </script>
@@ -58,6 +58,7 @@
       <nav class="nav" aria-label="Main">
         <a href="#/" data-nav="home">Benchmark</a>
         <a href="#/history" data-nav="history">My Results</a>
+        <a href="#/about" data-nav="about">About</a>
         <a href="https://opengpubenchmarks.com/" target="_blank" rel="noopener">Open GPU Benchmarks ↗</a>
       </nav>
     </header>
@@ -137,6 +138,7 @@
               <li><b>Provided by you:</b> GPU (from the official catalog), OS and any optional system details. To make things easier, we sometimes suggest a value, our best guess, for details most people don't know offhand. Suggested values are always marked, and you can change or clear them.</li>
               <li>Results stay in this browser unless you choose to share a link, export them or submit them to <a href="https://opengpubenchmarks.com/" target="_blank" rel="noopener">opengpubenchmarks.com</a>.</li>
             </ul>
+            <p class="about-more"><a href="#/about">About, privacy &amp; FAQ →</a></p>
           </aside>
         </div>
 
@@ -196,6 +198,7 @@
       <!-- Local history -->
       <section class="view" id="view-history" hidden></section>
       <section class="view" id="view-shared" hidden></section>
+      <section class="view" id="view-about" hidden></section>
     </main>
 
     <footer class="site-footer" id="footer">
@@ -208,6 +211,7 @@
           <h2>Benchmark</h2>
           <a href="#/">Neon Flythrough</a>
           <a href="#/history">My Results</a>
+          <a href="#/about">About &amp; FAQ</a>
           <a href="https://opengpubenchmarks.com/" target="_blank" rel="noopener">Open GPU Benchmarks ↗</a>
         </nav>
         <nav class="footer-col" aria-label="Project">
@@ -223,7 +227,7 @@
           <p>Built with <a href="https://threejs.org/" target="_blank" rel="noopener">three.js</a> (MIT).</p>
         </div>
       </div>
-      <p class="footer-legal">© 2026 MattyStacks. GPU and CPU names are trademarks of their respective owners. Scores from this benchmark are not comparable with other benchmarks.</p>
+      <p class="footer-legal">© 2026 the <a href="https://github.com/MattyStacks/openbenchmarker" target="_blank" rel="noopener">Open GPU Benchmarker maintainers</a>. Code released under the MIT License. The Open GPU Benchmarker name and logo aren't covered by the MIT License. GPU and CPU names are trademarks of their respective owners. Scores from this benchmark are not comparable with other benchmarks.</p>
     </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>

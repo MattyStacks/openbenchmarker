@@ -1,6 +1,6 @@
 # Privacy audit
 
-Date: 2026-10-22. Branch: `feature/share-results`. Scope: source (`src/`, `index.html`, `public/`) and built output (`dist/`, `npm run build`). Later copy (share text, About & FAQ) must stay accurate to this report; re-run the checks below when it changes.
+Date: 2026-10-22, re-checked 2026-10-23 for Plan 7 (About & FAQ, `memory_channels`, share-link extension section). Branch: `feature/share-results`. Scope: source (`src/`, `index.html`, `public/`), built output (`dist/`, `npm run build`), and the live response headers of production and the preview. Later copy (share text, About & FAQ) must stay accurate to this report; re-run the checks below when it changes.
 
 Principle being audited: everything runs in the browser; the site stores nothing on a server (no database, KV, cookies, accounts or server code); nothing is shared or submitted unless the user explicitly shares, exports or submits it.
 
@@ -26,7 +26,7 @@ Principle being audited: everything runs in the browser; the site stores nothing
 
 | Key / API | File | What is stored | Leaves the browser? |
 |---|---|---|---|
-| `ogb.results.v1` (`localStorage`) | `src/app/store.ts` | Saved `BenchResult[]` (measured result, user-filled `system`, `diag`, the separate `device` field, and on compared runs a `challenge` field holding the compared-with run's share code; it's stripped from JSON export and never submitted) | Only when the user exports JSON/CSV, downloads/copies YAML, or opens the GitHub submission form |
+| `ogb.results.v1` (`localStorage`) | `src/app/store.ts` | Saved `BenchResult[]` (measured result, user-filled `system`, `diag`, the separate `device` field, a `suggested` list naming system fields that hold a marked best guess (today only `memoryChannels: "4"` on phone and tablet runs), and on compared runs a `challenge` field holding the compared-with run's share code; it's stripped from JSON export and never submitted) | Only when the user exports JSON/CSV, downloads/copies YAML, or opens the GitHub submission form |
 | `ogb.config.v1` (`localStorage`) | `src/app/store.ts` | Last-used run config (resolution, preset, duration) | Never |
 | `ogb.challenge.v1` (`sessionStorage`) | `src/app/challenge.ts` | Pending comparison (share code) for this tab | Never |
 | `ogb.historyView.v1` (`localStorage`) | `src/app/history-view.ts` | My Results display preference, `cards` or `table` | Never |
@@ -37,7 +37,7 @@ Clearing site data deletes all of them. In My Results, "Clear my saved results" 
 
 ## Hosting
 
-Static assets only (`wrangler.toml` has no `main`, no bindings). Previews (`npm run preview:deploy`) serve the same build on `share-results.opengpubenchmarker.com` and `*.mattys.workers.dev`, marked `noindex`; each is its own origin with its own localStorage.
+Static assets only (`wrangler.toml` has no `main`, no bindings). Checked 2026-10-23 with `curl -D -` on `https://opengpubenchmarker.com/` and `https://share-results.opengpubenchmarker.com/`: no `Set-Cookie` header, and the HTML loads only the site's own `/assets/index-*.js` (no injected Cloudflare Web Analytics beacon or other script). The About page says only that Cloudflare serves the files like any web host; it makes no claim about Cloudflare's own logs. Previews (`npm run preview:deploy`) serve the same build on `share-results.opengpubenchmarker.com` and `*.mattys.workers.dev`, marked `noindex`; each is its own origin with its own localStorage.
 
 ## Built output checked
 
@@ -52,9 +52,9 @@ grep -o "indexedDB\|document.cookie\|sendBeacon" dist/assets/*.js   # sessionSto
 grep -rn "@font-face\|fonts.googleapis" src/ index.html dist/assets/*.css
 ```
 
-## FAQ candidates (for Plan 7)
+## About & FAQ page (Plan 7)
 
-Longer explanations kept short on the page in Plan 6, to expand in the About & FAQ page:
+`#/about` (`src/app/about-view.ts`) is the plain-language version of this report. Its storage table must list exactly the `ogb.*.v1` keys in `src/` and this report must name each of them (`tests/about.test.ts`). The candidates Plan 6 left for it, all now covered there:
 
 - What CC BY 4.0 allows: reuse with credit, including commercial use and AI training; copies other people made stay public (upstream's [license page](https://opengpubenchmarks.com/license/)).
 - Why submitting isn't automatic: the site keeps nothing and has no server; you submit through GitHub yourself, so your GitHub username is public on the pull request.

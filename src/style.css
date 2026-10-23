@@ -608,3 +608,34 @@ details.compare-entry > summary::-webkit-details-marker { display: none; }
 details.compare-entry > summary::after { content: "▸"; margin-left: auto; color: var(--muted); transition: transform 0.15s; }
 details.compare-entry[open] > summary::after { transform: rotate(90deg); }
 details.compare-entry:not([open]) { padding-bottom: 10px; }
+
+/* About & FAQ (#/about): one readable column, phone first. */
+.about { max-width: 760px; margin: 0 auto; display: grid; gap: 16px; min-width: 0; }
+.about-toc { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+.about-toc a { display: inline-flex; align-items: center; min-height: 40px; color: var(--cyan); }
+.about-sec { scroll-margin-top: 16px; }
+.about-sec p, .about-sec ul, .about-sec ol { margin: 0; }
+.about-sec ul, .about-sec ol { padding-left: 20px; display: grid; gap: 6px; }
+.about-sec a, .about-more a, .about-legal a { color: var(--cyan); }
+.about-more a { display: inline-flex; align-items: center; min-height: 44px; }
+.table-scroll { overflow-x: auto; max-width: 100%; }
+.about-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.about-table th, .about-table td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.about-table th { color: var(--muted); font-weight: 600; }
+.about-table code { overflow-wrap: anywhere; }
+.example-link code { display: block; overflow-wrap: anywhere; font-size: 12px; }
+.about-summary { padding: 10px 12px; border-left: 3px solid var(--cyan); background: rgba(46, 233, 255, 0.07); }
+details.tech > summary, .faq-item > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--text); }
+details.tech > summary { color: var(--muted); font-size: 13px; }
+details.tech > :not(summary) { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.faq-item { border-top: 1px solid var(--line); scroll-margin-top: 16px; }
+.faq-item > summary { font-weight: 600; list-style: none; gap: 10px; }
+.faq-item > summary::-webkit-details-marker { display: none; }
+.faq-item > summary::after { content: "▸"; margin-left: auto; color: var(--muted); transition: transform 0.15s; }
+.faq-item[open] > summary::after { transform: rotate(90deg); }
+.faq-item > :not(summary) { margin: 0 0 10px; }
+.about-legal { margin: 0; text-align: center; }
+@media (max-width: 480px) {
+  .about-table { font-size: 12.5px; }
+  .about-table th, .about-table td { padding: 6px 4px; }
+}

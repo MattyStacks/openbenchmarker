@@ -293,7 +293,7 @@ This tool feeds a public dataset, so:
   `system.os` (`windows`|`linux`), and `proof.method`. The resolution must be
   `720p`, `1080p`, `1440p` or `4K`, and match the rendered pixel size: older results
   from the removed Native option at any other size stay local only. A `score` must match its
-  score run's locked settings and `round(avg_fps × 100)`. `overclocked` is optional (yes/no). Linux-only fields on a
+  score run's locked settings and `round(avg_fps × 100)`. `overclocked` is optional (yes/no). `memory_channels` is optional, a whole number from 1 to 32. Linux-only fields on a
   Windows run fail. Blank optional fields are left out of the YAML. YAML
   download and copy stay disabled until validation passes.
 
@@ -347,14 +347,49 @@ npm run refresh-catalog   # optionally GITHUB_TOKEN=... to avoid rate limits
 
 The script refuses to overwrite the snapshot with an empty list.
 
+## How to add a field
+
+System information fields (what the user provides, under `system:` in the YAML) are defined once,
+in `src/benchmark/fields.ts`. The results form, `validate.ts`, the YAML and CSV exporters, JSON
+export and the storage migration all read that registry. To add one:
+
+1. **Check upstream first.** Find the field in open-gpu-benchmarks
+   `templates/community_submission.yaml` and `scripts/checks.py`, and copy its YAML name, type,
+   allowed values and position. If upstream doesn't have it yet, keep it out of the submission
+   YAML until it does (and note it in [docs/upstream-todos.md](docs/upstream-todos.md)).
+2. **Add the key** to `SystemInfo` in `src/benchmark/types.ts`.
+3. **Add a registry entry** in `SYSTEM_FIELDS`, at its upstream YAML position: `yaml` name,
+   `kind` (`text` is quoted, `digits` is a bare number, `choice` a bare word), label, placeholder,
+   optional `help`, `linux: true` for Linux-only fields, and a `validate` rule that mirrors
+   `checks.py`. If browsers can't detect it and a best guess helps, add a `suggest` rule; the
+   value is then marked in the result's `suggested` list and the YAML comments it as assumed.
+4. **Tests:** extend `tests/fields.test.ts` (validation, YAML output and order, CSV column, and
+   that older saved results load with it blank or suggested).
+5. **Share links** don't carry system fields. If a new field ever should be in links, add it as an
+   extension entry with a new tag (see [docs/share-links.md](docs/share-links.md)), not as a fixed
+   field; the format version changes only for breaking changes.
+
+Old saved results need no migration code: missing fields load as blank (or suggested), unknown
+fields from newer versions are kept, and a field the user cleared stays cleared.
+
 ## Privacy and sharing
 
 Everything runs in the browser. The site stores nothing on a server: no database, no accounts, no
 cookies, no analytics. Results live in this browser's localStorage. They leave it only when you
 share a link, export a file, or submit through GitHub. Share links carry the result in the URL
 fragment, which browsers never send to the server, and sharing is on the honor system (nothing is
-signed or verified). The full list of storage keys and checks is in
-[docs/privacy-audit.md](docs/privacy-audit.md). The About & FAQ page (`#/about`) covers it in plain words.
+signed or verified). Links are encoded, not encrypted: anyone with a link can read it, like a
+screenshot. They never carry the system details you typed in (including `memory_channels`), the
+diagnostics or the result id. The full list of storage keys and checks is in
+[docs/privacy-audit.md](docs/privacy-audit.md), and the link format in
+[docs/share-links.md](docs/share-links.md).
+
+The **About & FAQ** page (`#/about`, `src/app/about-view.ts`) explains all of this in plain words:
+principles, every storage key, what the host sees, how sharing works (with a field table decoded
+from a real link), submitting, phones, and the FAQ. Sections and FAQ entries can be linked
+directly, e.g. `#/about/sharing` or `#/about/faq-memory-channels`. `tests/about.test.ts` keeps the
+page honest: its storage list must match the keys in `src/`, its example link must decode to the
+values shown, and every `#/about/<id>` link elsewhere must have a target.
 
 ## Phones and tablets
 
@@ -365,13 +400,22 @@ planned; see [docs/upstream-todos.md](docs/upstream-todos.md)). Phones can run o
 resolution after a crash ([docs/high-res-memory.md](docs/high-res-memory.md)). The layout is designed
 for 360–430 px first.
 
+Browsers can't detect memory channels, so phone and tablet results store `memory_channels: 4` as a
+marked suggestion (flagship phones run four 16-bit LPDDR channels; many others use two). It isn't
+shown on the phone results page yet, but it's in JSON/CSV exports, and "4 (assumed)" shows in My
+Results. That way the saved result is already complete when phone submission opens. Phone and
+desktop channel counts aren't comparable: four phone channels add up to the width of one 64-bit
+desktop channel.
+
 ## Search engines and sharing
 
 Everything Google Search and link previews need ships from `index.html` and `public/`:
 
 - `<title>`, meta description, `robots`, and a canonical link to `https://opengpubenchmarker.com/`.
-  The app uses hash routes (`#/history`, `#/result/…`), which search engines treat as the
-  same page, so there is one indexable URL.
+  The app uses hash routes (`#/history`, `#/result/…`, `#/about`), which search engines treat as the
+  same page, so there is one indexable URL. The About & FAQ page is deliberately part of it rather
+  than in the sitemap; if it ever needs its own search listing, it would move to a static
+  `/about.html`.
 - Open Graph and Twitter card tags, with `public/og-image.png` (1200×630, a real frame of the
   Neon Flythrough on Ultra).
 - `WebApplication` JSON-LD structured data (free, MIT, requires WebGL2).
@@ -399,7 +443,9 @@ to separately from Open GPU Benchmarks), and diagnostics that need more than a b
 
 ## License
 
-- **Code:** [MIT](LICENSE), © 2026 MattyStacks.
+- **Code:** © 2026 the [Open GPU Benchmarker maintainers](https://github.com/MattyStacks/openbenchmarker).
+  Code released under the [MIT License](LICENSE). The Open GPU Benchmarker name and logo aren't
+  covered by the MIT License.
 - **Submitted results:** results you submit to Open GPU Benchmarks are published under
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and can't be taken back.
 - **Third-party:** [three.js](https://github.com/mrdoob/three.js) is MIT-licensed and is
@@ -412,7 +458,8 @@ src/benchmark/metrics.ts      computeStats / run stats (GPU busy, CPU time, stal
 src/benchmark/diagnose.ts     "what limited this run": verdict + findings (pure)
 src/benchmark/presets.ts      RESOLUTIONS, PRESETS, durations, SCORE_TESTS
 src/benchmark/catalog.ts      catalog snapshot, NOT_LISTED, BENCHMARKS (exactly one), version
-src/benchmark/types.ts        SystemInfo (all blank), BenchResult
+src/benchmark/types.ts        SystemInfo, BenchResult
+src/benchmark/fields.ts       system field registry: form, validation, YAML/CSV, migration, suggestions
 src/benchmark/validate.ts     validateSubmission (fail-closed)
 src/benchmark/exporter.ts     toYaml / toCsv / toJson / file names
 src/main.ts                   entry: routing, config form (dev-only ?capture hook)
@@ -425,6 +472,7 @@ src/app/share-env.ts          device detection for display/sharing only (pure, t
 src/app/run-guard.ts          crash detection (run-in-progress record), "didn't finish" hints, phone high-res confirmation
 src/app/share.ts              share link, share text, share card (canvas + QR) and the share flow
 src/app/shared-view.ts        shared-link view (#/r/<payload>), read-only
+src/app/about-view.ts         About & FAQ (#/about, #/about/<section>)
 src/benchmark/share-codec.ts  share-link binary format (versioned, CRC-8, plausibility checks)
 src/app/capture.ts            dev-only: fixed-t renders and renderer.info for scripts/capture.mjs
 src/engine/world.ts           grid, clearances, the 96 s flight keys, landmark bridges

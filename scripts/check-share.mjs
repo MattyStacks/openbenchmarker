@@ -7,6 +7,7 @@
 // Serves dist/ with `vite preview`, opens headless Chromium at phone and desktop width, replaces
 // navigator.share with a recorder, seeds saved results, clicks every Share button and checks what
 // was handed to the share sheet. Copy link and Copy code are checked through the clipboard.
+// Also checks that "How sharing works →" opens #/about/sharing without sideways scroll.
 // Exit code 1 on any failure. Runs alongside `npm test` (tests/share-keeps-link.test.ts).
 import { chromium } from "playwright";
 import { preview } from "vite";
@@ -97,6 +98,19 @@ for (const width of [390, 1280]) {
   await page.locator(".hist-table [data-act=compare]").first().click();
   await page.locator(".compare-row [data-cmp-pick] button").click();
   await clickShare("My Results table row: Compare → Share the comparison", ".compare-row [data-cmp-share]");
+
+  // "How sharing works →" next to Share opens the About page's sharing section, with no sideways scroll.
+  await page.goto(`${base}/#/result/plain`);
+  await page.locator(".share-box a[href='#/about/sharing']").click();
+  await page.waitForTimeout(200);
+  checks++;
+  const about = await page.evaluate(() => ({
+    view: !document.querySelector("#view-about").hidden,
+    section: !!document.querySelector("#sharing .about-table"),
+    hscroll: document.documentElement.scrollWidth > window.innerWidth,
+  }));
+  if (!about.view || !about.section) failures.push(`${width}px: How sharing works didn't open the sharing section`);
+  if (about.hscroll) failures.push(`${width}px: About page scrolls sideways`);
   await ctx.close();
 }
 

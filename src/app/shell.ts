@@ -1,6 +1,6 @@
 import { $ } from "./dom";
 
-export type View = "home" | "run" | "results" | "history" | "shared";
+export type View = "home" | "run" | "results" | "history" | "shared" | "about";
 
 /** True while a run owns the page: routing is ignored until it ends. */
 export const app = { running: false };
@@ -11,10 +11,11 @@ const TITLES: Record<View, string> = {
   results: "Result · Open GPU Benchmarker",
   history: "My Results · Open GPU Benchmarker",
   shared: "Shared result · Open GPU Benchmarker",
+  about: "About & FAQ · Open GPU Benchmarker",
 };
 
 export function showView(v: View): void {
-  for (const id of ["home", "run", "results", "history", "shared"]) $(`#view-${id}`).hidden = id !== v;
+  for (const id of ["home", "run", "results", "history", "shared", "about"]) $(`#view-${id}`).hidden = id !== v;
   document.title = TITLES[v];
   document.body.dataset.view = v;
   document.querySelectorAll<HTMLAnchorElement>("[data-nav]").forEach((a) => {

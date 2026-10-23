@@ -140,7 +140,7 @@ export function renderShared(payload: string): void {
   const { type, runs } = d.payload;
   const first = runs[0];
   const mineBtn = `<button type="button" class="btn" data-compare-mine>Compare with mine</button>`;
-  const honor = `<p class="honor-note">Shared on the honor system. Measured in the sharer's browser; nothing is stored or verified. <a href="#/about">How sharing works →</a></p>`;
+  const honor = `<p class="honor-note">Shared on the honor system. Measured in the sharer's browser; nothing is stored or verified. <a href="#/about/sharing">How sharing works →</a></p>`;
   const explore = `<p class="explore-link"><a href="${OGB_SITE}" target="_blank" rel="noopener">Explore results on Open GPU Benchmarks →</a></p>`;
   if (type === "comparison") {
     view.innerHTML = `
