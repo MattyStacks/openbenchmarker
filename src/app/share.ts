@@ -259,7 +259,9 @@ export function shareRun(r: SharedRun): { url: string; file: File; done: Promise
       (e: unknown) => ((e as Error)?.name === "AbortError" ? ("cancelled" as const) : copy()),
     );
   let done: Promise<ShareOutcome>;
-  if (typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })) done = viaSheet({ files: [file], title, text, url });
+  // With an image, the link goes inside the text instead of `url`: iOS shows "1 Link and 1 Image"
+  // with a blank icon for two items, but the card itself as the preview for one image.
+  if (typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })) done = viaSheet({ files: [file], title, text: `${text}\n${url}` });
   else if (typeof navigator.share === "function") done = viaSheet({ title, text, url });
   else done = copy();
   return { url, file, done };
