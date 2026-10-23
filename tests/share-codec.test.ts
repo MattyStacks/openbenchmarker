@@ -309,3 +309,87 @@ describe("extension section", () => {
     expect(() => encodeShare({ type: "result", runs: [run()], ext: [{ tag: 1, value: new Uint8Array(256) }] })).toThrow();
   });
 });
+
+describe("stress test links", () => {
+  const LAPS = [152.1, 151.8, 150.2, 148.9, 147.5, 146.7];
+  const mean = (xs: number[]) => Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 100) / 100;
+  function stressRun(over: Partial<SharedRun> = {}): SharedRun {
+    const r = run({ durationS: 576, avgFps: mean(LAPS), frameCount: 86112, stress: { test: "extreme", laps: LAPS }, ...over });
+    delete r.scoreTest;
+    delete r.score;
+    return r;
+  }
+  const ENTRY = stressRun({
+    resolution: "720p", width: 1280, height: 720, preset: "Low", avgFps: 301.25, p1Low: 210.4, p5Low: 240, worstMs: 9.1, frameCount: 173520,
+    stress: { test: "entry", laps: [312.4, 305.1, 300.2, 298.6, 296.9, 294.3] },
+    device: { browser: "safari", browserMajor: 26, os: "ios", deviceType: "phone", webkitEngine: true, gpuLabel: "Apple GPU" },
+  });
+  const enc = (p: SharePayload) => encodeShare(p);
+  const dec = (code: string) => decodeShare(code, TODAY);
+
+  it("round-trip with every lap, for result, invite and comparison links", () => {
+    expect(roundTrip(stressRun())).toEqual(stressRun());
+    expect(roundTrip(ENTRY)).toEqual(ENTRY);
+    const invite = dec(enc({ type: "challenge", runs: [ENTRY] }));
+    expect(invite.ok && invite.payload.runs[0]).toEqual(ENTRY);
+    for (const runs of [[stressRun(), ENTRY], [run(), stressRun()], [stressRun(), run()]]) {
+      const d = dec(enc({ type: "comparison", runs }));
+      expect(d).toEqual({ ok: true, payload: { type: "comparison", runs } });
+    }
+  });
+
+  it("keep unknown extension entries alongside the laps", () => {
+    const d = dec(enc({ type: "result", runs: [stressRun()], ext: [{ tag: 42, value: Uint8Array.from([7]) }] }));
+    expect(d.ok && d.payload.runs[0]).toEqual(stressRun());
+    expect(d.ok && d.payload.ext).toEqual([{ tag: 42, value: Uint8Array.from([7]) }]);
+  });
+
+  it("only finished stress tests at their locked settings can be shared", () => {
+    expect(shareBlocker(stressRun())).toBeNull();
+    expect(shareBlocker(stressRun({ stress: { test: "extreme", laps: LAPS.slice(0, 2) }, durationS: 192 }))).toBe("Only finished stress tests can be shared.");
+    expect(shareBlocker(stressRun({ preset: "Ultra" }))).toBe("Only finished stress tests can be shared.");
+    expect(shareBlocker({ ...stressRun(), scoreTest: "extreme" })).toBe("A run can't be both a score run and a stress test.");
+    expect(shareBlocker(run({ durationS: 576 }))).toBe("Unknown run length.");
+  });
+
+  it("an edited link with a recomputed CRC reads as damaged", () => {
+    const edit = (r: SharedRun) => dec(enc({ type: "result", runs: [r] })).ok;
+    expect(edit(stressRun({ avgFps: 160 }))).toBe(false); // laps don't average to the run's FPS
+    expect(edit(stressRun({ stress: { test: "extreme", laps: [...LAPS.slice(0, 5), 99] } }))).toBe(false);
+    expect(edit(stressRun({ frameCount: 9000 }))).toBe(false); // far too few frames for 576 s
+
+    const bytes = Array.from(fromBase64Url(enc({ type: "result", runs: [stressRun()] }))!);
+    const body = bytes.slice(0, -1);
+    const at = body.length - (1 + 12) - 2; // the stress entry: tag, length, head byte, 6 laps × 2 bytes
+    expect(body.slice(at, at + 3)).toEqual([1, 13, 2]);
+    const reseal = (b: number[]) => toBase64Url([...b, crc8(b)]);
+    // No stress entry, though the duration slot says "stress".
+    expect(dec(reseal(body.slice(0, at)))).toEqual({ ok: false, reason: "damaged" });
+    // Unknown test, a run index past the runs, a lap dropped, a second entry for the same run.
+    const entry = body.slice(at);
+    const swap = (i: number, v: number) => reseal([...body.slice(0, at), ...entry.map((x, k) => (k === i ? v : x))]);
+    expect(dec(swap(2, 3))).toEqual({ ok: false, reason: "damaged" });
+    expect(dec(swap(2, 0x82))).toEqual({ ok: false, reason: "damaged" });
+    expect(dec(reseal([...body.slice(0, at), 1, 11, ...entry.slice(2, 13)]))).toEqual({ ok: false, reason: "damaged" });
+    expect(dec(reseal([...body, ...entry]))).toEqual({ ok: false, reason: "damaged" });
+  });
+
+  it("laps past 6,553.5 FPS switch to whole-FPS steps", () => {
+    const laps = [7012, 7001, 6990, 6950, 6941, 6930];
+    const fast = stressRun({ resolution: "720p", width: 1280, height: 720, preset: "Low", avgFps: mean(laps), p1Low: 5000, p5Low: 6000, worstMs: 1, frameCount: 4000000, stress: { test: "entry", laps } });
+    expect(roundTrip(fast)).toEqual(fast);
+  });
+
+  it("the encoder won't write a stress entry by hand", () => {
+    expect(() => enc({ type: "result", runs: [run()], ext: [{ tag: 1, value: new Uint8Array(4) }] })).toThrow();
+  });
+
+  it("stay short enough for the share card's QR code", () => {
+    const one = SITE + enc({ type: "result", runs: [stressRun()] });
+    const both = SITE + enc({ type: "comparison", runs: [stressRun(), ENTRY] });
+    const v = (u: string) => qr(u, { ecc: "M", border: 4 }).version;
+    console.log("stress link length / QR version (ECC M):", JSON.stringify({ result: [one.length, v(one)], comparison: [both.length, v(both)] }));
+    expect(v(one)).toBeLessThanOrEqual(7);
+    expect(v(both)).toBeLessThanOrEqual(10);
+  });
+});

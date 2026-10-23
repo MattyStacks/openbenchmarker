@@ -1,6 +1,6 @@
 import { unknownDevice, type BenchResult, type BrowserId, type DeviceContext, type DeviceType, type GraphicsApi, type OsId } from "./types";
 import type { TimingMethod } from "./metrics";
-import type { PresetId, ResolutionId, ScoreTestId } from "./presets";
+import { STRESS_LAP_SECONDS, getStressTest, stressDuration, type PresetId, type ResolutionId, type ScoreTestId, type StressTestId } from "./presets";
 
 // ---------------------------------------------------------------------------
 // Share links: a whole result packed into a short URL fragment (#/r/<payload>).
@@ -33,6 +33,8 @@ export interface SharedRun {
   scoreTest?: ScoreTestId;
   /** Present only when the run was a valid, exactly-matching score test (score = avg FPS × 100). */
   score?: number;
+  /** A finished stress test: which one, and every lap's avg FPS in order (durationS = laps × 96 s). */
+  stress?: { test: StressTestId; laps: number[] };
   avgFps: number;
   p1Low: number;
   p5Low: number;
@@ -45,7 +47,7 @@ export interface SharedRun {
   device: DeviceContext;
 }
 
-/** One extension entry. Tag 0 is reserved; no tags are assigned yet (see docs/share-links.md). */
+/** One extension entry. Tag 0 is reserved; tag 1 is the stress laps (see docs/share-links.md). */
 export interface ShareExtension {
   tag: number;
   value: Uint8Array;
@@ -55,7 +57,7 @@ export interface SharePayload {
   type: ShareLinkType;
   /** One run for result and challenge links, two for comparison links. */
   runs: SharedRun[];
-  /** Extension entries in link order, unknown ones included; absent when the link has none. */
+  /** Extension entries in link order, unknown ones included (the stress entries become `runs[i].stress`); absent when there are none. */
   ext?: ShareExtension[];
 }
 
@@ -71,7 +73,7 @@ const V1 = {
     { id: "4K", w: 3840, h: 2160 },
   ] as { id: ResolutionId; w: number; h: number }[],
   presets: ["Low", "Medium", "High", "Ultra", "Extreme"] as PresetId[],
-  durations: [30, 60, 90],
+  durations: [30, 60, 90], // slot 3 (STRESS_SLOT): a stress test, its length in the stress entry
   scoreTests: [undefined, "entry", "extreme"] as (ScoreTestId | undefined)[],
   timing: [undefined, "gpu-timer", "batch-avg"] as (TimingMethod | undefined)[],
   apis: ["WebGL2", "WebGL1"] as GraphicsApi[],
@@ -112,6 +114,20 @@ const BITS = {
 } as const;
 
 const MAX_GPU_BYTES = (1 << BITS.gpuLen) - 1;
+
+/** Duration slot meaning "stress test": the run's laps (and so its length) are in a stress entry. */
+const STRESS_SLOT = 3;
+/**
+ * Extension tag of a stress entry. Value: one head byte, bit 7 = run index (0 or 1), bit 6 = laps
+ * in whole FPS instead of 0.1 FPS (only past 6,553.5 FPS), bits 5-0 = test (1 entry, 2 extreme);
+ * then each lap's avg FPS as 2 bytes, big-endian. The lap count is the entry length; a lap is
+ * STRESS_LAP_SECONDS (a different lap length would be a new test). Kept tight so a result link
+ * stays at QR version 7.
+ */
+export const STRESS_TAG = 1;
+const STRESS_TESTS_V1: StressTestId[] = ["entry", "extreme"];
+/** Largest lap FPS a stress entry holds (2 bytes of whole FPS). */
+const MAX_LAP_FPS = 2 ** 16 - 1;
 const EARLIEST_DAY = Math.floor(Date.UTC(2024, 0, 1) / 86400000);
 
 // ----- bit I/O -----
@@ -214,6 +230,7 @@ export function sharedRunFrom(r: BenchResult): SharedRun & { valid: boolean } {
     durationS: r.durationS,
     ...(r.scoreTest ? { scoreTest: r.scoreTest } : {}),
     ...(r.score !== undefined ? { score: r.score } : {}),
+    ...(r.stressTest && r.laps ? { stress: { test: r.stressTest, laps: r.laps.map((l) => l.avgFps) } } : {}),
     avgFps: r.avgFps,
     p1Low: r.p1Low,
     p5Low: r.p5Low,
@@ -234,7 +251,14 @@ export function shareBlocker(r: SharedRun & { valid?: boolean }): string | null 
   const res = V1.resolutions.find((x) => x.id === r.resolution);
   if (!res || res.w !== r.width || res.h !== r.height) return "Only 720p, 1080p, 1440p and 4K runs can be shared.";
   if (!V1.presets.includes(r.preset)) return "Unknown preset.";
-  if (!V1.durations.includes(r.durationS)) return "Unknown run length.";
+  if (r.stress) {
+    const t = getStressTest(r.stress.test);
+    if (!t || !STRESS_TESTS_V1.includes(t.id)) return "Unknown stress test.";
+    if (r.scoreTest || r.score !== undefined) return "A run can't be both a score run and a stress test.";
+    if (r.preset !== t.preset || r.resolution !== t.resolution || r.stress.laps.length !== t.laps || r.durationS !== stressDuration(t.laps))
+      return "Only finished stress tests can be shared.";
+    if (!r.stress.laps.every((x) => x > 0 && x <= MAX_LAP_FPS)) return "No timed frames.";
+  } else if (!V1.durations.includes(r.durationS)) return "Unknown run length.";
   if (!(r.avgFps > 0 && r.frameCount > 0)) return "No timed frames.";
   if (dayOf(r.date) === null) return "Unknown run date.";
   return null;
@@ -249,7 +273,7 @@ function writeRun(w: BitWriter, r: SharedRun): void {
   w.put(pa, BITS.verPatch);
   w.put(V1.resolutions.findIndex((x) => x.id === r.resolution), BITS.resolution);
   w.put(V1.presets.indexOf(r.preset), BITS.preset);
-  w.put(V1.durations.indexOf(r.durationS), BITS.duration);
+  w.put(r.stress ? STRESS_SLOT : V1.durations.indexOf(r.durationS), BITS.duration);
   w.put(Math.max(0, V1.scoreTests.indexOf(r.scoreTest)), BITS.scoreTest);
   w.put(r.score !== undefined ? 1 : 0, BITS.scored);
   w.put(r.avgFps * 100, BITS.avg);
@@ -270,6 +294,29 @@ function writeRun(w: BitWriter, r: SharedRun): void {
   for (const b of gpu) w.put(b, 8);
 }
 
+const withLength = (value: number[]) => [value.length, ...value];
+
+function stressEntry(runIndex: number, st: NonNullable<SharedRun["stress"]>): number[] {
+  const coarse = st.laps.some((fps) => Math.round(fps * 10) > 0xffff);
+  const out = [(runIndex << 7) | (coarse ? 0x40 : 0) | (STRESS_TESTS_V1.indexOf(st.test) + 1)];
+  for (const fps of st.laps) {
+    const v = Math.min(0xffff, Math.round(coarse ? fps : fps * 10));
+    out.push(v >> 8, v & 0xff);
+  }
+  return out;
+}
+
+/** A stress entry's value, or null when it is malformed. */
+function readStressEntry(v: Uint8Array): { runIndex: number; stress: NonNullable<SharedRun["stress"]> } | null {
+  if (v.length < 3 || v.length % 2 === 0) return null;
+  const test = STRESS_TESTS_V1[(v[0] & 0x3f) - 1];
+  if (!test) return null;
+  const scale = v[0] & 0x40 ? 1 : 10;
+  const laps: number[] = [];
+  for (let i = 1; i < v.length; i += 2) laps.push(((v[i] << 8) | v[i + 1]) / scale);
+  return { runIndex: v[0] >> 7, stress: { test, laps } };
+}
+
 /** Encode runs into the payload part of the link. Throws if a run can't be shared (check shareBlocker first). */
 export function encodeShare(payload: SharePayload): string {
   const want = payload.type === "comparison" ? 2 : 1;
@@ -284,8 +331,11 @@ export function encodeShare(payload: SharePayload): string {
   w.put(0, 6);
   for (const r of payload.runs) writeRun(w, r);
   const bytes = w.bytes();
+  payload.runs.forEach((r, i) => {
+    if (r.stress) bytes.push(STRESS_TAG, ...withLength(stressEntry(i, r.stress)));
+  });
   for (const e of payload.ext ?? []) {
-    if (!(Number.isInteger(e.tag) && e.tag >= 1 && e.tag <= 255) || e.value.length > 255) throw new Error("Bad share extension entry");
+    if (!(Number.isInteger(e.tag) && e.tag >= 1 && e.tag <= 255) || e.tag === STRESS_TAG || e.value.length > 255) throw new Error("Bad share extension entry");
     bytes.push(e.tag, e.value.length, ...e.value);
   }
   bytes.push(crc8(bytes));
@@ -298,7 +348,9 @@ function readRunV1(rd: BitReader): SharedRun | null {
   const version = `${rd.get(BITS.verMajor)}.${rd.get(BITS.verMinor)}.${rd.get(BITS.verPatch)}`;
   const res = at(V1.resolutions, rd.get(BITS.resolution));
   const preset = at(V1.presets, rd.get(BITS.preset));
-  const duration = at(V1.durations, rd.get(BITS.duration));
+  const durationIndex = rd.get(BITS.duration);
+  // A stress run's length comes from its stress entry (0 until decodeShare attaches it).
+  const duration = durationIndex === STRESS_SLOT ? 0 : at(V1.durations, durationIndex);
   const stIndex = rd.get(BITS.scoreTest);
   const scored = rd.get(BITS.scored) === 1;
   const avg100 = rd.get(BITS.avg);
@@ -357,7 +409,7 @@ function readRunV1(rd: BitReader): SharedRun | null {
  */
 export function plausible(r: SharedRun, today = new Date()): boolean {
   const lowSlack = 0.05 + 1e-9;
-  if (!(r.avgFps > 0 && r.p1Low > 0 && r.frameCount > 0 && r.worstMs > 0)) return false;
+  if (!(r.avgFps > 0 && r.p1Low > 0 && r.frameCount > 0 && r.worstMs > 0 && r.durationS > 0)) return false;
   if (r.p1Low > r.avgFps + lowSlack || r.p5Low > r.avgFps + lowSlack || r.p5Low + 1e-9 < r.p1Low) return false;
   if (1000 / r.worstMs > r.p1Low + lowSlack + r.p1Low * 0.001) return false;
   const wallS = r.frameCount / r.avgFps;
@@ -367,6 +419,16 @@ export function plausible(r: SharedRun, today = new Date()): boolean {
   const todayDay = Math.floor(today.getTime() / 86400000);
   if (day < EARLIEST_DAY || day > todayDay + 1) return false; // +1: the run date is local, today is UTC
   if (r.score !== undefined && r.score !== Math.round(r.avgFps * 100)) return false;
+  if (r.stress) {
+    // The locked test, every lap, and lap throughputs that average to the run's (laps are equal
+    // wall-clock, so their mean is the run's avg FPS up to a few batches and the link's 0.1 FPS laps).
+    const t = getStressTest(r.stress.test);
+    if (!t || r.scoreTest || r.score !== undefined) return false;
+    if (r.preset !== t.preset || r.resolution !== t.resolution || r.stress.laps.length !== t.laps || r.durationS !== stressDuration(t.laps)) return false;
+    if (!r.stress.laps.every((x) => x > 0)) return false;
+    const mean = r.stress.laps.reduce((a, b) => a + b, 0) / r.stress.laps.length;
+    if (Math.abs(mean - r.avgFps) > r.avgFps * 0.01 + 0.05) return false;
+  }
   return true;
 }
 
@@ -387,7 +449,7 @@ export function decodeShare(s: string, today = new Date()): DecodeResult {
     const runs: SharedRun[] = [];
     for (let i = 0; i < (type === "comparison" ? 2 : 1); i++) {
       const r = readRunV1(rd);
-      if (!r || !plausible(r, today)) return { ok: false, reason: "damaged" };
+      if (!r) return { ok: false, reason: "damaged" };
       runs.push(r);
     }
     // Zero padding to a byte boundary, then extension entries (if any) up to the CRC.
@@ -397,9 +459,20 @@ export function decodeShare(s: string, today = new Date()): DecodeResult {
       const tag = body[i];
       const len = body[i + 1];
       if (tag === 0 || len === undefined || i + 2 + len > body.length) return { ok: false, reason: "damaged" };
-      ext.push({ tag, value: body.slice(i + 2, i + 2 + len) });
+      const value = body.slice(i + 2, i + 2 + len);
       i += 2 + len;
+      if (tag !== STRESS_TAG) {
+        ext.push({ tag, value });
+        continue;
+      }
+      // Stress laps for a run whose duration slot says "stress test"; at most one per run.
+      const e = readStressEntry(value);
+      const r = e ? runs[e.runIndex] : undefined;
+      if (!e || !r || r.durationS !== 0 || r.stress) return { ok: false, reason: "damaged" };
+      r.stress = e.stress;
+      r.durationS = e.stress.laps.length * STRESS_LAP_SECONDS;
     }
+    if (!runs.every((r) => plausible(r, today))) return { ok: false, reason: "damaged" };
     return { ok: true, payload: { type, runs, ...(ext.length ? { ext } : {}) } };
   } catch {
     return { ok: false, reason: "damaged" };

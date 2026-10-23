@@ -26,7 +26,7 @@ Bits are packed most significant first, then base64url without padding (RFC 4648
 | Version major.minor.patch | 4 · 6 · 6 | 0–15 · 0–63 · 0–63 | — |
 | Resolution | 3 | 720p · 1080p · 1440p · 4K (4–7 reserved) | — |
 | Preset | 3 | Low · Medium · High · Ultra · Extreme (5–7 reserved) | — |
-| Duration | 2 | 30 · 60 · 90 s (3 reserved) | — |
+| Duration | 2 | 30 · 60 · 90 s · 3 = stress test (its length comes from the stress entry, tag 1) | — |
 | Score test | 2 | none · Entry · Extreme (3 reserved) | — |
 | Scored | 1 | 1 = valid, exactly matching score test | score = avg FPS × 100, recomputed, never stored |
 | Avg FPS | 24 | 0–167,772.15 | 0.01 FPS (gives the score exactly) |
@@ -52,9 +52,18 @@ Bits are packed most significant first, then base64url without padding (RFC 4648
 Zero or more entries between the padding and the CRC, each **tag (1 byte), length (1 byte), value (length bytes)**:
 
 - Decoders read every entry and skip tags they don't know (the payload keeps them in `ext`, so a re-encode gives the same link). New **optional** fields can join links this way with no version bump.
-- Tag 0 is reserved (a stray zero byte after the padding still reads as damaged, as before). Tags 1–255 are free; **none is assigned yet**. Assign one here, with its value format, before using it.
+- Tag 0 is reserved (a stray zero byte after the padding still reads as damaged, as before). Tag 1 is the stress entry (below). Tags 2–255 are free; assign one here, with its value format, before using it.
 - The version byte changes only for breaking changes: a new fixed field, a reordered table, or a different meaning for an existing bit.
 - `memory_channels` and the other user-filled system fields are **not** in links (see below).
+
+**Tag 1: stress entry.** One for each run whose Duration is 3 (stress test), written right after the padding, before any other entry. Each finished lap's avg FPS for Stress: Entry or Stress: Extreme:
+
+| Byte | Contents |
+|---|---|
+| 0 | bit 7: run index (0, or 1 for a comparison's second run) · bit 6: laps in whole FPS (set only when a lap passes 6,553.5 FPS) · bits 5–0: test, 1 Entry, 2 Extreme |
+| 1… | each lap's avg FPS, 2 bytes big-endian, in 0.1 FPS (or whole FPS with bit 6) |
+
+The lap count is (length − 1) ÷ 2, and a lap is always 96 s (one pass of the flight), so Duration = laps × 96 s. A different lap length would be a new test number. Per-lap 1% lows stay in the saved result and aren't shared. Six laps make a 15-byte entry (+20 characters): a stress result with an RTX 5080 name is 121 characters, still QR version 7.
 - Compatibility: v1 links made before the section existed have no bytes after the padding, so they decode exactly as before. `tests/share-codec.test.ts` pins four such codes (result, challenge, comparison, no GPU name) and checks that they decode to identical runs and re-encode to the same string. v1 had not reached production when the section was added, so no deployed decoder rejects entries.
 
 Never in a link: the user-filled system fields, the diagnostics, the result id, the run time of day, or anything else from `BenchResult`.
@@ -70,6 +79,7 @@ A link is rejected as **"This link looks damaged or edited"** if any of these fa
   - The worst frame is no faster than the 1% low.
   - Frames ÷ avg (the timed wall-clock) is between 0.99 × duration and 1.01 × duration + 2 s + 4 frames. The run stops submitting at the duration, then waits for the batches still queued: at most three in flight (`MAX_IN_FLIGHT`), each at least one frame, plus scheduling slack. A 5 FPS phone can end about 0.8 s late.
   - The run date is between 2024-01-01 and tomorrow. Tomorrow is allowed because the run date is local time and "today" is UTC.
+  - Stress runs: Duration 3 comes with exactly one stress entry, and the reverse. The test's locked preset, resolution and lap count must match, no score test, and the laps' mean must be within 1% (+0.05 FPS) of the run's avg FPS. Laps are equal wall-clock, so the mean of their throughputs is the run's avg up to a few batches and rounding.
 
 ## Length and QR size
 
@@ -82,6 +92,8 @@ Measured with the production origin (`https://opengpubenchmarker.com/#/r/` is 35
 | "NVIDIA GeForce RTX 5080" | 101 | 5 / **6** / 8 |
 | 40-character GPU name (the plan 1 cap) | 122 | 6 / **7** / 9 |
 | Comparison, two RTX 5080 runs | 162 | — / **9** / — |
+| Stress result, 6 laps, RTX 5080 | 121 | — / **7** / — |
+| Comparison, two stress runs | 183 | — / **10** / — |
 
 The card uses **ECC M** (15% recovery) with a 4-module quiet zone. M keeps the code at version 5–7 (37–45 modules), and screens and screenshots are clean enough that Q's extra redundancy isn't needed. On the 1200×630 card the code is about 300 px. Decoding the rendered card with jsQR worked at 1200, 600, 480, 420 and 300 px wide (a chat thumbnail).
 
