@@ -1,4 +1,4 @@
-import { DURATIONS, PRESETS, RESOLUTIONS, SCORE_TESTS, getResolution, type PresetId, type ResolutionId } from "../benchmark/presets";
+import { DURATIONS, PRESETS, RESOLUTIONS, SCORE_TESTS, STRESS_TESTS, getResolution, stressDuration, type PresetId, type ResolutionId } from "../benchmark/presets";
 import { $, esc } from "./dom";
 import { MOBILE } from "./env";
 import { startRun } from "./run";
@@ -38,7 +38,11 @@ function deviceMemoryGb(): number | null {
 /** One-tap confirmation before a heavy 1440p/4K run on a phone or tablet. */
 function confirmHighRes(cfg: RunConfig): Promise<"run" | "switch" | "cancel"> {
   const dlg = $<HTMLDialogElement>("#highres-confirm");
-  $("#highres-body").textContent = "1440p and 4K at heavier presets need a lot of memory and may crash the browser on some phones. 1080p is a safe bet.";
+  const stress = STRESS_TESTS.find((t) => t.id === cfg.stressTest);
+  $("#highres-body").textContent = stress
+    ? `${stress.name} renders ${cfg.resolution} for about 10 minutes, which needs a lot of memory and may crash the browser on some phones. Stress: Entry is made for phones.`
+    : "1440p and 4K at heavier presets need a lot of memory and may crash the browser on some phones. 1080p is a safe bet.";
+  $("#highres-switch").textContent = stress ? "Run Stress: Entry instead" : "Switch to 1080p";
   const mem = deviceMemoryGb();
   const hint = $("#highres-hint");
   hint.hidden = mem === null || mem > 4;
@@ -61,7 +65,10 @@ async function launch(cfg: RunConfig): Promise<void> {
   if (needsHighResWarning(cfg.resolution, cfg.preset, MOBILE, finished)) {
     const choice = await confirmHighRes(cfg);
     if (choice === "cancel") return;
-    if (choice === "switch") {
+    if (choice === "switch" && cfg.stressTest) {
+      const entry = STRESS_TESTS[0];
+      cfg = { resolution: entry.resolution, preset: entry.preset, duration: stressDuration(entry.laps), stressTest: entry.id, ...(cfg.challenge ? { challenge: cfg.challenge } : {}) };
+    } else if (choice === "switch") {
       cfg = { resolution: "1080p", preset: cfg.preset, duration: cfg.duration, ...(cfg.challenge ? { challenge: cfg.challenge } : {}) };
       setRadio("resolution", "1080p");
       saveConfig(cfg);
@@ -116,8 +123,8 @@ function refreshRunHints(): void {
   const dnf = didNotFinish(res, preset);
   note.hidden = !dnf;
   note.textContent = dnf ? `${res} · ${preset}: didn't finish on this device last time. You can still run it.` : "";
-  document.querySelectorAll<HTMLElement>("#score-runs [data-test]").forEach((btn) => {
-    const t = SCORE_TESTS.find((x) => x.id === btn.dataset.test);
+  document.querySelectorAll<HTMLElement>("#score-runs [data-test], #stress-runs [data-stress]").forEach((btn) => {
+    const t = btn.dataset.test ? SCORE_TESTS.find((x) => x.id === btn.dataset.test) : STRESS_TESTS.find((x) => x.id === btn.dataset.stress);
     btn.querySelector(".dnf")?.remove();
     if (t && didNotFinish(t.resolution, t.preset)) btn.insertAdjacentHTML("beforeend", `<small class="dnf">Didn't finish on this device last time</small>`);
   });
@@ -188,7 +195,7 @@ function bindCompareEntry(): void {
 export function buildConfigForm(leftover: InProgressRun | null = null): void {
   const cfg = loadConfig();
   // Don't preselect the settings that just crashed: start from the safer resolution instead.
-  if (leftover && !leftover.scoreTest && leftover.resolution === cfg.resolution) {
+  if (leftover && !leftover.scoreTest && !leftover.stressTest && leftover.resolution === cfg.resolution) {
     const safer = leftoverMessage(leftover).suggest;
     if (safer) {
       cfg.resolution = safer;
@@ -229,6 +236,18 @@ export function buildConfigForm(leftover: InProgressRun | null = null): void {
     const t = SCORE_TESTS.find((x) => x.id === btn?.dataset.test);
     if (!t || app.running) return;
     void launch({ resolution: t.resolution, preset: t.preset, duration: t.duration, scoreTest: t.id });
+  });
+
+  const stressRuns = $("#stress-runs");
+  stressRuns.innerHTML = STRESS_TESTS.map((t) => {
+    const r = getResolution(t.resolution)!;
+    return `<button type="button" class="btn btn-score" data-stress="${t.id}"><b>${esc(t.name)}</b><small>${t.preset} · ${t.resolution} (${r.width}×${r.height}) · ${t.laps} laps ≈ ${Math.round(stressDuration(t.laps) / 60)} min</small></button>`;
+  }).join("");
+  stressRuns.addEventListener("click", (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-stress]");
+    const t = STRESS_TESTS.find((x) => x.id === btn?.dataset.stress);
+    if (!t || app.running) return;
+    void launch({ resolution: t.resolution, preset: t.preset, duration: stressDuration(t.laps), stressTest: t.id });
   });
 
   bindCompareEntry();
