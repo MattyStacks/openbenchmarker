@@ -640,3 +640,27 @@ details.tech > :not(summary) { margin: 0 0 8px; font-size: 13px; color: var(--mu
   .about-table { font-size: 12.5px; }
   .about-table th, .about-table td { padding: 6px 4px; }
 }
+
+/* Stress tests: lap reading, chart and table. */
+.laps-section { display: grid; gap: 12px; margin-top: 8px; }
+.stress-reading { padding: 12px 14px; border-left: 3px solid var(--good); background: rgba(77, 255, 180, 0.06); border-radius: 0 8px 8px 0; }
+.stress-reading[data-band="slowed"] { border-left-color: var(--warn); background: rgba(255, 179, 64, 0.07); }
+.stress-reading[data-band="throttled"] { border-left-color: var(--bad); background: rgba(255, 92, 120, 0.07); }
+.stress-reading p { margin: 0; }
+.stress-reading p + p { margin-top: 6px; }
+.lap-chart { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--glass); }
+.lap-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.lap-chart figcaption { margin-top: 6px; font-size: 12px; color: var(--dim); }
+.lc-grid { stroke: var(--line); stroke-width: 1; }
+.lc-steady { stroke: var(--dim); stroke-width: 1; opacity: 0.7; }
+.lc-tick { fill: var(--muted); font: 12px var(--mono); }
+.lc-val { fill: var(--text); font: 600 13px var(--mono); }
+.lc-line { fill: none; stroke: var(--cyan); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.lc-dot { fill: var(--cyan); stroke: var(--bg2); stroke-width: 2; }
+.lc-hit { fill: transparent; }
+.lc-pt { cursor: default; outline: none; }
+.lc-pt:hover .lc-dot, .lc-pt:focus .lc-dot { r: 7; }
+.lap-table { width: 100%; max-width: 520px; border-collapse: collapse; font-size: 14px; }
+.lap-table th, .lap-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.lap-table th { font: 600 11px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.lap-table .num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }

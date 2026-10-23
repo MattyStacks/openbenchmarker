@@ -51,6 +51,8 @@ export function gpuLine(r: BenchResult): string {
 export type SubmissionStatus =
   | { kind: "invalid"; text: string }
   | { kind: "handheld"; text: "" }
+  /** Stress tests show stability; they are never submitted. */
+  | { kind: "stress"; text: "" }
   | { kind: "ready"; text: string }
   | { kind: "gpu-not-listed"; text: string }
   | { kind: "next-step"; text: string; missing: string[] };
@@ -62,6 +64,7 @@ export type SubmissionStatus =
 export function submissionStatus(r: BenchResult): SubmissionStatus {
   if (!r.valid) return { kind: "invalid", text: `Invalid: ${r.invalidReason || "unknown reason"}` };
   if (isHandheld(runClass(r))) return { kind: "handheld", text: "" };
+  if (r.stressTest) return { kind: "stress", text: "" };
   const errs = validateSubmission(r);
   if (!errs.length) return { kind: "ready", text: "Ready to submit" };
   if (r.system.gpuId === NOT_LISTED) return { kind: "gpu-not-listed", text: "GPU not in the catalog yet" };
@@ -131,6 +134,6 @@ export function tableStatus(r: BenchResult): { cls: "good" | "next" | "muted" | 
   if (s.kind === "ready") return { cls: "good", text: "✓ Ready to submit" };
   if (s.kind === "gpu-not-listed") return { cls: "next", text: "Add your GPU →" };
   if (s.kind === "next-step") return { cls: "next", text: `Needs: ${s.missing.join(", ")}` };
-  if (s.kind === "handheld") return { cls: "muted", text: "Share only" };
+  if (s.kind === "handheld" || s.kind === "stress") return { cls: "muted", text: "Share only" };
   return { cls: "bad", text: s.text };
 }

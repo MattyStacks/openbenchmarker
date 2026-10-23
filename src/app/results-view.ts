@@ -11,10 +11,10 @@ import {
   UPSTREAM_TEMPLATES,
   gpuRequestUrl,
 } from "../benchmark/catalog";
-import { download, gamesYamlEntry, suggestedFileName, toCsv, toJson, toYaml } from "../benchmark/exporter";
+import { download, gamesYamlEntry, suggestedFileName, toCsv, toJson, toRunYaml, toYaml } from "../benchmark/exporter";
 import { VERDICT_LABEL, diagnose, isMaskedRenderer } from "../benchmark/diagnose";
 import { round1 } from "../benchmark/metrics";
-import { getScoreTest } from "../benchmark/presets";
+import { getScoreTest, getStressTest } from "../benchmark/presets";
 import { decodeShare, encodeShare, shareBlocker, sharedRunFrom, type SharedRun } from "../benchmark/share-codec";
 import { clearPending, pendingCode, setPending } from "./challenge";
 import { LABELS, bindCompareBoxes, compareBoxHtml, comparePanelHtml } from "./compare-view";
@@ -28,6 +28,7 @@ import { BATCH_MS } from "./env";
 import { deviceLine, gpuLine, isHandheld, runClass } from "./result-display";
 import { bindShareBox, sharePayload, shareBoxHtml } from "./share";
 import { showView } from "./shell";
+import { completedStress, lapsSectionHtml, stressCardsHtml } from "./stress-view";
 import { upsertResult } from "./store";
 
 /**
@@ -162,7 +163,11 @@ export function renderResults(r: BenchResult): void {
   showView("results");
   const cls = runClass(r);
   const handheld = isHandheld(cls);
-  const showSubmit = r.valid && !handheld;
+  const stress = getStressTest(r.stressTest);
+  const stressDone = completedStress(r);
+  const lapFps = (r.laps ?? []).map((l) => l.avgFps);
+  // Stress tests show stability; they aren't submitted to the dataset.
+  const showSubmit = r.valid && !handheld && !stress;
   const dev = [deviceLine(r), gpuLine(r) ? `${gpuLine(r)} (reported by browser)` : ""].filter(Boolean).join(" · ");
   const other = comparedWith(r);
   // The comparison is now on its result: the pending one (this tab) is done.
@@ -185,7 +190,9 @@ export function renderResults(r: BenchResult): void {
     ${other ? `<h2 class="section-title">This run in full</h2>` : ""}
     <div class="score-cards">
       ${
-        r.score !== undefined
+        stressDone
+          ? stressCardsHtml(stressDone, lapFps, round1(r.avgFps))
+          : r.score !== undefined
           ? `<div class="score hero-score"><span>${esc(getScoreTest(r.scoreTest)?.name ?? "Score")}</span><b id="res-score">${r.score}</b><span class="score-test">${round1(r.avgFps).toFixed(1)} FPS × 100</span></div>
       <div class="score"><span>Average FPS</span><b id="res-avg">${round1(r.avgFps).toFixed(1)}</b></div>`
           : `<div class="score hero-score"><span>Average FPS</span><b id="res-avg">${round1(r.avgFps).toFixed(1)}</b></div>`
@@ -194,9 +201,11 @@ export function renderResults(r: BenchResult): void {
       <div class="score small"><span>5% Low FPS</span><b>${round1(r.p5Low).toFixed(1)}</b></div>
       <div class="score small"><span>Worst frame</span><b>${r.worstMs.toFixed(2)} ms</b></div>
       <div class="score small"><span>Frames timed</span><b id="res-frames">${r.frameCount}</b></div>
-      <div class="score small"><span>Run settings</span><b class="settings" id="res-settings">${r.scoreTest ? `${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)} · ` : ""}${esc(r.resolution)} (${r.width}×${r.height}) · ${esc(r.preset)} · ${r.durationS} s · ${esc(r.graphicsApi)}</b></div>
+      <div class="score small"><span>Run settings</span><b class="settings" id="res-settings">${r.scoreTest ? `${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)} · ` : ""}${stress ? `${esc(stress.name)} · ` : ""}${esc(r.resolution)} (${r.width}×${r.height}) · ${esc(r.preset)} · ${stress ? `${lapFps.length} laps · ` : ""}${r.durationS} s · ${esc(r.graphicsApi)}</b></div>
     </div>
     ${r.valid && !shareBlocker(sharedRunFrom(r)) ? shareBoxHtml() : ""}
+    ${stress && !stressDone ? `<p class="muted">Started as ${esc(stress.name)}, but ${r.valid ? "its settings didn't match the locked test" : "the run was invalid"}. ${lapFps.length} of ${stress.laps} laps finished, so it has no stability result.</p>` : ""}
+    ${stress ? lapsSectionHtml(lapFps, (r.laps ?? []).map((l) => l.p1Low), !!r.diag && diagnose(r).verdict === "cpu", !!stressDone) : ""}
     ${r.scoreTest && r.score === undefined ? `<p class="muted">Started as ${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)}, but ${r.valid ? "its settings didn't match the locked test" : "the run was invalid"}, so it has no score.</p>` : ""}
     <details class="result-details" open>
       <summary>Details: what limited this run, timing and export</summary>
@@ -205,6 +214,7 @@ export function renderResults(r: BenchResult): void {
       <div class="row export-row">
         <button type="button" class="btn" id="exp-json">Export JSON</button>
         <button type="button" class="btn" id="exp-csv">Export CSV</button>
+        ${showSubmit ? "" : `<button type="button" class="btn" id="copy-report">Copy run report (YAML)</button><span class="muted tiny" id="copy-report-status" role="status"></span>`}
       </div>
     </details>
     ${r.valid && !shareBlocker(sharedRunFrom(r)) ? compareBoxHtml(r) : ""}
@@ -215,6 +225,7 @@ export function renderResults(r: BenchResult): void {
       <p class="explore-link"><a href="${OGB_SITE}" target="_blank" rel="noopener">Explore results on Open GPU Benchmarks →</a></p>`
         : ""
     }
+    ${stress && r.valid && !handheld ? `<p class="handheld-note">Stress tests show stability, so they aren't submitted to Open GPU Benchmarks. To submit, run a score run or a custom run.</p>` : ""}
     ${showSubmit ? `<section class="submit-section" id="submit-section" aria-labelledby="submit-title">
     <h2 class="section-title" id="submit-title">Submit to Open GPU Benchmarks</h2>
     ${nudgeDismissed ? "" : `<div class="nudge" id="nudge">
@@ -311,6 +322,17 @@ export function renderResults(r: BenchResult): void {
   if (shareBox) bindShareBox(shareBox, sharedRunFrom(r));
   $("#exp-json").onclick = () => download(suggestedFileName(r, "json"), toJson(r), "application/json");
   $("#exp-csv").onclick = () => download(suggestedFileName(r, "csv"), toCsv([r]), "text/csv");
+  const report = view.querySelector<HTMLButtonElement>("#copy-report");
+  // Plain HTTP (LAN testing) has no clipboard: download the report instead.
+  if (report)
+    report.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(toRunYaml(r));
+        $("#copy-report-status").textContent = "Copied ✓";
+      } catch {
+        download(suggestedFileName(r, "yaml"), toRunYaml(r), "application/x-yaml");
+      }
+    };
   const focus = pendingFocus;
   pendingFocus = null;
   if (!showSubmit) return;

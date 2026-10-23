@@ -25,6 +25,7 @@ export function validateSubmission(r: BenchResult | null | undefined): string[] 
   const s = r.system ?? ({} as BenchResult["system"]);
 
   if (!r.valid) errors.push(`Run: invalid (${r.invalidReason || "unknown reason"}); invalid runs can be saved locally but never submitted`);
+  if (r.stressTest) errors.push("Run: stress tests show stability and aren't submitted to Open GPU Benchmarks; run a score run or a custom run to submit");
   if (r.mobile) errors.push("Device: mobile runs aren't accepted for submission yet; local save and JSON/CSV still work");
 
   const gpuId = (s.gpuId ?? "").trim();

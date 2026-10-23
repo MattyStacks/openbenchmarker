@@ -2,10 +2,11 @@ import { BENCHMARK_VERSION, findGpu } from "../benchmark/catalog";
 import { download, suggestedFileName, toCsv, toJson, toYaml } from "../benchmark/exporter";
 import { VERDICT_LABEL, diagnose } from "../benchmark/diagnose";
 import { round1 } from "../benchmark/metrics";
-import { getScoreTest } from "../benchmark/presets";
+import { getScoreTest, getStressTest } from "../benchmark/presets";
 import { decodeShare, sharedRunFrom } from "../benchmark/share-codec";
 import { bindCompareBoxes, compareBoxHtml } from "./compare-view";
 import { bindHaveCode, codeRowHtml } from "./shared-view";
+import { completedStress, pctText, stabilityOf } from "./stress-view";
 import type { BenchResult } from "../benchmark/types";
 import { $, esc } from "./dom";
 import {
@@ -81,6 +82,8 @@ function card(r: BenchResult): string {
   const dev = deviceLine(r);
   const gpu = gpuLine(r);
   const test = getScoreTest(r.scoreTest);
+  const stress = getStressTest(r.stressTest);
+  const stab = stabilityText(r);
   const statusHtml =
     st.kind === "ready"
       ? `<span class="rc-status good">✓ Ready to submit</span>`
@@ -94,10 +97,16 @@ function card(r: BenchResult): string {
     <details class="rc-main">
       <summary>
         <div class="rc-head">
-          ${r.score !== undefined ? `<b class="rc-fps">${r.score}</b><span class="rc-unit">${esc(test?.name ?? "Score")}</span>` : `<b class="rc-fps">${round1(r.avgFps).toFixed(1)}</b><span class="rc-unit">avg FPS</span>`}
+          ${
+            stab
+              ? `<b class="rc-fps">${stab}</b><span class="rc-unit">stability · ${esc(stress!.name)}</span>`
+              : r.score !== undefined
+                ? `<b class="rc-fps">${r.score}</b><span class="rc-unit">${esc(test?.name ?? "Score")}</span>`
+                : `<b class="rc-fps">${round1(r.avgFps).toFixed(1)}</b><span class="rc-unit">avg FPS</span>`
+          }
           <span class="rc-badges">${badges(r)}</span>
         </div>
-        <div class="rc-sub">${r.score !== undefined ? `${round1(r.avgFps).toFixed(1)} avg · ` : ""}${round1(r.p1Low).toFixed(1)} 1% low · ${esc(r.resolution)} · ${esc(r.preset)} · ${r.durationS} s</div>
+        <div class="rc-sub">${r.score !== undefined || stab ? `${round1(r.avgFps).toFixed(1)} avg · ` : ""}${round1(r.p1Low).toFixed(1)} 1% low · ${esc(r.resolution)} · ${esc(r.preset)} · ${stress ? `${r.laps?.length ?? 0} laps` : `${r.durationS} s`}</div>
         ${dev || gpu ? `<div class="rc-dev">${esc([dev, gpu].filter(Boolean).join(" · "))}</div>` : ""}
         <div class="rc-meta"><span>${esc(r.date)} ${esc(r.time)}</span>${statusHtml}</div>
       </summary>
@@ -118,6 +127,12 @@ function card(r: BenchResult): string {
       </details>
     </div>
   </article>`;
+}
+
+/** "96.4%" for a completed stress test, "" otherwise. */
+function stabilityText(r: BenchResult): string {
+  const s = completedStress(r) ? stabilityOf((r.laps ?? []).map((l) => l.avgFps)) : null;
+  return s === null ? "" : pctText(s);
 }
 
 /** Filled when a card opens, so 100+ cards don't each run the diagnosis. */
@@ -166,6 +181,7 @@ function table(rows: readonly BenchResult[], dnf: readonly UnfinishedCombo[]): s
       <td class="num${old ? " dim" : ""}">v${esc(r.benchmarkVersion)}</td>
       <td>${esc(r.resolution)}</td><td>${esc(r.preset)}</td>
       <td class="num">${r.score ?? ""}</td>
+      <td class="num">${stabilityText(r)}</td>
       <td class="num">${round1(r.avgFps).toFixed(1)}</td><td class="num">${round1(r.p1Low).toFixed(1)}</td>
       <td class="t-dev">${esc(deviceLine(r))}${gpuLine(r) ? `<span class="t-gpu">${esc(gpuLine(r))}</span>` : ""}</td>
       <td class="t-status">${st.cls === "next" ? `<button type="button" class="linklike st-next" data-act="submit" title="Open the submit section">${esc(st.text)}</button>` : `<span class="st-${st.cls}">${esc(st.text)}</span>`}</td>
@@ -174,11 +190,11 @@ function table(rows: readonly BenchResult[], dnf: readonly UnfinishedCombo[]): s
     </tr>`;
   };
   const dnfRow = (c: UnfinishedCombo) => `<tr data-dnf-res="${esc(c.resolution)}" data-dnf-preset="${esc(c.preset)}">
-      <td>${esc(c.lastAt.slice(0, 10))}</td><td></td><td>${esc(c.resolution)}</td><td>${esc(c.preset)}</td><td colspan="4"><span class="badge warn">Didn't finish</span>${c.count > 1 ? ` ${c.count} times on this device` : ""}</td>
+      <td>${esc(c.lastAt.slice(0, 10))}</td><td></td><td>${esc(c.resolution)}</td><td>${esc(c.preset)}</td><td colspan="5"><span class="badge warn">Didn't finish</span>${c.count > 1 ? ` ${c.count} times on this device` : ""}</td>
       <td><span class="st-muted">Try a lower resolution</span></td><td></td>
       <td><div class="t-actions"><button type="button" class="btn btn-sm" data-act="dnf-remove">Remove</button></div></td></tr>`;
   return `<div class="hist-table-wrap"><table class="hist-table">
-    <thead><tr><th>Date</th><th>Version</th><th><abbr title="Resolution">Res.</abbr></th><th>Preset</th><th>Score</th><th>Avg FPS</th><th>1% low</th><th>Device · GPU <em>(browser)</em></th><th>Submission</th><th>Limit</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+    <thead><tr><th>Date</th><th>Version</th><th><abbr title="Resolution">Res.</abbr></th><th>Preset</th><th>Score</th><th>Stability</th><th>Avg FPS</th><th>1% low</th><th>Device · GPU <em>(browser)</em></th><th>Submission</th><th>Limit</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
     <tbody>${dnf.map(dnfRow).join("")}${rows.map(row).join("")}</tbody></table></div>`;
 }
 

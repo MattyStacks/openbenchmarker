@@ -1,6 +1,6 @@
 import { BENCHMARK, UPSTREAM_REPO } from "./catalog";
 import { diagnose, isMaskedRenderer } from "./diagnose";
-import { round1 } from "./metrics";
+import { round1, stability } from "./metrics";
 import { WARMUP_SECONDS } from "./presets";
 import { SYSTEM_FIELDS, type SystemField } from "./fields";
 import type { BenchResult } from "./types";
@@ -70,6 +70,48 @@ function yamlScalar(f: SystemField, v: string): string {
   if (f.kind === "digits") return String(Number(v));
   if (f.kind === "yesno") return String(v === "yes");
   return f.kind === "choice" ? v : q(v);
+}
+
+/** Stress test, stability and every lap. Only in run reports: stress runs are never submitted. */
+function stressLines(r: BenchResult): string[] {
+  if (!r.stressTest) return [];
+  const laps = r.laps ?? [];
+  const s = stability(laps);
+  return [
+    `    stress_test: ${r.stressTest}`,
+    ...(s !== null ? [`    stability_pct: ${pct1(s)}`] : []),
+    `    laps:`,
+    ...laps.map((l, i) => `      - { lap: ${i + 1}, avg_fps: ${round1(l.avgFps)}, p1_low: ${round1(l.p1Low)} }`),
+  ];
+}
+
+/**
+ * Run report YAML for results that can't be submitted (stress tests): the same result, run details
+ * and detected values as a submission, for pasting into a bug report or chat. Not for upstream.
+ */
+export function toRunYaml(r: BenchResult): string {
+  const lines = [
+    `# Run report from Open GPU Benchmarker ${r.benchmarkVersion} (https://opengpubenchmarker.com/), benchmark "${BENCHMARK.name}". Not a submission.`,
+    `game_id: ${r.gameId}`,
+    `date: ${q(r.date)}`,
+    `version: ${q(r.benchmarkVersion)}`,
+    `valid: ${r.valid}`,
+    ...(r.valid ? [] : [`invalid_reason: ${q(r.invalidReason)}`]),
+    `result:`,
+    `  - resolution: ${q(r.resolution)}`,
+    `    time: ${q(r.time)}`,
+    `    graphics_preset: ${q(r.preset)}`,
+    `    avg_fps: ${round1(r.avgFps)}`,
+    `    p1_low: ${round1(r.p1Low)}`,
+    `    p5_low: ${round1(r.p5Low)}`,
+    `    duration: ${r.durationS}`,
+    `    frame_count: ${r.frameCount}`,
+    ...stressLines(r),
+    ...runDetailLines(r),
+    `graphics_api: ${r.graphicsApi}`,
+    ...detectedLines(r),
+  ];
+  return lines.join("\n") + "\n";
 }
 
 /** Upstream submission YAML (block style only). Throws if the result does not validate. */
@@ -145,6 +187,13 @@ const CSV_FIELDS: [string, (r: BenchResult) => string | number][] = [
   ["timing", (r) => r.timing ?? ""],
   ["score_test", (r) => r.scoreTest ?? ""],
   ["score", (r) => r.score ?? ""],
+  ["stress_test", (r) => r.stressTest ?? ""],
+  ["stability_pct", (r) => {
+    const s = r.stressTest ? stability(r.laps ?? []) : null;
+    return s !== null ? pct1(s) : "";
+  }],
+  ["lap_avg_fps", (r) => (r.laps ?? []).map((l) => round1(l.avgFps)).join(" ")],
+  ["lap_p1_low", (r) => (r.laps ?? []).map((l) => round1(l.p1Low)).join(" ")],
   ["limit", (r) => (r.diag ? diagnose(r).verdict : "")],
   ["gpu_busy_pct", (r) => (r.diag?.gpuBusy != null ? pct1(r.diag.gpuBusy) : "")],
   ["gpu_ms_per_frame", (r) => (r.diag?.gpuMs != null ? r2(r.diag.gpuMs) : "")],
@@ -192,7 +241,8 @@ export function toJson(r: BenchResult): string {
   // The compared-with run belongs to someone else (or another session): not part of this export.
   const { challenge: _compared, ...own } = r;
   void _compared;
-  return JSON.stringify({ ...own, diagnosis, submittable: errors.length === 0, blockingIssues: errors }, null, 2) + "\n";
+  const stab = r.stressTest ? stability(r.laps ?? []) : null;
+  return JSON.stringify({ ...own, ...(stab !== null ? { stabilityPct: pct1(stab) } : {}), diagnosis, submittable: errors.length === 0, blockingIssues: errors }, null, 2) + "\n";
 }
 
 export function suggestedFileName(r: BenchResult, ext: "yaml" | "json" | "csv"): string {
