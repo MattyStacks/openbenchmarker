@@ -568,3 +568,21 @@ table.history { width: 100%; border-collapse: collapse; font-size: 14px; }
 .have-code-form input { flex: 1; min-width: 0; min-height: 44px; font-family: var(--mono); }
 .have-code-form .btn { min-height: 44px; }
 .share-actions .btn:not(.btn-share) { font-size: 14px; line-height: 1.2; }
+
+/* Comparing, visible everywhere (results page, home, My Results cards and table rows). */
+.compare-box { margin: 16px 0; padding: 14px 16px; border: 1px solid var(--line-hi); border-radius: 12px; background: var(--glass); display: grid; gap: 10px; min-width: 0; }
+.compare-box .have-code-form { margin: 0; }
+.have-code-form select { flex: 1; min-width: 0; min-height: 44px; }
+.cmp-error { margin: 0; color: var(--warn); font-size: 14px; }
+.cmp-actions .btn { min-height: 44px; }
+.compare-entry { display: grid; gap: 10px; }
+.compare-entry .have-code-form { margin: 0; }
+.code-row { display: grid; gap: 6px; margin: 12px 0; }
+.code-row > label { font: 600 12px/1.4 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.code-row .have-code-form { margin: 0; max-width: 640px; }
+.rc-actions .rc-compare { flex: 0 0 auto; }
+.self-compare { grid-column: 1 / -1; display: grid; gap: 8px; }
+.self-compare .compare-box, .compare-row .compare-box { margin: 0; }
+.cmp-close { justify-self: start; min-height: 44px; }
+.hist-table tr.compare-row td { white-space: normal; padding: 12px; background: var(--bg2); }
+.hist-table tr.compare-row:hover { background: none; }

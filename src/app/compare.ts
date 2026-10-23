@@ -35,10 +35,18 @@ export function compareRuns(a: SharedRun, b: SharedRun, labels = { a: "the share
   const da = a.device, db = b.device;
   const gpuKnown = !!(da.gpuLabel && db.gpuLabel);
   const sameGpu = gpuKnown && da.gpuLabel === db.gpuLabel;
-  const sameBrowser = da.browser === db.browser && da.browser !== "other";
-  if (sameGpu && da.os === db.os && da.os !== "other" && !sameBrowser && da.browser !== "other" && db.browser !== "other")
+  // Brave on iOS runs WebKit, Brave on Windows runs Chromium: same name, different browser engine.
+  const sameBrowser = da.browser === db.browser && da.webkitEngine === db.webkitEngine && da.browser !== "other";
+  const kindA = deviceKind(da), kindB = deviceKind(db);
+  const browsersKnown = da.browser !== "other" && db.browser !== "other";
+  const browserDiffers = browsersKnown && (da.browser !== db.browser || da.webkitEngine !== db.webkitEngine);
+  if (sameGpu && da.os === db.os && da.os !== "other" && browserDiffers)
     notes.push(`Same GPU and OS, different browser (${browserLabel(da)} vs ${browserLabel(db)}): this compares browsers.`);
-  else if (sameBrowser && gpuKnown && !sameGpu) notes.push(`Same browser, different GPU (${da.gpuLabel} vs ${db.gpuLabel}).`);
+  else {
+    if (kindA && kindB && kindA !== kindB) notes.push(`Different devices: ${kindA} vs ${kindB}.`);
+    if (browserDiffers) notes.push(`Different browsers: ${browserLabel(da)} vs ${browserLabel(db)}.`);
+    if (sameBrowser && gpuKnown && !sameGpu) notes.push(`Same browser, different GPU (${da.gpuLabel} vs ${db.gpuLabel}).`);
+  }
   if (majorsDiffer || !(a.avgFps > 0)) return { pct: null, verdict: "", notes, likeForLike };
   const pct = ((b.avgFps - a.avgFps) / a.avgFps) * 100;
   const verdict =
@@ -48,6 +56,25 @@ export function compareRuns(a: SharedRun, b: SharedRun, labels = { a: "the share
   return { pct, verdict, notes, likeForLike };
 }
 
+/** "iPad", "iPhone", "Android phone", "desktop/laptop", or "" when unknown. */
+export function deviceKind(d: SharedRun["device"]): string {
+  if (d.deviceType === "desktop") return "desktop/laptop";
+  if (d.deviceType === "phone") return d.os === "ios" ? "iPhone" : d.os === "android" ? "Android phone" : "phone";
+  if (d.deviceType === "tablet") return d.os === "ios" ? "iPad" : d.os === "android" ? "Android tablet" : "tablet";
+  return "";
+}
+
+/** Column device line: "📱 iPad · Brave (WebKit)" or "🖥 Brave 155 · Windows". */
+export function deviceSummary(r: SharedRun): string {
+  const kind = deviceKind(r.device);
+  const handheld = r.device.deviceType === "phone" || r.device.deviceType === "tablet";
+  const browser = r.device.browser !== "other" ? browserLabel(r.device) : "";
+  if (handheld) return ["📱 " + kind, browser].filter(Boolean).join(" · ");
+  const os = r.device.os !== "other" ? osLabel(r.device) : "";
+  const parts = [browser, os].filter(Boolean).join(" · ");
+  return parts ? `${kind ? "🖥 " : ""}${parts}` : "";
+}
+
 /** "8.9% apart", "about the same" or "" (versions can't be compared). */
 export function apartLabel(c: Comparison): string {
   if (c.pct === null) return "";
@@ -55,13 +82,13 @@ export function apartLabel(c: Comparison): string {
 }
 
 /**
- * The viewer's own saved runs that can sit next to a shared run: valid, same major version,
- * resolution and preset. Same duration first, then newest.
+ * The viewer's own saved runs that can sit next to a shared run: valid, same major version and the
+ * same settings (resolution, preset, duration), newest first. Any device or browser.
  */
 export function matchLocal(list: readonly BenchResult[], run: SharedRun): BenchResult[] {
   return list
-    .filter((r) => r.valid && major(r.benchmarkVersion) === major(run.benchmarkVersion) && r.resolutionId === run.resolution && r.preset === run.preset)
-    .sort((x, y) => Number(y.durationS === run.durationS) - Number(x.durationS === run.durationS) || `${y.date} ${y.time}`.localeCompare(`${x.date} ${x.time}`));
+    .filter((r) => r.valid && major(r.benchmarkVersion) === major(run.benchmarkVersion) && r.resolutionId === run.resolution && r.preset === run.preset && r.durationS === run.durationS)
+    .sort((x, y) => `${y.date} ${y.time}`.localeCompare(`${x.date} ${x.time}`));
 }
 
 /** Other saved runs to compare one of mine against: same settings first, then everything else valid. */

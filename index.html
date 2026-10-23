@@ -107,6 +107,22 @@
           <div class="score-run-buttons" id="score-runs"></div>
         </section>
 
+        <section class="panel compare-entry" aria-labelledby="cmp-entry-title">
+          <h2 class="panel-title" id="cmp-entry-title"><span class="kana" aria-hidden="true">比較</span>Compare</h2>
+          <p class="config-note">Compare your next run with a shared result (paste its link or code) or with one of your own saved runs. The same settings get selected and the two runs show side by side afterwards. Nothing starts until you press Start.</p>
+          <form class="have-code-form" id="cmp-entry-paste">
+            <label class="visually-hidden" for="cmp-entry-code">Shared link or code</label>
+            <input id="cmp-entry-code" name="code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste a shared link or code" />
+            <button type="submit" class="btn">Use it</button>
+          </form>
+          <form class="have-code-form" id="cmp-entry-pick" hidden>
+            <label class="visually-hidden" for="cmp-entry-run">One of your saved runs</label>
+            <select id="cmp-entry-run" name="run"></select>
+            <button type="submit" class="btn">Use it</button>
+          </form>
+          <p class="cmp-error" id="cmp-entry-error" role="alert" hidden></p>
+        </section>
+
         <div class="home-grid">
           <form id="config" class="panel config" autocomplete="off">
             <h2 class="panel-title"><span class="kana" aria-hidden="true">設定</span>Run settings</h2>

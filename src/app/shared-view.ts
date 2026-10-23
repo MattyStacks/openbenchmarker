@@ -62,6 +62,17 @@ export function haveCodeHtml(open = false): string {
   </details>`;
 }
 
+/** The same, always visible (My Results): one row, label, input and Open. */
+export function codeRowHtml(): string {
+  return `<form class="code-row" data-have-code>
+    <label for="code-row-input">Open a shared result</label>
+    <div class="have-code-form">
+      <input id="code-row-input" name="code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste a shared link or code" />
+      <button type="submit" class="btn">Open</button>
+    </div>
+  </form>`;
+}
+
 /** Delegated: any [data-have-code] form inside root. */
 export function bindHaveCode(root: HTMLElement): void {
   root.addEventListener("submit", (e) => {
@@ -80,7 +91,10 @@ function compareWithMine(view: HTMLElement, target: SharedRun): void {
   const btn = view.querySelector<HTMLButtonElement>("[data-compare-mine]");
   if (!slot || !btn) return;
   if (!matches.length) {
-    btn.remove();
+    btn.addEventListener("click", () => {
+      btn.hidden = true;
+      slot.innerHTML = `<p class="muted">You don't have a saved run at ${esc(settingsLabel(target))} (v${esc(target.benchmarkVersion.split(".")[0])}.x) in this browser yet. Run the same test to compare.</p>`;
+    });
     return;
   }
   const show = (id: string) => {
@@ -134,8 +148,8 @@ export function renderShared(payload: string): void {
       <details class="result-details"><summary>Both runs in full</summary>${runBlock(runs[0], "Shared run")}${runBlock(runs[1], "Compared run")}</details>
       ${honor}
       <div class="shared-cta">
-        <button type="button" class="btn btn-primary btn-start" data-setup>Set up the same test <span aria-hidden="true">▶</span></button>
-        <p class="muted tiny">Selects ${esc(settingsLabel(first))} so you can compare your own run with the shared run. Nothing starts until you press Start.</p>
+        <button type="button" class="btn btn-primary btn-start" data-setup>Run the same test &amp; compare <span aria-hidden="true">▶</span></button>
+        <p class="muted tiny">Selects ${esc(settingsLabel(first))} so your run can sit next to the shared run, on any device or browser. Nothing starts until you press Start.</p>
         ${mineBtn}
       </div>
       <div data-mine-slot></div>`;
@@ -145,7 +159,7 @@ export function renderShared(payload: string): void {
       ${runBlock(first)}
       ${honor}
       <div class="shared-cta">
-        <button type="button" class="btn btn-primary btn-start" data-setup>Set up the same test <span aria-hidden="true">▶</span></button>
+        <button type="button" class="btn btn-primary btn-start" data-setup>Run the same test &amp; compare <span aria-hidden="true">▶</span></button>
         <p class="muted tiny">Selects ${esc(settingsLabel(first))}. Press Start when you're ready, on any device or browser, and you'll see both runs side by side. Your result stays in your browser unless you share it.</p>
         ${mineBtn}
       </div>
@@ -156,12 +170,11 @@ export function renderShared(payload: string): void {
       ${runBlock(first)}
       ${honor}
       <div class="shared-cta">
-        <button type="button" class="btn btn-primary btn-start" id="shared-run">Run the same test <span aria-hidden="true">▶</span></button>
-        <p class="muted tiny">Opens the benchmark with ${esc(settingsLabel(first))} selected. Your result stays in your browser unless you share it.</p>
+        <button type="button" class="btn btn-primary btn-start" data-setup>Run the same test &amp; compare <span aria-hidden="true">▶</span></button>
+        <p class="muted tiny">Selects ${esc(settingsLabel(first))}. Press Start when you're ready, on any device or browser, and you'll see both runs side by side. Your result stays in your browser unless you share it.</p>
         ${mineBtn}
       </div>
       <div data-mine-slot></div>`;
-    $("#shared-run").addEventListener("click", () => prefillFromShare(first));
   }
   view.querySelector("[data-setup]")?.addEventListener("click", () => setUp(first));
   compareWithMine(view, first);

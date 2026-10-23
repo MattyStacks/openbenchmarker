@@ -49,6 +49,19 @@ describe("compareRuns: neutral wording", () => {
     expect(compareRuns(run(), run()).notes).toEqual([]);
   });
 
+  it("desktop vs iPad, different browsers: notes, and the numbers still show however far apart", () => {
+    const ipad = { browser: "brave" as const, browserMajor: null, os: "ios" as const, deviceType: "tablet" as const, webkitEngine: true, gpuLabel: "Apple GPU" };
+    const desk = { ...EDGE, browser: "brave" as const, browserMajor: 155 };
+    const c = compareRuns(run({ device: ipad, mobile: true, avgFps: 343.6 }), run({ device: desk, avgFps: 4716.3 }));
+    expect(c.pct).toBeCloseTo(1272.6, 0);
+    expect(c.verdict).toBe("Your run was 1272.6% faster than the shared run.");
+    expect(c.notes).toContain("Different devices: iPad vs desktop/laptop.");
+    expect(c.notes).toContain("Different browsers: Brave (WebKit) vs Brave 155.");
+    expect(c.notes.join(" ")).not.toMatch(/Same browser/);
+    const safari = { ...ipad, browser: "safari" as const, browserMajor: 27 };
+    expect(compareRuns(run({ device: safari }), run({ device: desk })).notes).toContain("Different browsers: Safari 27 vs Brave 155.");
+  });
+
   it("labels can name both sides for a third party", () => {
     expect(compareRuns(run(), run({ avgFps: 155 }), { a: "the shared run", b: "The compared run" }).verdict).toBe("The compared run was 8.9% faster than the shared run.");
   });
@@ -75,8 +88,8 @@ describe("matching local runs", () => {
     br({ id: "invalid", valid: false, invalidReason: "Aborted by user" }),
     br({ id: "v1", benchmarkVersion: "1.1.0" }),
   ];
-  it("Compare with mine: same major, resolution and preset; same duration first, then newest", () => {
-    expect(matchLocal(list, run()).map((r) => r.id)).toEqual(["same-60-new", "same-60-old", "same-30-new"]);
+  it("Compare with mine: same major version and settings, any device, newest first", () => {
+    expect(matchLocal(list, run()).map((r) => r.id)).toEqual(["same-60-new", "same-60-old"]);
   });
   it("Compare with another of my runs: same settings first, then the rest", () => {
     const mine = list[2];

@@ -117,7 +117,7 @@ Every decoded string goes through `esc()`. A test link whose GPU name was `<img 
 
 ## Share flow
 
-1. **Share result:** if `navigator.canShare({ files })`, the share sheet gets the card PNG plus the text with the link at the end. The link isn't passed as a separate `url`: iOS shows a share that holds a link and an image as "1 Link and 1 Image" with a blank icon, but a single image shows the card as the preview. (On the tester's iPhone the preview still showed a blank icon after this change; accepted for now, since sharing, the image and Copy link all work.) Otherwise it gets the text and the link. Where there's no share sheet (desktop Firefox, some Linux browsers) or it fails, the text and link are copied to the clipboard with a confirmation. Cancelling the sheet (`AbortError`) shows nothing.
+1. **Share my result:** if `navigator.canShare({ files, url })`, the share sheet gets the card PNG, the text and the link as `url`. Putting the link only inside the text (tried during Plan 3) made some apps send just the picture, so the link always goes as `url`. The iOS share sheet shows "1 Link and 1 Image" with a plain icon, which is accepted. Otherwise it gets the text and the link. Where there's no share sheet (desktop Firefox, some Linux browsers) or it fails, the text and link are copied to the clipboard with a confirmation. Cancelling the sheet (`AbortError`) shows nothing.
 2. **Copy link** and **Save image** are always next to it. "Preview the share card" shows the PNG.
 3. In My Results, valid rows have a Share button that does step 1.
 
@@ -145,39 +145,44 @@ Share text, e.g.: *"Score: Extreme 14,321: 143.2 FPS avg, 118.4 1% low in the Ne
 
 QR scan test: show the card full-screen on one device and scan it with another phone's camera. Then do the same with a screenshot of the card sent through iMessage or Discord (the thumbnail and the opened image).
 
-## Comparisons (Plan 5)
+## Comparisons (Plan 5, revised after testing)
 
-Sharing comes first. **Share my result** is the only big button. Comparing is optional, offered as a quiet "Or share an invite to compare" link, and works without anyone else: you can compare two of your own runs (two browsers, two settings, before and after a driver update). The wording is neutral: no "beat", no "friend".
+Sharing comes first: **Share my result** is the main button and always sends the **link** (`url`), with the card image where the browser can share files. Comparing is a visible, separate option on every screen, on desktop as well as phones. You can compare against someone else's run or against one of your own earlier runs, in any browser or on any device. The numbers always show however far apart they are; only a different major benchmark version hides the %.
 
 ```
-Results page / My Results ⋯
- ├─ Share my result        → type=result     (card: result)
- └─ Share an invite to compare → type=challenge  (card: result + "RUN THE SAME TEST & COMPARE")
-        │ someone opens it (or you, in another browser)
-        ▼
-   Shared view "Compare with this run"  [Set up the same test]   ← nothing starts
-        ▼
-   Home: same settings selected + banner "Comparing with 142.3 FPS avg … Press Start when you're ready"
-        │ Start (phone high-res warning applies) — the run carries the code (RunConfig.challenge)
-        ▼
-   Result page: Side by side (shared run | your run), % difference, notes
-        │ Share the comparison
-        ▼
-   type=comparison: runs[0] = shared run, runs[1] = compared run  (card: two columns)
-        ▼
-   Shared view: both side by side  [Set up the same test]  [Compare with mine]
+Any shared link (Share my result, an invite, or a comparison)
+   ▼
+Shared view: [Run the same test & compare]   [Compare with mine]
+   ▼  same settings selected + banner "Comparing with 343.6 FPS avg … Press Start when you're ready"
+   │  (nothing starts; "Stop comparing" turns it back into a plain run)
+Home: [Start]  → the run carries the code (RunConfig.challenge → BenchResult.challenge)
+   ▼
+Result page, comparison first: Side by side (Compared with | This run), % and notes,
+[Share the comparison] (primary) [Share this run only]; then this run in full, Details (open), submit
 ```
 
-- **Link types.** `challenge` is shown as "an invite to compare". In a `comparison` link, `runs[0]` is the shared run and `runs[1]` the compared run.
-- **Notes** (`src/app/compare.ts`):
-  - different settings: "Not like-for-like"
-  - a different major version: the FPS can't be compared, so the % is hidden
-  - a different minor or patch version: numbers may differ slightly
-  - same GPU and OS but a different browser: "this compares browsers"
-  - same browser but a different GPU
-  - within 0.5%: "about the same"
-- **Storage.** The pending comparison is kept in `sessionStorage` `ogb.challenge.v1` for this tab only, so it survives a reload or crash (the crash notice offers "Back to the comparison"). The result keeps the compared-with code in its `challenge` field so you can look at it again later. It's stripped from JSON export.
-- **Compare with mine** (shared views) and **Compare with another of my runs** (My Results ⋯) only use runs saved in this browser.
+Where you can compare:
+- **Home, "Compare":** paste a shared link or code, or pick one of your saved runs. The same settings get selected, the banner appears, and your next run shows side by side.
+- **Results page, "Compare this run"** (under the share box): paste a link or code, or pick one of your runs. The panel opens in place, with **Share the comparison**.
+- **My Results:** a **Compare** button on every card and in every table row. It opens the same box under the card, or as a full-width row in the table. **Open a shared result** is a visible input at the top.
+- **Shared views:** **Compare with mine** is always shown. It uses your saved runs with the same settings and major version; if there are none it says so.
+
+Notes (`src/app/compare.ts`, neutral wording):
+- not like-for-like (different settings)
+- different benchmark versions
+- different devices (e.g. "iPad vs desktop/laptop")
+- different browsers (Brave on iOS/WebKit counts as a different browser from Brave on Windows)
+- "Same GPU and OS, different browser: this compares browsers"
+- "Same browser, different GPU"
+- within 0.5%: "about the same"
+
+Link types:
+- `challenge` (an invite) still exists. Every shared link is comparable now, so the share box no longer offers a separate invite.
+- In a `comparison` link, `runs[0]` is the run compared with and `runs[1]` the other run.
+
+Storage:
+- `sessionStorage` `ogb.challenge.v1` holds the pending comparison (this tab only; it survives a reload or crash).
+- The `challenge` field on the saved result keeps the comparison so you can look at it again. It's stripped from JSON export.
 
 **Two-result links** (production origin, ECC M): two runs with typical GPU names are about 165 characters (QR version 9). With two 40-character GPU names, 181 characters (QR version 10). An invite with a 40-character GPU name is 122 characters (version 7). Rendered invite and comparison cards decode with jsQR at 1200, 600 and 420 px wide.
 
@@ -203,10 +208,11 @@ A code is just the end of a link: the part after `#/r/`. **Copy code** (share bo
 
 Spaces, line breaks and trailing punctuation that chat apps add are ignored (`extractShareCode`). The code is decoded in the browser and nothing is sent anywhere. A bad code shows "damaged or edited".
 
-### Demo on two phones (preview)
-1. Phone A: run 720p Low → **Or share an invite to compare** → send it in Messages.
-2. Phone B: open it → **Set up the same test** (settings selected, banner, nothing starts) → **Start**.
-3. Phone B: **Side by side** appears under the scores → **Share the comparison** → send it back.
-4. Phone A: open it → both runs side by side → **Compare with mine**.
+### Demo (preview)
+1. iPhone or iPad: run 720p Low → **Share my result** → send it to the PC. The link arrives with the image.
+2. PC: open it → **Run the same test & compare** (settings selected, banner, nothing starts) → **Start**.
+3. PC: the result opens comparison-first → **Share the comparison** → send it back.
+4. Phone: open it → both runs side by side → **Compare with mine**.
+5. PC: My Results → table view → **Compare** on a row → pick another of your runs, or paste the phone's code.
 
-**Browser comparison on one PC:** run in Edge → invite → open the link in Chrome → Set up → Start. The notes say "Same GPU and OS, different browser: this compares browsers".
+**Browser comparison on one PC:** run in Edge → Copy code → open Chrome → home **Compare**, paste the code → Start. The notes say "Same GPU and OS, different browser: this compares browsers".

@@ -5,7 +5,7 @@ import { round1 } from "../benchmark/metrics";
 import { getScoreTest } from "../benchmark/presets";
 import { decodeShare, encodeShare, shareBlocker, sharedRunFrom, type SharedRun } from "../benchmark/share-codec";
 import { clearPending, pendingCode, setPending } from "./challenge";
-import { LABELS, comparePanelHtml } from "./compare-view";
+import { LABELS, bindCompareBoxes, compareBoxHtml, comparePanelHtml } from "./compare-view";
 import { prefillFromShare } from "./home";
 import { commandsFor } from "../benchmark/sysinfo";
 import { LINUX_ONLY_FIELDS, type BenchResult, type SystemInfo } from "../benchmark/types";
@@ -131,12 +131,12 @@ function comparedWith(r: BenchResult): SharedRun | null {
 
 function comparisonSection(r: BenchResult, other: SharedRun): string {
   if (!r.valid || shareBlocker(sharedRunFrom(r)))
-    return `<section class="compare-panel"><h2 class="cmp-title">Side by side</h2><p>Your run was invalid, so it can't be compared with the shared run (${other.avgFps.toFixed(1)} FPS avg).</p><button type="button" class="btn" data-compare-again>Set up again</button></section>`;
+    return `<section class="compare-panel"><h2 class="cmp-title">Side by side</h2><p>This run was invalid, so it can't be compared with the other run (${other.avgFps.toFixed(1)} FPS avg).</p><button type="button" class="btn" data-compare-again>Set up again</button></section>`;
   return comparePanelHtml(
     other,
     sharedRunFrom(r),
     LABELS.shared,
-    `<div class="row"><button type="button" class="btn" data-share-comparison>Share the comparison</button><span class="share-status" role="status" data-cmp-status></span></div>`,
+    `<div class="row cmp-actions"><button type="button" class="btn btn-primary" data-share-comparison>Share the comparison</button><button type="button" class="btn" data-share-only>Share this run only</button><span class="share-status" role="status" data-cmp-status></span></div>`,
   );
 }
 
@@ -174,6 +174,8 @@ export function renderResults(r: BenchResult): void {
       ${dev ? `<p class="result-device">${esc(dev)}</p>` : ""}
     </div>
     ${r.valid ? "" : `<div class="banner-invalid" role="alert"><b>INVALID RUN:</b> ${esc(r.invalidReason)}. Saved locally; it can never be submitted.</div>`}
+    ${other ? comparisonSection(r, other) : ""}
+    ${other ? `<h2 class="section-title">This run in full</h2>` : ""}
     <div class="score-cards">
       ${
         r.score !== undefined
@@ -187,11 +189,10 @@ export function renderResults(r: BenchResult): void {
       <div class="score small"><span>Frames timed</span><b id="res-frames">${r.frameCount}</b></div>
       <div class="score small"><span>Run settings</span><b class="settings" id="res-settings">${r.scoreTest ? `${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)} · ` : ""}${esc(r.resolution)} (${r.width}×${r.height}) · ${esc(r.preset)} · ${r.durationS} s · ${esc(r.graphicsApi)}</b></div>
     </div>
-    ${other ? comparisonSection(r, other) : ""}
     ${r.valid && !shareBlocker(sharedRunFrom(r)) ? shareBoxHtml() : ""}
-    <div data-challenge-slot></div>
+    ${r.valid && !shareBlocker(sharedRunFrom(r)) ? compareBoxHtml(r) : ""}
     ${r.scoreTest && r.score === undefined ? `<p class="muted">Started as ${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)}, but ${r.valid ? "its settings didn't match the locked test" : "the run was invalid"}, so it has no score.</p>` : ""}
-    <details class="result-details">
+    <details class="result-details" open>
       <summary>Details: what limited this run, timing and export</summary>
       ${diagPanel(r)}
     <p class="muted small-print">Uncapped: frames were rendered back-to-back in ~${BATCH_MS} ms batches, with three batches kept queued on the GPU. Average FPS is frames divided by timed wall-clock. ${r.timing === "gpu-timer" ? "Lows and worst frame use each frame's GPU time from timer queries (or its batch average, if larger)." : r.timing === "batch-avg" ? "No GPU timer was available, so lows and worst frame use each batch's average frame time." : "Each frame was timed from submission to GPU completion."} Loop busy ${(r.loopBusy * 100).toFixed(0)}% of timed wall-clock.</p>
@@ -264,10 +265,20 @@ export function renderResults(r: BenchResult): void {
         if (status) status.textContent = o === "shared" ? "Shared ✓" : o === "copied" ? "Link and text copied ✓" : o === "failed" ? "Couldn't share here." : "";
       });
     });
+    view.querySelector("[data-share-only]")?.addEventListener("click", () => {
+      const status = view.querySelector<HTMLElement>("[data-cmp-status]");
+      void sharePayload({ type: "result", runs: [sharedRunFrom(r)] }).done.then((o) => {
+        if (status) status.textContent = o === "shared" ? "Shared ✓" : o === "copied" ? "Link and text copied ✓" : o === "failed" ? "Couldn't share here." : "";
+      });
+    });
     view.querySelector("[data-compare-again]")?.addEventListener("click", () => {
       setPending(encodeShare({ type: "challenge", runs: [other] }));
       prefillFromShare(other);
     });
+  }
+  if (!view.dataset.cmpBound) {
+    view.dataset.cmpBound = "1";
+    bindCompareBoxes(view);
   }
   const shareBox = view.querySelector<HTMLElement>(".share-box");
   if (shareBox) bindShareBox(shareBox, sharedRunFrom(r));

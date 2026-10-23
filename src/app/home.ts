@@ -4,7 +4,10 @@ import { MOBILE } from "./env";
 import { startRun } from "./run";
 import { didNotFinish, leftoverMessage, needsHighResWarning, type InProgressRun } from "./run-guard";
 import type { SharedRun } from "../benchmark/share-codec";
-import { clearPending, pendingCode, pendingRun } from "./challenge";
+import { clearPending, pendingCode, pendingRun, setPending } from "./challenge";
+import { deviceSummary } from "./compare";
+import { runFromPasted } from "./compare-view";
+import { encodeShare, shareBlocker, sharedRunFrom } from "../benchmark/share-codec";
 import { browserLabel, settingsLabel } from "./share";
 import { app } from "./shell";
 import { allResults, loadConfig, saveConfig, type RunConfig } from "./store";
@@ -143,6 +146,44 @@ function showLeftoverNotice(r: InProgressRun): void {
   });
 }
 
+/** Home "Compare" entry: your saved runs (shareable ones) for the picker, newest first. */
+function refreshCompareEntry(): void {
+  const runs = allResults().filter((r) => r.valid && !shareBlocker(sharedRunFrom(r)));
+  const pick = $<HTMLFormElement>("#cmp-entry-pick");
+  pick.hidden = runs.length === 0;
+  $<HTMLSelectElement>("#cmp-entry-run").innerHTML = runs
+    .map((r) => {
+      const s = sharedRunFrom(r);
+      return `<option value="${esc(r.id)}">Mine: ${esc(r.date)} ${esc(r.time)} · ${r.avgFps.toFixed(1)} FPS · ${esc(settingsLabel(s))} · ${esc(deviceSummary(s).replace(/^[^\w]+/, ""))}</option>`;
+    })
+    .join("");
+}
+
+/** Set up a comparison with a run: same settings selected, banner shown, nothing started. */
+function compareWith(run: SharedRun): void {
+  setPending(encodeShare({ type: "challenge", runs: [run] }));
+  prefillFromShare(run);
+}
+
+function bindCompareEntry(): void {
+  const err = $("#cmp-entry-error");
+  $<HTMLFormElement>("#cmp-entry-paste").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const run = runFromPasted(String(new FormData(e.target as HTMLFormElement).get("code") ?? ""));
+    err.hidden = !!run;
+    err.textContent = run ? "" : "This link or code looks damaged or edited. Paste the whole link, or ask for it again.";
+    if (run) compareWith(run);
+  });
+  $<HTMLFormElement>("#cmp-entry-pick").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const r = allResults().find((x) => x.id === new FormData(e.target as HTMLFormElement).get("run"));
+    err.hidden = true;
+    if (r) compareWith(sharedRunFrom(r));
+  });
+  window.addEventListener("hashchange", refreshCompareEntry);
+  refreshCompareEntry();
+}
+
 // Home: configuration (visible immediately, no reveal step)
 export function buildConfigForm(leftover: InProgressRun | null = null): void {
   const cfg = loadConfig();
@@ -190,6 +231,7 @@ export function buildConfigForm(leftover: InProgressRun | null = null): void {
     void launch({ resolution: t.resolution, preset: t.preset, duration: t.duration, scoreTest: t.id });
   });
 
+  bindCompareEntry();
   // A finished run clears its combo's hint; refresh whenever the page comes back home.
   window.addEventListener("hashchange", refreshRunHints);
   refreshRunHints();

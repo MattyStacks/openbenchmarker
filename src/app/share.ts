@@ -370,9 +370,10 @@ export function sharePayload(p: SharePayload): { url: string; file: File; done: 
       (e: unknown) => ((e as Error)?.name === "AbortError" ? ("cancelled" as const) : copy()),
     );
   let done: Promise<ShareOutcome>;
-  // With an image, the link goes inside the text instead of `url`: iOS shows "1 Link and 1 Image"
-  // with a blank icon for two items, but the card itself as the preview for one image.
-  if (typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })) done = viaSheet({ files: [file], title, text: `${text}\n${url}` });
+  // The link always travels as `url`, so it reaches the other person whatever the app does with the
+  // image. (Putting it only inside the text made some apps send just the picture.) iOS then shows
+  // "1 Link and 1 Image" with a plain icon in the share sheet, which is accepted.
+  if (typeof navigator.share === "function" && navigator.canShare?.({ files: [file], url })) done = viaSheet({ files: [file], title, text, url });
   else if (typeof navigator.share === "function") done = viaSheet({ title, text, url });
   else done = copy();
   return { url, file, done };
@@ -407,7 +408,6 @@ export function shareBoxHtml(): string {
     </div>
     <p class="share-status" role="status" aria-live="polite" data-share-status></p>
     <p class="muted tiny">${esc(SHARE_NOTE)}</p>
-    <p class="invite-line"><button type="button" class="linklike" data-share-invite>Or share an invite to compare</button><span class="muted tiny"> Someone (or you, in another browser) runs the same test, and you see both side by side.</span></p>
     <details data-card-preview><summary>Preview the share card</summary></details>
   </div>`;
 }
@@ -430,9 +430,6 @@ export function bindShareBox(root: HTMLElement, r: SharedRun): void {
   const result: SharePayload = { type: "result", runs: [r] };
   root.querySelector("[data-share]")?.addEventListener("click", () => {
     void sharePayload(result).done.then((o) => say(OUTCOME_TEXT[o], o === "failed"));
-  });
-  root.querySelector("[data-share-invite]")?.addEventListener("click", () => {
-    void sharePayload({ type: "challenge", runs: [r] }).done.then((o) => say(o === "shared" ? "Invite shared ✓" : OUTCOME_TEXT[o], o === "failed"));
   });
   root.querySelector("[data-copy-link]")?.addEventListener("click", async () => {
     const url = payloadUrl(result);
