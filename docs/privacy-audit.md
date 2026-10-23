@@ -15,8 +15,9 @@ Principle being audited: everything runs in the browser; the site stores nothing
 | `sessionStorage` | One key, `ogb.challenge.v1` (`src/app/challenge.ts`): the share code of a run you chose to compare with ("Set up the same test"), kept in this tab only so it survives a reload or crash. Cleared when the comparison is shown on your result, or on "Stop comparing". |
 | IndexedDB / Cache Storage | Not used anywhere in source or `dist/`. |
 | `localStorage` | `src/app/store.ts`, `src/app/run-guard.ts` and `src/app/history-view.ts`, five keys (below). |
-| Clipboard / Web Share | Only on explicit taps: copy YAML / lookup commands (`src/app/results-view.ts`), and Share / Copy link / Save image (`src/app/share.ts`). Share hands the link, text and card PNG to the system share sheet (`navigator.share`); where that's missing it copies the link and text to the clipboard. The site sends nothing itself. |
+| Clipboard / Web Share | Only on explicit taps: copy YAML / lookup commands (`src/app/results-view.ts`), and Share / Copy link / Save image (`src/app/share.ts`). Share hands the link and text to the system share sheet (`navigator.share`), never the card PNG (since Plan 5; Save image is a separate download); where Share is missing it copies the link and text to the clipboard. The site sends nothing itself. |
 | Share links | `#/r/<payload>`: the whole result encoded (not encrypted) in the URL fragment (`src/benchmark/share-codec.ts`). Browsers never send the fragment in HTTP requests, so opening a link sends nothing about the result to the site. It is decoded and shown only in the recipient's browser. A link carries the measured numbers, settings, run date, browser + version, OS, device type and the GPU name as reported by the browser. It never carries the user-filled `system` fields, the diagnostics or the result id. Anyone with a link can read it. |
+| Links to GitHub and opengpubenchmarks.com | Plain links that open in a new tab, only when clicked; the page never opens one by itself. GitHub's new-file form link carries the submission YAML (shown in the preview first). The "Request your GPU" link opens a prefilled, editable GitHub issue whose query string carries only the GPU name as reported by the browser (labelled as a starting point); it never carries result data, and nothing is posted until the user submits the issue on GitHub. The home page's request link carries no name. |
 | Share card | Drawn on a 2D canvas in the browser (`renderCard`), QR code generated locally (`uqr`, bundled; no network). |
 | `navigator.deviceMemory` | Read only to add a hint to the phone high-resolution confirmation (Chromium only). Never stored. |
 | Browser APIs read for diagnostics/device | `navigator.userAgent` / `userAgentData` (including `getHighEntropyValues(["platform","brands"])`), `navigator.brave.isBrave()`, `navigator.hardwareConcurrency`, Battery Status API (Chromium), WebGL `WEBGL_debug_renderer_info`. All read locally, shown labelled as detected, never sent anywhere by the site. |
@@ -50,3 +51,13 @@ npm run build
 grep -o "indexedDB\|document.cookie\|sendBeacon" dist/assets/*.js   # sessionStorage: only ogb.challenge.v1
 grep -rn "@font-face\|fonts.googleapis" src/ index.html dist/assets/*.css
 ```
+
+## FAQ candidates (for Plan 7)
+
+Longer explanations kept short on the page in Plan 6, to expand in the About & FAQ page:
+
+- What CC BY 4.0 allows: reuse with credit, including commercial use and AI training; copies other people made stay public (upstream's [license page](https://opengpubenchmarks.com/license/)).
+- Why submitting isn't automatic: the site keeps nothing and has no server; you submit through GitHub yourself, so your GitHub username is public on the pull request.
+- How a GPU gets into the catalog: request it with an issue, or add it with a pull request (`templates/catalog_*.yaml`, ID rules in `data/gpus/README.md`); the snapshot here updates with each site release.
+- What the "Request your GPU" link sends: only the browser-reported GPU name, to GitHub, when you click it; you edit it before submitting.
+- Why phone and tablet runs can't be submitted yet: the dataset lists desktop and laptop GPUs (an upstream schema change for phone runs is planned; see [upstream-todos.md](upstream-todos.md)).

@@ -30,7 +30,7 @@ export function validateSubmission(r: BenchResult | null | undefined): string[] 
   const gpuId = (s.gpuId ?? "").trim();
   if (!gpuId) errors.push("GPU: choose your exact GPU from the catalog");
   else if (gpuId === NOT_LISTED)
-    errors.push(`GPU: not in the catalog yet; open an issue or PR to add it (${UPSTREAM_ISSUES}), then submit once it exists`);
+    errors.push(`GPU: not in the catalog yet. Request it or add it (${UPSTREAM_ISSUES}), then submit once it's listed`);
   else if (!findGpu(gpuId)) errors.push(`GPU: '${gpuId}' is not a catalog gpu_id; free-text GPU names are not accepted`);
 
   if (!BENCHMARKS.some((b) => b.gameId === r.gameId)) errors.push(`Benchmark: game_id '${r.gameId}' is not this tool's benchmark`);

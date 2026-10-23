@@ -84,7 +84,7 @@ function card(r: BenchResult): string {
   const statusHtml =
     st.kind === "ready"
       ? `<span class="rc-status good">✓ Ready to submit</span>`
-      : st.kind === "next-step"
+      : st.kind === "next-step" || st.kind === "gpu-not-listed"
         ? `<span class="rc-status">${esc(st.text)}</span>`
         : st.kind === "invalid"
           ? `<span class="rc-status bad">${esc(st.text)}</span>`

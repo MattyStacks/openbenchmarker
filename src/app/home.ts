@@ -1,3 +1,4 @@
+import { gpuRequestUrl } from "../benchmark/catalog";
 import { DURATIONS, PRESETS, RESOLUTIONS, SCORE_TESTS, getResolution, type PresetId, type ResolutionId } from "../benchmark/presets";
 import { $, esc } from "./dom";
 import { MOBILE } from "./env";
@@ -231,6 +232,8 @@ export function buildConfigForm(leftover: InProgressRun | null = null): void {
     void launch({ resolution: t.resolution, preset: t.preset, duration: t.duration, scoreTest: t.id });
   });
 
+  // The same prefilled catalog request as the results page, without a browser-reported name.
+  $<HTMLAnchorElement>("#home-gpu-request").href = gpuRequestUrl(null);
   bindCompareEntry();
   // A finished run clears its combo's hint; refresh whenever the page comes back home.
   window.addEventListener("hashchange", refreshRunHints);

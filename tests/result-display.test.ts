@@ -1,3 +1,4 @@
+import { NOT_LISTED } from "../src/benchmark/catalog";
 import { describe, expect, it } from "vitest";
 import { BENCHMARK, GPU_CATALOG } from "../src/benchmark/catalog";
 import { emptySystem, type BenchResult, type DeviceContext } from "../src/benchmark/types";
@@ -61,6 +62,10 @@ describe("display rules table", () => {
     expect(s.kind === "next-step" && s.missing).toEqual(["GPU", "OS"]);
   });
 
+  it("desktop runs with an unlisted GPU: a way to add it, not a missing field", () => {
+    expect(submissionStatus(result({ device: DESK, mobile: false, system: { ...READY_SYS, gpuId: NOT_LISTED } }))).toEqual({ kind: "gpu-not-listed", text: "GPU not in the catalog yet" });
+  });
+
   it("unknown (old) runs: same calm wording as desktop", () => {
     expect(submissionStatus(result()).text).toBe("Add your system details to submit");
   });
@@ -91,6 +96,7 @@ describe("table view Submission column", () => {
     expect(tableStatus(result({ device: DESK, mobile: false }))).toEqual({ cls: "next", text: "Needs: GPU, OS" });
     expect(tableStatus(result())).toEqual({ cls: "next", text: "Needs: GPU, OS" });
     expect(tableStatus(result({ device: IPHONE, mobile: true }))).toEqual({ cls: "muted", text: "Share only" });
+    expect(tableStatus(result({ device: DESK, mobile: false, system: { ...READY_SYS, gpuId: NOT_LISTED } }))).toEqual({ cls: "next", text: "Add your GPU →" });
     expect(tableStatus(result({ device: IPHONE, mobile: true, valid: false, invalidReason: "Aborted by user" }))).toEqual({ cls: "bad", text: "Invalid: Aborted by user" });
   });
 });

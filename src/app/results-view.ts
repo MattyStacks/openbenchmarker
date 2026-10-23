@@ -1,4 +1,16 @@
-import { BENCHMARK, CATALOG_SNAPSHOT_DATE, GPU_CATALOG, NOT_LISTED, UPSTREAM_ISSUES, UPSTREAM_REPO, UPSTREAM_TEMPLATES } from "../benchmark/catalog";
+import {
+  BENCHMARK,
+  CATALOG_SNAPSHOT_DATE,
+  CC_BY_DEED,
+  DATA_LICENSE,
+  GPU_CATALOG,
+  NOT_LISTED,
+  OGB_SITE,
+  UPSTREAM_CATALOG_README,
+  UPSTREAM_REPO,
+  UPSTREAM_TEMPLATES,
+  gpuRequestUrl,
+} from "../benchmark/catalog";
 import { download, gamesYamlEntry, suggestedFileName, toCsv, toJson, toYaml } from "../benchmark/exporter";
 import { VERDICT_LABEL, diagnose, isMaskedRenderer } from "../benchmark/diagnose";
 import { round1 } from "../benchmark/metrics";
@@ -140,6 +152,9 @@ function comparisonSection(r: BenchResult, other: SharedRun): string {
   );
 }
 
+/** "Not now" on the submit nudge: in memory only, so it stays hidden until the page reloads. */
+let nudgeDismissed = false;
+
 /** Set by openResult so the page can scroll to a section after it renders. */
 let pendingFocus: "submit" | null = null;
 
@@ -165,7 +180,7 @@ export function renderResults(r: BenchResult): void {
   const gpuOptions = [
     `<option value="">— Select your exact GPU —</option>`,
     ...GPU_CATALOG.map((g) => `<option value="${esc(g.id)}">${esc(g.name)} (${esc(g.id)})</option>`),
-    `<option value="${NOT_LISTED}">My GPU is not listed</option>`,
+    `<option value="${NOT_LISTED}">My GPU isn't listed</option>`,
   ].join("");
   view.innerHTML = `
     <div class="results-head">
@@ -204,20 +219,34 @@ export function renderResults(r: BenchResult): void {
 
     ${
       handheld && r.valid
-        ? `<p class="handheld-note">📱 Phone and tablet runs can be shared, but not submitted: the Open GPU Benchmarks dataset lists desktop and laptop GPUs.</p>`
+        ? `<p class="handheld-note">📱 Phone and tablet runs can be shared, but not submitted: the Open GPU Benchmarks dataset lists desktop and laptop GPUs.</p>
+      <p class="explore-link"><a href="${OGB_SITE}" target="_blank" rel="noopener">Explore results on Open GPU Benchmarks →</a></p>`
         : ""
     }
     ${showSubmit ? `<section class="submit-section" id="submit-section" aria-labelledby="submit-title">
     <h2 class="section-title" id="submit-title">Submit to Open GPU Benchmarks</h2>
+    ${nudgeDismissed ? "" : `<div class="nudge" id="nudge">
+      <p><b>Want to help other people pick a GPU?</b> If you're comfortable, add your result to Open GPU Benchmarks, the free, open dataset this tool feeds. It only takes a few minutes.</p>
+      <div class="nudge-actions">
+        <button type="button" class="btn btn-primary" data-nudge="submit">Submit your result →</button>
+        <a class="btn" href="${OGB_SITE}" target="_blank" rel="noopener">See the charts →</a>
+        <button type="button" class="btn" data-nudge="later">Not now</button>
+      </div>
+    </div>`}
     <div class="results-grid">
       <form class="card sys-form" id="sys-form" autocomplete="off">
         <h2><span class="kana" aria-hidden="true">システム</span>System information</h2>
         <p class="muted">Only you can provide these. Nothing here is guessed or auto-filled; grey text is just an example.</p>
         <label class="field"><span>GPU <em>required</em></span><select name="gpuId">${gpuOptions}</select></label>
-        <p class="muted tiny">Catalog snapshot ${esc(CATALOG_SNAPSHOT_DATE)} from <a href="${UPSTREAM_REPO}/tree/main/data/gpus" target="_blank" rel="noopener">open-gpu-benchmarks</a>.</p>
+        <p class="muted tiny">The catalog is new and growing: ${GPU_CATALOG.length} GPU${GPU_CATALOG.length === 1 ? "" : "s"} as of ${esc(CATALOG_SNAPSHOT_DATE)} (<a href="${UPSTREAM_REPO}/tree/main/data/gpus" target="_blank" rel="noopener">catalog</a>). Don't see yours? Choose "My GPU isn't listed".</p>
         <div id="gpu-blocked" class="blocked" hidden>
-          <b>Your GPU isn't in the catalog yet, so this result can't be submitted.</b>
-          Open an <a href="${UPSTREAM_ISSUES}" target="_blank" rel="noopener">issue</a> or a pull request upstream to add it (catalog <a href="${UPSTREAM_TEMPLATES}" target="_blank" rel="noopener">templates/</a>). Once it exists in the catalog, come back to My Results and submit. Please don't submit under a similar GPU. Local save and JSON/CSV export still work.
+          <p><b>Your GPU isn't in the catalog yet — help add it!</b> The catalog is new and growing, and every card added makes the dataset more useful for everyone.</p>
+          <div class="blocked-links">
+            <p><a class="btn btn-primary" href="${esc(gpuRequestUrl(r.device?.gpuLabel))}" target="_blank" rel="noopener">Request your GPU (open an issue) →</a> <span class="muted tiny">Easiest, no coding needed.</span></p>
+            <p><a class="btn" href="${UPSTREAM_TEMPLATES}" target="_blank" rel="noopener">Add it yourself (pull request) →</a> <span class="muted tiny">If you're comfortable with GitHub (<a href="${UPSTREAM_CATALOG_README}" target="_blank" rel="noopener">ID rules</a>).</span></p>
+          </div>
+          ${r.device?.gpuLabel ? `<p class="muted tiny">Starting point for your request: <b>${esc(r.device.gpuLabel)}</b> (reported by your browser). Edit it on GitHub to the exact card: brand, model and memory.</p>` : ""}
+          <p>Once it's listed, you can come back and submit this result. It stays saved in My Results until then.</p>
         </div>
         <label class="field"><span>Operating system <em>required</em></span>
           <select name="os"><option value="">— Select —</option><option value="windows">windows</option><option value="linux">linux</option></select></label>
@@ -241,18 +270,24 @@ export function renderResults(r: BenchResult): void {
         <div id="os-cmds"></div>
 
         <h2><span class="kana" aria-hidden="true">送信</span>Export &amp; submit</h2>
+        <div id="submit-export">
         <div id="val-box" aria-live="polite"></div>
         <div class="row">
           <button type="button" class="btn btn-primary" id="exp-yaml">Download YAML</button>
           <button type="button" class="btn" id="copy-yaml">Copy YAML</button>
         </div>
-        <div class="warn-public">
-          <b>Submitted data is public forever.</b> Results in open-gpu-benchmarks are released under
-          <a href="${UPSTREAM_REPO}/blob/main/data/LICENSE" target="_blank" rel="noopener">CC BY 4.0</a>: anyone can use them for anything, including AI training, and a submission can't be taken back. Only include what you're happy to make public.
+        <p class="muted tiny why-manual"><b>Why isn't submitting automatic?</b> This site doesn't keep anything. You submit to Open GPU Benchmarks yourself, so you see exactly what's published and decide what goes in it.</p>
         </div>
+        <div class="warn-public">
+          <p>Submitting is optional, and it's up to you. Your results stay in this browser unless you choose to share, export or submit them.</p>
+          <p>If you submit to Open GPU Benchmarks, your result joins a public dataset under the CC BY 4.0 license. That's a common license for open data: anyone can reuse the data as long as they credit the source. <a href="${CC_BY_DEED}" target="_blank" rel="noopener">Read what CC BY 4.0 allows →</a> (<a href="${DATA_LICENSE}" target="_blank" rel="noopener">dataset license</a>)</p>
+          <p>Submitted results stay public, so leave any optional field blank if you'd rather not share it. Submissions go through GitHub, so your GitHub username is public on the pull request.</p>
+        </div>
+        <div id="submit-preview">
         <h3>Submission YAML preview</h3>
         <pre class="yaml" id="yaml-preview"></pre>
         <div id="submit-steps"></div>
+        </div>
       </div>
     </div>
     </section>` : ""}
@@ -336,7 +371,11 @@ export function renderResults(r: BenchResult): void {
     const ok = errors.length === 0;
     // Linux-only inputs stay visible once filled, so a windows/linux mix can be seen and fixed.
     form.classList.toggle("show-linux", r.system.os === "linux" || LINUX_ONLY_FIELDS.some((k) => r.system[k].trim()));
-    $("#gpu-blocked").hidden = r.system.gpuId !== NOT_LISTED;
+    // Not listed: the way to add the GPU replaces the submit controls (no dead-end buttons).
+    const notListed = r.system.gpuId === NOT_LISTED;
+    $("#gpu-blocked").hidden = !notListed;
+    $("#submit-export").hidden = notListed;
+    $("#submit-preview").hidden = notListed;
     $("#val-box").innerHTML = ok
       ? `<p class="ok">✓ Ready to submit: all required fields valid.</p>`
       : `<div class="next-step"><b>Add your system details to submit</b> (saving, sharing and export work anyway):<ul>${errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul></div>`;
@@ -362,6 +401,15 @@ export function renderResults(r: BenchResult): void {
     }
   });
   form.addEventListener("submit", (e) => e.preventDefault());
+  view.querySelector("#nudge")?.addEventListener("click", (e) => {
+    const act = (e.target as HTMLElement).closest<HTMLElement>("[data-nudge]")?.dataset.nudge;
+    if (act === "submit") form.scrollIntoView({ behavior: "smooth", block: "start" });
+    else if (act === "later") {
+      // Hidden until the page reloads; nothing is stored.
+      nudgeDismissed = true;
+      $("#nudge").remove();
+    }
+  });
   $("#exp-yaml").onclick = () => validateSubmission(r).length === 0 && download(suggestedFileName(r, "yaml"), toYaml(r), "application/x-yaml");
   $("#copy-yaml").onclick = async () => {
     if (validateSubmission(r).length) return;

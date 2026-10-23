@@ -20,6 +20,33 @@ export const NOT_LISTED = "__not_listed__";
 export const UPSTREAM_REPO = "https://github.com/MattyStacks/open-gpu-benchmarks";
 export const UPSTREAM_ISSUES = `${UPSTREAM_REPO}/issues/new/choose`;
 export const UPSTREAM_TEMPLATES = `${UPSTREAM_REPO}/tree/main/templates`;
+export const UPSTREAM_CATALOG_README = `${UPSTREAM_REPO}/blob/main/data/gpus/README.md#picking-the-id`;
+export const DATA_LICENSE = `${UPSTREAM_REPO}/blob/main/data/LICENSE`;
+export const CC_BY_DEED = "https://creativecommons.org/licenses/by/4.0/";
+export const OGB_SITE = "https://opengpubenchmarks.com/";
+
+/**
+ * A prefilled (blank) GitHub issue asking for a GPU to be added to the catalog. The browser-reported
+ * name is only a labelled starting point for the request; it never goes into a result. Nothing is
+ * sent until the user clicks the link and submits the issue on GitHub themselves.
+ */
+export function gpuRequestUrl(gpuLabel: string | null | undefined): string {
+  const label = (gpuLabel ?? "").replace(/\s+/g, " ").trim().slice(0, 100);
+  const body = [
+    "**GPU to add:** <!-- the exact product: brand, model and memory, e.g. MSI GeForce RTX 5060 Ti 16 GB Ventus 2X OC -->",
+    "",
+    "**Form factor:** desktop / laptop <!-- keep one -->",
+    "",
+    "**Product or spec page:** <!-- optional link, helps get the details right -->",
+    "",
+    `**Reported by the browser (starting point, edit as needed):** ${label || "not shown by the browser"}`,
+    "",
+    "---",
+    "Requested from Open GPU Benchmarker (https://opengpubenchmarker.com/). This is a catalog request only; it contains no benchmark result.",
+  ].join("\n");
+  const title = `GPU catalog request: ${label || "my GPU"}`;
+  return `${UPSTREAM_REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+}
 
 export const BENCHMARKS = [{ gameId: "openbenchmarker_neon_flythrough", name: "OpenBenchmarker Neon Flythrough" }] as const;
 export const BENCHMARK = BENCHMARKS[0];

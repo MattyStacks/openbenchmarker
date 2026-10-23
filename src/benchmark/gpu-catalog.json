@@ -1,6 +1,6 @@
 {
-  "snapshotDate": "2026-10-19",
-  "source": "https://github.com/MattyStacks/open-gpu-benchmarks/tree/1b3f1098401316dc57350a1643d2067c47f9ab10/data/gpus",
+  "snapshotDate": "2026-10-23",
+  "source": "https://github.com/MattyStacks/open-gpu-benchmarks/tree/819da39987ddbeb0e2305a368f0c332f4972b9e6/data/gpus",
   "gpus": [
     {
       "id": "rtx_5080_16gb_fe",

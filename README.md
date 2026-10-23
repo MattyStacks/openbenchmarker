@@ -269,10 +269,16 @@ This tool feeds a public dataset, so:
   "unknown". Limit: iPadOS Safari sends a Mac UA, so an iPad is recognised only by a Mac UA
   plus more than one touch point; a touch-screen Mac would be misread as an iPad. See [docs/privacy-audit.md](docs/privacy-audit.md).
 - The GPU must be an exact `gpu_id` from the upstream catalog. Free text is
-  rejected. **If your GPU isn't listed, you can't submit.** Open an issue or PR
-  upstream to add it ([issue chooser](https://github.com/MattyStacks/open-gpu-benchmarks/issues/new/choose),
-  [templates](https://github.com/MattyStacks/open-gpu-benchmarks/tree/main/templates)),
-  then submit once it exists. Local save and JSON/CSV export still work.
+  rejected. If your GPU isn't listed yet, the results page swaps the submit controls for two
+  ways to add it: **Request your GPU** (a prefilled GitHub issue, no coding needed) or **Add it
+  yourself** (a pull request using upstream's
+  [templates](https://github.com/MattyStacks/open-gpu-benchmarks/tree/main/templates)). Once it's
+  listed, reopen the result from My Results and submit it. Saving, sharing and JSON/CSV export work
+  in the meantime.
+- The request issue is prefilled with the GPU name **as reported by the browser**, labelled as an
+  editable starting point (`gpuRequestUrl` in `src/benchmark/catalog.ts`). That name only seeds a
+  catalog request. It never goes into a result or a `system:` field, and it reaches GitHub only
+  when the user clicks the link and submits the issue.
 - Validation (`src/benchmark/validate.ts`) fails closed and mirrors upstream
   `templates/community_submission.yaml` and `scripts/checks.py`. Required:
   catalog `gpu_id`, `game_id`, date, resolution, preset, `avg_fps`, `p1_low`,
@@ -284,6 +290,14 @@ This tool feeds a public dataset, so:
   download and copy stay disabled until validation passes.
 
 ### Submitting
+
+Submitting is optional, and it's up to you. Results stay in the browser unless you share, export or
+submit them. The site keeps nothing and sends nothing itself, so submitting isn't automatic: you
+submit to Open GPU Benchmarks yourself through GitHub, see exactly what's published, and decide what
+goes in it. Your GitHub username is public on the pull request. On desktop and laptop results the
+page shows a short, dismissible invitation to submit ("Not now" hides it; nothing is stored), and
+links to [opengpubenchmarks.com](https://opengpubenchmarks.com/) to explore the charts. Nothing
+opens on its own and there are no pop-ups.
 
 The results page builds `result_YYYYMMDD_openbenchmarker_neon_flythrough.yaml` for
 `data/community/<gpu_id>/`, and it can open GitHub's new-file form already filled in.
@@ -304,19 +318,44 @@ The first PR that uses this benchmark must also add it to upstream `data/games.y
     url: https://opengpubenchmarker.com/
 ```
 
-Submitted data is public under **CC BY 4.0** and can't be taken back.
+Submitted results join a public dataset under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+([dataset license](https://github.com/MattyStacks/open-gpu-benchmarks/blob/main/data/LICENSE)), a
+common license for open data: anyone can reuse the data as long as they credit the source.
+Submitted results stay public, so leave any optional field blank if you'd rather not share it.
 
 ### GPU catalog snapshot
 
 `src/benchmark/gpu-catalog.json` is a dated snapshot of upstream
-`data/gpus/<form_factor>/<vendor>/*.yaml` (excluding `reference/`). On
-2026-10-19 the catalog holds exactly one product, `rtx_5080_16gb_fe`. To refresh it:
+`data/gpus/<form_factor>/<vendor>/*.yaml` (excluding `reference/`). The catalog is new and
+growing: on 2026-10-23 it holds one product, `rtx_5080_16gb_fe` (upstream also has 309
+`reference/` base models, which results can't use). Every card added makes the dataset more
+useful. To get one added, request it with an issue or open a pull request (see Honest-data rules);
+[docs/upstream-todos.md](docs/upstream-todos.md) lists how requests are handled upstream. After
+upstream merges new cards, refresh the snapshot and release:
 
 ```sh
 npm run refresh-catalog   # optionally GITHUB_TOKEN=... to avoid rate limits
 ```
 
 The script refuses to overwrite the snapshot with an empty list.
+
+## Privacy and sharing
+
+Everything runs in the browser. The site stores nothing on a server: no database, no accounts, no
+cookies, no analytics. Results live in this browser's localStorage. They leave it only when you
+share a link, export a file, or submit through GitHub. Share links carry the result in the URL
+fragment, which browsers never send to the server, and sharing is on the honor system (nothing is
+signed or verified). The full list of storage keys and checks is in
+[docs/privacy-audit.md](docs/privacy-audit.md). The About & FAQ page (`#/about`) covers it in plain words.
+
+## Phones and tablets
+
+Phones and tablets can run the benchmark, and share or compare results. They can't submit to Open
+GPU Benchmarks yet, because the dataset lists desktop and laptop GPUs (an upstream schema change is
+planned; see [docs/upstream-todos.md](docs/upstream-todos.md)). Phones can run out of memory at
+1440p and 4K, so the site asks for a one-tap confirmation before those runs and offers a lower
+resolution after a crash ([docs/high-res-memory.md](docs/high-res-memory.md)). The layout is designed
+for 360–430 px first.
 
 ## Search engines and sharing
 

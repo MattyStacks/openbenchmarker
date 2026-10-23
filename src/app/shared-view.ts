@@ -1,4 +1,4 @@
-import { BENCHMARK_VERSION, BENCHMARKS } from "../benchmark/catalog";
+import { BENCHMARK_VERSION, BENCHMARKS, OGB_SITE } from "../benchmark/catalog";
 import { getScoreTest } from "../benchmark/presets";
 import { decodeShare, encodeShare, extractShareCode, sharedRunFrom, type SharedRun } from "../benchmark/share-codec";
 import { setPending } from "./challenge";
@@ -141,12 +141,14 @@ export function renderShared(payload: string): void {
   const first = runs[0];
   const mineBtn = `<button type="button" class="btn" data-compare-mine>Compare with mine</button>`;
   const honor = `<p class="honor-note">Shared on the honor system. Measured in the sharer's browser; nothing is stored or verified. <a href="#/about">How sharing works →</a></p>`;
+  const explore = `<p class="explore-link"><a href="${OGB_SITE}" target="_blank" rel="noopener">Explore results on Open GPU Benchmarks →</a></p>`;
   if (type === "comparison") {
     view.innerHTML = `
       <div class="results-head"><h1 class="sign">Shared comparison</h1><p class="muted">Neon Flythrough · two runs side by side</p></div>
       ${comparePanelHtml(runs[0], runs[1], LABELS.link)}
       <details class="result-details"><summary>Both runs in full</summary>${runBlock(runs[0], "Shared run")}${runBlock(runs[1], "Compared run")}</details>
       ${honor}
+      ${explore}
       <div class="shared-cta">
         <button type="button" class="btn btn-primary btn-start" data-setup>Run the same test &amp; compare <span aria-hidden="true">▶</span></button>
         <p class="muted tiny">Selects ${esc(settingsLabel(first))} so your run can sit next to the shared run, on any device or browser. Nothing starts until you press Start.</p>
@@ -158,6 +160,7 @@ export function renderShared(payload: string): void {
       <div class="results-head"><h1 class="sign">Compare with this run</h1><p class="muted">Neon Flythrough · ${esc(settingsLabel(first))}</p></div>
       ${runBlock(first)}
       ${honor}
+      ${explore}
       <div class="shared-cta">
         <button type="button" class="btn btn-primary btn-start" data-setup>Run the same test &amp; compare <span aria-hidden="true">▶</span></button>
         <p class="muted tiny">Selects ${esc(settingsLabel(first))}. Press Start when you're ready, on any device or browser, and you'll see both runs side by side. Your result stays in your browser unless you share it.</p>
@@ -169,6 +172,7 @@ export function renderShared(payload: string): void {
       <div class="results-head"><h1 class="sign">Shared result</h1><p class="muted">Neon Flythrough · ${esc(settingsLabel(first))}</p></div>
       ${runBlock(first)}
       ${honor}
+      ${explore}
       <div class="shared-cta">
         <button type="button" class="btn btn-primary btn-start" data-setup>Run the same test &amp; compare <span aria-hidden="true">▶</span></button>
         <p class="muted tiny">Selects ${esc(settingsLabel(first))}. Press Start when you're ready, on any device or browser, and you'll see both runs side by side. Your result stays in your browser unless you share it.</p>

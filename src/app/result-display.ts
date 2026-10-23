@@ -1,3 +1,4 @@
+import { NOT_LISTED } from "../benchmark/catalog";
 import { shareBlocker, sharedRunFrom } from "../benchmark/share-codec";
 import type { BenchResult, DeviceContext } from "../benchmark/types";
 import { missingLabels, validateSubmission } from "../benchmark/validate";
@@ -51,6 +52,7 @@ export type SubmissionStatus =
   | { kind: "invalid"; text: string }
   | { kind: "handheld"; text: "" }
   | { kind: "ready"; text: string }
+  | { kind: "gpu-not-listed"; text: string }
   | { kind: "next-step"; text: string; missing: string[] };
 
 /**
@@ -62,6 +64,7 @@ export function submissionStatus(r: BenchResult): SubmissionStatus {
   if (isHandheld(runClass(r))) return { kind: "handheld", text: "" };
   const errs = validateSubmission(r);
   if (!errs.length) return { kind: "ready", text: "Ready to submit" };
+  if (r.system.gpuId === NOT_LISTED) return { kind: "gpu-not-listed", text: "GPU not in the catalog yet" };
   return { kind: "next-step", text: "Add your system details to submit", missing: missingLabels(errs) };
 }
 
@@ -126,6 +129,7 @@ export function mixesMajors(list: readonly BenchResult[]): boolean {
 export function tableStatus(r: BenchResult): { cls: "good" | "next" | "muted" | "bad"; text: string } {
   const s = submissionStatus(r);
   if (s.kind === "ready") return { cls: "good", text: "✓ Ready to submit" };
+  if (s.kind === "gpu-not-listed") return { cls: "next", text: "Add your GPU →" };
   if (s.kind === "next-step") return { cls: "next", text: `Needs: ${s.missing.join(", ")}` };
   if (s.kind === "handheld") return { cls: "muted", text: "Share only" };
   return { cls: "bad", text: s.text };
