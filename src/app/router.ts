@@ -1,5 +1,6 @@
 import { renderHistory } from "./history-view";
 import { renderResults } from "./results-view";
+import { renderShared } from "./shared-view";
 import { app, showView } from "./shell";
 import { findResult } from "./store";
 
@@ -11,6 +12,8 @@ export function route(): void {
     const r = findResult(decodeURIComponent(m[1]));
     if (r) return renderResults(r);
   }
+  const shared = h.match(/^#\/r\/(.+)$/);
+  if (shared) return renderShared(shared[1]);
   if (h === "#/history") return renderHistory();
   showView("home");
 }

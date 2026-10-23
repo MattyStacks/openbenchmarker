@@ -3,6 +3,7 @@ import { $, esc } from "./dom";
 import { MOBILE } from "./env";
 import { startRun } from "./run";
 import { didNotFinish, leftoverMessage, needsHighResWarning, type InProgressRun } from "./run-guard";
+import type { SharedRun } from "../benchmark/share-codec";
 import { app } from "./shell";
 import { allResults, loadConfig, saveConfig, type RunConfig } from "./store";
 
@@ -62,12 +63,39 @@ async function launch(cfg: RunConfig): Promise<void> {
   void startRun(cfg);
 }
 
+/** Settings of the shared result the user chose to run ("Run the same test"); null otherwise. */
+let shareTarget: { resolution: string; preset: string; duration: number } | null = null;
+
+/** "Run the same test" from a shared link: select its settings and bring the form into view. */
+export function prefillFromShare(r: SharedRun): void {
+  shareTarget = { resolution: r.resolution, preset: r.preset, duration: r.durationS };
+  setRadio("resolution", r.resolution);
+  setRadio("preset", r.preset);
+  setRadio("duration", r.durationS);
+  location.hash = "#/";
+  refreshRunHints();
+  const scoreBtn = r.score !== undefined ? document.querySelector<HTMLElement>(`#score-runs [data-test="${r.scoreTest}"]`) : null;
+  document.querySelectorAll("#score-runs .is-target").forEach((b) => b.classList.remove("is-target"));
+  scoreBtn?.classList.add("is-target");
+  requestAnimationFrame(() => (scoreBtn ?? $("#config")).scrollIntoView({ behavior: "smooth", block: "start" }));
+}
+
 /** "Didn't finish on this device last time" hints for the selected combo and the score runs. */
 function refreshRunHints(): void {
   const form = $<HTMLFormElement>("#config");
   const fd = new FormData(form);
   const res = String(fd.get("resolution") ?? "");
   const preset = String(fd.get("preset") ?? "");
+  const target = $("#cfg-target");
+  target.hidden = !shareTarget;
+  if (shareTarget) {
+    const want = `${shareTarget.resolution} · ${shareTarget.preset} · ${shareTarget.duration} s`;
+    const same = shareTarget.resolution === res && shareTarget.preset === preset && String(shareTarget.duration) === String(fd.get("duration"));
+    target.classList.toggle("differs", !same);
+    target.textContent = same
+      ? `Same settings as the shared result (${want}).`
+      : `Not like-for-like: the shared result used ${want}. Your result won't compare directly.`;
+  }
   const note = $("#cfg-dnf");
   const dnf = didNotFinish(res, preset);
   note.hidden = !dnf;

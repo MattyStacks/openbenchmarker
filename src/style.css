@@ -411,3 +411,22 @@ table.history { width: 100%; border-collapse: collapse; font-size: 14px; }
 .confirm-actions { display: grid; gap: 10px; margin-top: 14px; }
 .confirm-actions .btn { min-height: 48px; }
 @media (min-width: 481px) { .confirm-actions { grid-template-columns: 1fr 1fr; } }
+
+/* Sharing: results-page share box, shared-link view, "run the same test" note. */
+.share-box { margin: 16px 0; padding: 14px 16px; border: 1px solid var(--line-hi); border-radius: 10px; background: var(--glass); display: grid; gap: 10px; }
+.share-box .row .btn { min-height: 48px; }
+.share-box .btn-share { flex: 1 1 220px; font-size: 17px; }
+.share-status { font-size: 14px; color: var(--good); min-height: 1.4em; }
+.share-status.bad { color: var(--warn); }
+.share-box details summary { cursor: pointer; color: var(--muted); }
+.share-box img.card-preview { display: block; width: 100%; max-width: 600px; height: auto; margin-top: 10px; border-radius: 8px; border: 1px solid var(--line); }
+.shared-run { margin: 8px 0 18px; }
+.shared-label { margin: 0 0 8px; font: 700 13px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.shared-facts { margin-top: 12px; }
+.honor-note { padding: 10px 12px; border-left: 3px solid var(--cyan); background: rgba(46, 233, 255, 0.07); font-size: 14px; }
+.shared-cta { display: grid; gap: 8px; margin: 18px 0; }
+.shared-cta .btn-start { width: 100%; }
+.target-note { margin: 0; padding: 8px 12px; border-left: 3px solid var(--cyan); background: rgba(46, 233, 255, 0.07); font-size: 14px; }
+.target-note.differs { border-left-color: var(--warn); background: rgba(255, 179, 64, 0.08); }
+.btn-score.is-target { border-color: var(--cyan); box-shadow: 0 0 18px rgba(46, 233, 255, 0.45); }
+.history .actions { white-space: nowrap; }

@@ -57,6 +57,12 @@ localStorage and does not see results saved on production. Remove it with
 `npx wrangler preview delete --name share-results`. See [docs/privacy-audit.md](docs/privacy-audit.md)
 for what the site does and does not store or send.
 
+**Sharing.** A valid result can be shared as a link (`#/r/<payload>`) plus a share
+card PNG with a QR code. The whole result is encoded in the URL fragment, which
+browsers never send to the server; it is encoded, not encrypted, and sharing runs on
+the honor system (nothing is signed or verified). Format and test steps:
+[docs/share-links.md](docs/share-links.md).
+
 Phones can run out of memory at 1440p and 4K on heavier presets, and the OS then
 closes the page. The site detects this on the next load, offers a lower
 resolution, and asks for a one-tap confirmation before memory-heavy runs on phones
@@ -368,6 +374,9 @@ src/app/history-view.ts       My Results (#/history)
 src/app/home.ts, shell.ts, router.ts, store.ts, hud.ts, env.ts, dom.ts
 src/app/share-env.ts          device detection for display/sharing only (pure, tested)
 src/app/run-guard.ts          crash detection (run-in-progress record), "didn't finish" hints, phone high-res confirmation
+src/app/share.ts              share link, share text, share card (canvas + QR) and the share flow
+src/app/shared-view.ts        shared-link view (#/r/<payload>), read-only
+src/benchmark/share-codec.ts  share-link binary format (versioned, CRC-8, plausibility checks)
 src/app/capture.ts            dev-only: fixed-t renders and renderer.info for scripts/capture.mjs
 src/engine/world.ts           grid, clearances, the 96 s flight keys, landmark bridges
 src/engine/path.ts            FlightPath (pose as a function of t) + 3D clearance index

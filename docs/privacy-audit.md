@@ -14,7 +14,9 @@ Principle being audited: everything runs in the browser; the site stores nothing
 | Web fonts / third-party assets | None. System fonts only (`src/style.css`: "System fonts only, no external assets"); no `@font-face`, Google Fonts or CDN assets. Three.js is bundled at build time. |
 | `sessionStorage` / IndexedDB / Cache Storage | Not used anywhere in source or `dist/`. |
 | `localStorage` | `src/app/store.ts` and `src/app/run-guard.ts`, four keys (below). |
-| Clipboard / Web Share | Clipboard writes only on explicit button clicks (`src/app/results-view.ts` copy YAML / copy lookup commands, dev-only `src/app/lab.ts`). No `navigator.share` yet (Plan 3). |
+| Clipboard / Web Share | Only on explicit taps: copy YAML / lookup commands (`src/app/results-view.ts`), and Share / Copy link / Save image (`src/app/share.ts`). Share hands the link, text and card PNG to the system share sheet (`navigator.share`); where that's missing it copies the link and text to the clipboard. The site sends nothing itself. |
+| Share links | `#/r/<payload>`: the whole result encoded (not encrypted) in the URL fragment (`src/benchmark/share-codec.ts`). Browsers never send the fragment in HTTP requests, so opening a link sends nothing about the result to the site. It is decoded and shown only in the recipient's browser. A link carries the measured numbers, settings, run date, browser + version, OS, device type and the GPU name as reported by the browser. It never carries the user-filled `system` fields, the diagnostics or the result id. Anyone with a link can read it. |
+| Share card | Drawn on a 2D canvas in the browser (`renderCard`), QR code generated locally (`uqr`, bundled; no network). |
 | `navigator.deviceMemory` | Read only to add a hint to the phone high-resolution confirmation (Chromium only). Never stored. |
 | Browser APIs read for diagnostics/device | `navigator.userAgent` / `userAgentData` (including `getHighEntropyValues(["platform","brands"])`), `navigator.brave.isBrave()`, `navigator.hardwareConcurrency`, Battery Status API (Chromium), WebGL `WEBGL_debug_renderer_info`. All read locally, shown labelled as detected, never sent anywhere by the site. |
 

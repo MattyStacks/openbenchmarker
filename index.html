@@ -124,6 +124,7 @@
             </fieldset>
             <p class="config-note">Plus a 3 s warm-up that is never counted. Settings are locked during the run. Keep this tab visible and don't resize the window or rotate your device, or the run is marked invalid.</p>
             <p class="dnf-note" id="cfg-dnf" hidden></p>
+            <p class="target-note" id="cfg-target" hidden></p>
             <button type="submit" class="btn btn-primary btn-start" id="start">Start custom run <span aria-hidden="true">▶</span></button>
           </form>
 
@@ -133,7 +134,7 @@
               <li><b>Measured by the run:</b> Avg FPS, 1% Low, 5% Low, worst frame, frame count, score (score runs), resolution, preset, date, graphics API, and what limited the run (GPU busy time, CPU time per frame, stalls).</li>
               <li><b>Detected by the browser:</b> WebGL renderer, CPU thread count, battery state and browser version, recorded in a separate labelled section. They never fill in your system details.</li>
               <li><b>Provided by you:</b> GPU (from the official catalog), OS and any optional system details. Nothing is guessed or auto-filled.</li>
-              <li>Results stay in this browser unless you choose to export or submit them to <a href="https://opengpubenchmarks.com/" target="_blank" rel="noopener">opengpubenchmarks.com</a>.</li>
+              <li>Results stay in this browser unless you choose to share a link, export them or submit them to <a href="https://opengpubenchmarks.com/" target="_blank" rel="noopener">opengpubenchmarks.com</a>.</li>
             </ul>
           </aside>
         </div>
@@ -177,13 +178,14 @@
 
       <!-- Local history -->
       <section class="view" id="view-history" hidden></section>
+      <section class="view" id="view-shared" hidden></section>
     </main>
 
     <footer class="site-footer" id="footer">
       <div class="footer-inner">
         <div class="footer-col footer-about">
           <a class="brand" href="#/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">Open GPU <b>Benchmarker</b></span></a>
-          <p>A free, open-source GPU benchmark that runs in your browser. Results stay in this browser unless you export or submit them. No accounts, no cookies, no tracking scripts.</p>
+          <p>A free, open-source GPU benchmark that runs in your browser. Results stay in this browser unless you share, export or submit them. No accounts, no cookies, no tracking scripts.</p>
         </div>
         <nav class="footer-col" aria-label="Site">
           <h2>Benchmark</h2>

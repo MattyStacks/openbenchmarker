@@ -3,9 +3,11 @@ import { download, toCsv } from "../benchmark/exporter";
 import { VERDICT_LABEL, diagnose } from "../benchmark/diagnose";
 import { round1 } from "../benchmark/metrics";
 import { getScoreTest } from "../benchmark/presets";
+import { shareBlocker, sharedRunFrom } from "../benchmark/share-codec";
 import type { BenchResult } from "../benchmark/types";
 import { missingLabels, validateSubmission } from "../benchmark/validate";
 import { $, esc } from "./dom";
+import { shareRun } from "./share";
 import { showView } from "./shell";
 import { allResults, reloadResults, removeResult } from "./store";
 
@@ -43,12 +45,24 @@ export function renderHistory(): void {
               return `<tr><td>${esc(r.date)} ${esc(r.time)}</td><td class="num${old ? " ver-old" : ""}">v${esc(r.benchmarkVersion)}</td><td>${esc(r.resolution)}</td><td>${esc(r.preset)}</td><td class="num">${r.score !== undefined ? `<span title="${esc(getScoreTest(r.scoreTest)?.name ?? "")}">${r.score}</span>` : ""}</td><td class="num">${round1(r.avgFps).toFixed(1)}</td><td class="num">${round1(r.p1Low).toFixed(1)}</td>
               <td>${v ? `<span class="limit-tag v-${v}">${esc(VERDICT_LABEL[v])}</span>` : ""}</td>
               <td><span class="status ${s.cls}">${esc(s.text)}</span></td>
-              <td class="actions"><a class="btn btn-sm" href="#/result/${encodeURIComponent(r.id)}">Open</a><button class="btn btn-sm" data-del="${esc(r.id)}">Delete</button></td></tr>`;
+              <td class="actions"><a class="btn btn-sm" href="#/result/${encodeURIComponent(r.id)}">Open</a>${r.valid && !shareBlocker(sharedRunFrom(r)) ? `<button class="btn btn-sm" data-share-id="${esc(r.id)}">Share</button>` : ""}<button class="btn btn-sm" data-del="${esc(r.id)}">Delete</button></td></tr>`;
             })
             .join("")}</tbody></table></div>`
         : `<p>No runs yet. <a href="#/">Run the benchmark</a>.</p>`
     }`;
   view.querySelector("#hist-csv")?.addEventListener("click", () => download("openbenchmarker_results.csv", toCsv(allResults()), "text/csv"));
+  view.querySelectorAll<HTMLButtonElement>("[data-share-id]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const r = allResults().find((x) => x.id === b.dataset.shareId);
+      if (!r) return;
+      // Built and handed to the share sheet inside the tap (Safari needs that).
+      void shareRun(sharedRunFrom(r)).done.then((o) => {
+        if (o === "cancelled") return;
+        b.textContent = o === "shared" ? "Shared ✓" : o === "copied" ? "Link copied ✓" : "Open it to share";
+        setTimeout(() => (b.textContent = "Share"), 2500);
+      });
+    }),
+  );
   view.querySelectorAll<HTMLButtonElement>("[data-del]").forEach((b) =>
     b.addEventListener("click", () => {
       if (!confirm("Delete this result from this browser?")) return;

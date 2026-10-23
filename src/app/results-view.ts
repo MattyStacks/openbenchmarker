@@ -3,11 +3,13 @@ import { download, gamesYamlEntry, suggestedFileName, toCsv, toJson, toYaml } fr
 import { VERDICT_LABEL, diagnose, isMaskedRenderer } from "../benchmark/diagnose";
 import { round1 } from "../benchmark/metrics";
 import { getScoreTest } from "../benchmark/presets";
+import { shareBlocker, sharedRunFrom } from "../benchmark/share-codec";
 import { commandsFor } from "../benchmark/sysinfo";
 import { LINUX_ONLY_FIELDS, type BenchResult, type SystemInfo } from "../benchmark/types";
 import { validateSubmission } from "../benchmark/validate";
 import { $, esc } from "./dom";
 import { BATCH_MS } from "./env";
+import { bindShareBox, shareBoxHtml } from "./share";
 import { showView } from "./shell";
 import { upsertResult } from "./store";
 
@@ -125,6 +127,7 @@ export function renderResults(r: BenchResult): void {
       <div class="score small"><span>Frames timed</span><b id="res-frames">${r.frameCount}</b></div>
       <div class="score small"><span>Run settings</span><b class="settings" id="res-settings">${r.scoreTest ? `${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)} · ` : ""}${esc(r.resolution)} (${r.width}×${r.height}) · ${esc(r.preset)} · ${r.durationS} s · ${esc(r.graphicsApi)}</b></div>
     </div>
+    ${r.valid && !shareBlocker(sharedRunFrom(r)) ? shareBoxHtml() : ""}
     ${r.scoreTest && r.score === undefined ? `<p class="muted">Started as ${esc(getScoreTest(r.scoreTest)?.name ?? r.scoreTest)}, but ${r.valid ? "its settings didn't match the locked test" : "the run was invalid"}, so it has no score.</p>` : ""}
     ${diagPanel(r)}
     <p class="muted small-print">Uncapped: frames were rendered back-to-back in ~${BATCH_MS} ms batches, with three batches kept queued on the GPU. Average FPS is frames divided by timed wall-clock. ${r.timing === "gpu-timer" ? "Lows and worst frame use each frame's GPU time from timer queries (or its batch average, if larger)." : r.timing === "batch-avg" ? "No GPU timer was available, so lows and worst frame use each batch's average frame time." : "Each frame was timed from submission to GPU completion."} Loop busy ${(r.loopBusy * 100).toFixed(0)}% of timed wall-clock.</p>
@@ -177,6 +180,9 @@ export function renderResults(r: BenchResult): void {
         <div id="submit-steps"></div>
       </div>
     </div>`;
+
+  const shareBox = view.querySelector<HTMLElement>(".share-box");
+  if (shareBox) bindShareBox(shareBox, sharedRunFrom(r));
 
   const form = $<HTMLFormElement>("#sys-form");
   for (const [k, v] of Object.entries(r.system)) {

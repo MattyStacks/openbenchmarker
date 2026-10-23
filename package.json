@@ -24,7 +24,8 @@
     "refresh-catalog": "node scripts/refresh-catalog.mjs"
   },
   "dependencies": {
-    "three": "0.186.1"
+    "three": "0.186.1",
+    "uqr": "0.1.3"
   },
   "devDependencies": {
     "@types/three": "0.186.0",
