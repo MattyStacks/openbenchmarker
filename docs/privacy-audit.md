@@ -8,8 +8,9 @@ Principle being audited: everything runs in the browser; the site stores nothing
 
 | Area | Result |
 |---|---|
-| Cookies | None. No `document.cookie`, no `Set-Cookie` (static assets only; `public/_headers` sets no cookie headers). |
-| Analytics / beacons / error reporting | None. No analytics, `sendBeacon`, Sentry or similar in source or `dist/`. |
+| Cookies | None from the site's own code. No `document.cookie`, no `Set-Cookie` (static assets only; `public/_headers` sets no cookie headers). Cloudflare can set its own security cookies (`__cf_bm`, `cf_clearance`) if its bot protection or a challenge applies; none were seen when checked. |
+| Analytics / beacons / error reporting | None in the site's own code. No analytics, `sendBeacon`, Sentry or similar in source or `dist/`. |
+| Cloudflare (host) features | Responses carry Cloudflare's `nel` + `report-to` headers (Network Error Logging, `success_fraction: 0.0`): browsers may report failed loads to `a.nel.cloudflare.com`. No Cloudflare Web Analytics beacon is injected. Cloudflare sees each request (IP, user agent, URL without the fragment) under its own privacy policy. |
 | Network requests from app code | None. No `fetch(`, `XMLHttpRequest`, `WebSocket` or `EventSource` in `src/`. The only URLs in the bundle are hyperlinks, catalog metadata and licence/attribution strings (GitHub, opengpubenchmarks.com, threejs.org, schema.org, creativecommons.org); they load nothing unless clicked. |
 | Web fonts / third-party assets | None. System fonts only (`src/style.css`: "System fonts only, no external assets"); no `@font-face`, Google Fonts or CDN assets. Three.js is bundled at build time. |
 | `sessionStorage` | One key, `ogb.challenge.v1` (`src/app/challenge.ts`): the share code of a run you chose to compare with ("Set up the same test"), kept in this tab only so it survives a reload or crash. Cleared when the comparison is shown on your result, or on "Stop comparing". |
@@ -37,7 +38,7 @@ Clearing site data deletes all of them. In My Results, "Clear my saved results" 
 
 ## Hosting
 
-Static assets only (`wrangler.toml` has no `main`, no bindings). Checked 2026-10-23 with `curl -D -` on `https://opengpubenchmarker.com/` and `https://share-results.opengpubenchmarker.com/`: no `Set-Cookie` header, and the HTML loads only the site's own `/assets/index-*.js` (no injected Cloudflare Web Analytics beacon or other script). The About page says only that Cloudflare serves the files like any web host; it makes no claim about Cloudflare's own logs. Previews (`npm run preview:deploy`) serve the same build on `share-results.opengpubenchmarker.com` and `*.mattys.workers.dev`, marked `noindex`; each is its own origin with its own localStorage.
+Static assets only (`wrangler.toml` has no `main`, no bindings). Checked 2026-10-23 with `curl -D -` on `https://opengpubenchmarker.com/` and `https://share-results.opengpubenchmarker.com/`: no `Set-Cookie` header, and the HTML loads only the site's own `/assets/index-*.js` (no injected Cloudflare Web Analytics beacon or other script). Responses do carry Cloudflare's NEL `report-to` header. The About page names Cloudflare as the service provider, says it sees requests and may keep records under its own privacy policy, and lists its browser-side features (error reports, security checks that may set a cookie, analytics not enabled); it makes no specific claim about Cloudflare's retention periods. Previews (`npm run preview:deploy`) serve the same build on `share-results.opengpubenchmarker.com` and `*.mattys.workers.dev`, marked `noindex`; each is its own origin with its own localStorage.
 
 ## Built output checked
 

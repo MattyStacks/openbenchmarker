@@ -84,7 +84,7 @@ export function aboutHtml(): string {
       <ul>
         <li><b>It runs on your device.</b> The benchmark, the results and the share cards are all made in your browser.</li>
         <li><b>We don't store anything.</b> There's no database, no accounts and no server code. The site is just files.</li>
-        <li><b>No cookies, no accounts, no tracking.</b> No analytics or tracking scripts of any kind.</li>
+        <li><b>No accounts, no cookies needed, no tracking of our own.</b> We don't add analytics or tracking scripts. Our host, Cloudflare, runs some features of its own to deliver and protect the site. <a href="#/about/host">Here's what it may see.</a></li>
         <li><b>Nothing is shared unless you choose to.</b> You decide what goes public, if anything.</li>
         <li><b>We suggest, you decide.</b> To make things easier, we sometimes suggest a value, our best guess, especially for details most people don't know offhand about their device. Suggested values are always marked, and you can change or clear them. We don't take liberties with your data: measured values come from the run, and anything else is yours to confirm.</li>
       </ul>
@@ -111,12 +111,19 @@ export function aboutHtml(): string {
 
     <section id="cookies" class="card about-sec">
       <h2>Cookies</h2>
-      <p>None. The site doesn't set or read any cookies, and our host sends none with the page.</p>
+      <p>The site itself doesn't set or read any cookies, and you never need one to use it. Cloudflare, our host, sent none with the page when we checked, but its security checks can set one of its own (for example <code>cf_clearance</code> after you pass a bot check). Those belong to Cloudflare, and the site never reads them.</p>
     </section>
 
     <section id="host" class="card about-sec">
-      <h2>What our host sees</h2>
-      <p>The site's files are served by Cloudflare, the way any web host serves a page: your browser asks for the page and its files, and Cloudflare sends them. We don't add any analytics, tracking scripts or cookies, and the site has no server code of its own.</p>
+      <h2>Our host: Cloudflare</h2>
+      <p>We use Cloudflare as our service provider to serve the site's files: your browser asks for the page and its files, and Cloudflare sends them. Like any host, Cloudflare sees each of those requests, including your IP address and browser, and may keep records of them to run, measure and protect its network. That's Cloudflare's own processing, covered by ${ext("https://www.cloudflare.com/privacypolicy/", "Cloudflare's privacy policy")}.</p>
+      <p>Cloudflare also has a few features that involve your browser:</p>
+      <ul>
+        <li><b>Error reports.</b> The page comes with a header asking your browser to tell Cloudflare if loading the site fails, for example a connection error. Reports go to Cloudflare, not us, and never contain your results.</li>
+        <li><b>Security checks.</b> If traffic looks automated, Cloudflare can show a check and set a cookie to remember that you passed.</li>
+        <li><b>Analytics.</b> Cloudflare offers a cookieless analytics script. We haven't turned it on, and the page doesn't load it.</li>
+      </ul>
+      <p>We don't add any analytics, tracking scripts or cookies, and the site has no server code of its own.</p>
       <p>The part of the address after the <code>#</code>, where share links keep a result, is never part of that request.</p>
     </section>
 
@@ -200,8 +207,8 @@ export function aboutHtml(): string {
 
     <section id="faq" class="card about-sec faq">
       <h2>FAQ</h2>
-      ${faq("faq-sent", "Is my data sent anywhere?", `<p>No. Your results stay in this browser. Something leaves only when you share a link, export a file, or submit to Open GPU Benchmarks, and then only where you send it.</p>`)}
-      ${faq("faq-cookies", "Do you use cookies?", `<p>No cookies at all. My Results uses your browser's local storage, which stays on your device. <a href="#/about/saved">See everything that's saved.</a></p>`)}
+      ${faq("faq-sent", "Is my data sent anywhere?", `<p>No. Your results stay in this browser. Something leaves only when you share a link, export a file, or submit to Open GPU Benchmarks, and then only where you send it. Like any website, our host Cloudflare sees the page requests themselves. <a href="#/about/host">Here's what it may see.</a></p>`)}
+      ${faq("faq-cookies", "Do you use cookies?", `<p>The site doesn't set or need any. My Results uses your browser's local storage, which stays on your device. <a href="#/about/saved">See everything that's saved.</a> Cloudflare, our host, may set a security cookie of its own in some cases. <a href="#/about/host">More about our host.</a></p>`)}
       ${faq("faq-one-click", "Why can't I submit with one click?", `<p>The site keeps nothing and has no server, so you submit through GitHub yourself. That way you see exactly what's published before it goes public.</p>`)}
       ${faq("faq-faked", "Can shared results be faked?", `<p>Yes. The link format is open, so someone could make a link with numbers they never ran. The check value catches accidents, not edits. Treat a shared result as a claim, not proof.</p>`)}
       ${faq("faq-link", "What exactly is in a share link?", `<p>Your measured numbers, the settings, the run date, your browser and OS, the device type and the GPU name your browser reported. No name, account, IP address or device ID. <a href="#/about/sharing">See the full table.</a></p>`)}

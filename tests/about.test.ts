@@ -40,9 +40,15 @@ describe("About & FAQ matches the code", () => {
     expect(EXAMPLE_LINK.length).toBeLessThan(110);
   });
 
-  it("says nothing about Cloudflare beyond serving the files", () => {
+  it("names Cloudflare as the host without claiming its retention periods", () => {
     const host = html.slice(html.indexOf('id="host"'), html.indexOf('id="sharing"'));
-    expect(host).not.toMatch(/\blogs?\b|retain|days/i);
+    expect(host).toContain("Cloudflare");
+    expect(host).toContain("https://www.cloudflare.com/privacypolicy/");
+    expect(host).not.toMatch(/retain|\bdays\b/i);
+  });
+
+  it("never claims no tracking without qualifying it", () => {
+    for (const text of [html, indexHtml]) expect(text).not.toMatch(/no tracking[.,]|no cookies[.,]/i);
   });
 
   it("has the FAQ entries other pages link to", () => {
