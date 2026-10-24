@@ -615,7 +615,7 @@ table.history { width: 100%; border-collapse: collapse; font-size: 14px; }
 .cmp-close { justify-self: start; min-height: 44px; }
 .hist-table tr.compare-row td { white-space: normal; padding: 12px; background: var(--bg2); }
 .hist-table tr.compare-row:hover { background: none; }
-/* Home "Compare with another run": below the custom run, collapsed until opened. */
+/* Home "Compare with another run": always the last home section (above the footer), collapsed until opened. */
 details.compare-entry { margin-top: 16px; }
 details.compare-entry > summary { cursor: pointer; list-style: none; min-height: 44px; display: flex; align-items: center; margin: 0; }
 details.compare-entry > summary::-webkit-details-marker { display: none; }

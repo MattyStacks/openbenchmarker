@@ -147,6 +147,19 @@
           </section>
         </div>
 
+        <section class="panel score-runs" aria-labelledby="score-runs-title">
+          <h2 class="panel-title" id="score-runs-title"><span class="kana" aria-hidden="true">採点</span>Score runs</h2>
+          <p class="config-note">Fixed tests with locked settings, so every score is the same workload. A faster or overclocked GPU scores higher. You get FPS, the score, and a breakdown of whether your GPU or CPU was the limit.</p>
+          <div class="score-run-buttons" id="score-runs"></div>
+        </section>
+
+        <section class="panel score-runs" aria-labelledby="stress-runs-title">
+          <h2 class="panel-title" id="stress-runs-title"><span class="kana" aria-hidden="true">耐久</span>Stress tests</h2>
+          <p class="config-note">Repeats the 96 s flight 6 times (about 10 minutes) to show whether performance drops as your device heats up. You get a stability % (slowest lap ÷ fastest lap) and every lap's FPS. Plug in and keep this tab in front. Entry runs on phones; Extreme is for desktop GPUs.</p>
+          <div class="score-run-buttons" id="stress-runs"></div>
+        </section>
+
+        <!-- Keep "Compare with another run" the last section on the home page, right above the footer. New sections go above it. -->
         <details class="panel compare-entry" id="compare-entry">
           <summary class="panel-title"><span class="kana" aria-hidden="true">比較</span>Compare with another run</summary>
           <p class="config-note">Compare your next run with a shared result (paste its link or code) or with one of your own saved runs. The same settings get selected and the two runs show side by side afterwards. Nothing starts until you press Start.</p>
@@ -162,18 +175,6 @@
           </form>
           <p class="cmp-error" id="cmp-entry-error" role="alert" hidden></p>
         </details>
-
-        <section class="panel score-runs" aria-labelledby="score-runs-title">
-          <h2 class="panel-title" id="score-runs-title"><span class="kana" aria-hidden="true">採点</span>Score runs</h2>
-          <p class="config-note">Fixed tests with locked settings, so every score is the same workload. A faster or overclocked GPU scores higher. You get FPS, the score, and a breakdown of whether your GPU or CPU was the limit.</p>
-          <div class="score-run-buttons" id="score-runs"></div>
-        </section>
-
-        <section class="panel score-runs" aria-labelledby="stress-runs-title">
-          <h2 class="panel-title" id="stress-runs-title"><span class="kana" aria-hidden="true">耐久</span>Stress tests</h2>
-          <p class="config-note">Repeats the 96 s flight 6 times (about 10 minutes) to show whether performance drops as your device heats up. You get a stability % (slowest lap ÷ fastest lap) and every lap's FPS. Plug in and keep this tab in front. Entry runs on phones; Extreme is for desktop GPUs.</p>
-          <div class="score-run-buttons" id="stress-runs"></div>
-        </section>
       </section>
 
       <!-- Run: HUD lives inside the stage, which sits below the in-flow banner -->
