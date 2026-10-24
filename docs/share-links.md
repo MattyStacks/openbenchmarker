@@ -184,7 +184,7 @@ Result page, comparison first: Side by side (Compared with | This run), % and no
 ```
 
 Where you can compare:
-- **Home, "Compare with another run"** (below Run settings, collapsed until opened): paste a shared link or code, or pick one of your saved runs. The same settings get selected, the banner appears, and your next run shows side by side.
+- **Home, "Compare with another run"** (below the custom run settings, collapsed until opened): paste a shared link or code, or pick one of your saved runs. The same settings get selected, the banner appears, and your next run shows side by side.
 - **Results page, "Compare this run"** (under the share box): paste a link or code, or pick one of your runs. The panel opens in place, with **Share the comparison**.
 - **My Results:** a **Compare** button on every card and in every table row. It opens the same box under the card, or as a full-width row in the table. **Open a shared result** is a visible input at the top.
 - **Shared views:** **Compare with mine** is always shown. It uses your saved runs with the same settings and major version; if there are none it says so.

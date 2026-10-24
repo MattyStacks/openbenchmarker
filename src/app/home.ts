@@ -1,4 +1,4 @@
-import { DURATIONS, PRESETS, RESOLUTIONS, SCORE_TESTS, STRESS_TESTS, getResolution, stressDuration, type PresetId, type ResolutionId } from "../benchmark/presets";
+import { DURATIONS, PRESETS, RESOLUTIONS, SCORE_TESTS, STRESS_TESTS, getResolution, stressDuration, type Preset, type PresetId, type ResolutionId } from "../benchmark/presets";
 import { $, esc } from "./dom";
 import { MOBILE } from "./env";
 import { startRun } from "./run";
@@ -20,6 +20,29 @@ const PRESET_HINT: Record<PresetId, string> = {
   Ultra: "high-end",
   Extreme: "flagship",
 };
+
+const compact = new Intl.NumberFormat("en-US", { notation: "compact" });
+
+/** What each preset changes, from PRESETS itself so the table can't drift from the real settings. */
+function presetTableHtml(): string {
+  const n = (x: number) => compact.format(x);
+  const cols: [string, (p: Preset) => string | number, boolean?][] = [
+    ["Made for", (p) => PRESET_HINT[p.id]],
+    ["Towers", (p) => n(p.buildings), true],
+    ["Neon signs", (p) => n(p.signs), true],
+    ["Traffic", (p) => n(p.cars), true],
+    ["Drones", (p) => n(p.drones + p.farDrones), true],
+    ["Rain", (p) => n(p.rain), true],
+    ["Shadows", (p) => (p.shadowMap ? `${p.shadowMap / 1024}K` : "Off")],
+    ["Anti-aliasing", (p) => (p.msaa ? `${p.msaa}×` : "Off")],
+    ["Reflections", (p) => (p.reflections ? "On" : "Off")],
+    ["Light rays", (p) => p.volumetrics || "Off"],
+  ];
+  const cls = (num?: boolean) => (num ? ` class="num"` : "");
+  const head = cols.map(([h, , num]) => `<th scope="col"${cls(num)}>${h}</th>`).join("");
+  const rows = PRESETS.map((p) => `<tr><th scope="row">${p.id}</th>${cols.map(([, f, num]) => `<td${cls(num)}>${f(p)}</td>`).join("")}</tr>`).join("");
+  return `<table class="about-table preset-table"><thead><tr><th scope="col">Preset</th>${head}</tr></thead><tbody>${rows}</tbody></table>`;
+}
 
 const radio = (name: string, value: string | number, checked: boolean, label: string, sub = "") =>
   `<label><input type="radio" name="${name}" value="${value}" ${checked ? "checked" : ""}/><span>${label}${sub ? `<small>${sub}</small>` : ""}</span></label>`;
@@ -209,6 +232,7 @@ export function buildConfigForm(leftover: InProgressRun | null = null): void {
   }
   $("#cfg-resolution").innerHTML = RESOLUTIONS.map((r) => radio("resolution", r.id, r.id === cfg.resolution, esc(r.id), `${r.width}×${r.height}`)).join("");
   $("#cfg-preset").innerHTML = PRESETS.map((p) => radio("preset", p.id, p.id === cfg.preset, p.id, PRESET_HINT[p.id])).join("");
+  $("#preset-table").innerHTML = presetTableHtml();
   $("#cfg-duration").innerHTML = DURATIONS.map((d) => radio("duration", d, d === cfg.duration, `${d} s`)).join("");
   const form = $<HTMLFormElement>("#config");
   form.addEventListener("change", refreshRunHints);

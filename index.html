@@ -102,21 +102,12 @@
 
         <div class="run-notice" id="run-notice" role="status" hidden></div>
 
-        <section class="panel score-runs" aria-labelledby="score-runs-title">
-          <h2 class="panel-title" id="score-runs-title"><span class="kana" aria-hidden="true">採点</span>Score runs</h2>
-          <p class="config-note">Fixed tests with locked settings, so every score is the same workload. A faster or overclocked GPU scores higher. You get FPS, the score, and a breakdown of whether your GPU or CPU was the limit.</p>
-          <div class="score-run-buttons" id="score-runs"></div>
-        </section>
-
-        <section class="panel score-runs" aria-labelledby="stress-runs-title">
-          <h2 class="panel-title" id="stress-runs-title"><span class="kana" aria-hidden="true">耐久</span>Stress tests</h2>
-          <p class="config-note">Repeats the 96 s flight 6 times (about 10 minutes) to show whether performance drops as your device heats up. You get a stability % (slowest lap ÷ fastest lap) and every lap's FPS. Plug in and keep this tab in front. Entry runs on phones; Extreme is for desktop GPUs.</p>
-          <div class="score-run-buttons" id="stress-runs"></div>
-        </section>
-
         <div class="home-grid">
           <form id="config" class="panel config" autocomplete="off">
-            <h2 class="panel-title"><span class="kana" aria-hidden="true">設定</span>Run settings</h2>
+            <div class="config-head">
+              <h2 class="panel-title"><span class="kana" aria-hidden="true">設定</span>Custom run</h2>
+              <p class="config-note">One run at the settings you choose.</p>
+            </div>
             <fieldset class="field">
               <legend>Resolution</legend>
               <div class="seg seg-res" id="cfg-resolution"></div>
@@ -129,23 +120,31 @@
               <legend>Duration</legend>
               <div class="seg" id="cfg-duration"></div>
             </fieldset>
-            <p class="config-note">Plus a 3 s warm-up that is never counted. Settings are locked during the run. Keep this tab visible and don't resize the window or rotate your device, or the run is marked invalid.</p>
+            <p class="config-note config-foot">Plus a 3 s warm-up that is never counted. Settings are locked during the run. Keep this tab visible and don't resize the window or rotate your device, or the run is marked invalid.</p>
             <div class="compare-banner" id="compare-banner" role="status" hidden></div>
             <p class="dnf-note" id="cfg-dnf" hidden></p>
             <p class="target-note" id="cfg-target" hidden></p>
             <button type="submit" class="btn btn-primary btn-start" id="start">Start custom run <span aria-hidden="true">▶</span></button>
           </form>
 
-          <aside class="panel about">
-            <h2 class="panel-title"><span class="kana" aria-hidden="true">誠実</span>Honest results</h2>
-            <ul>
-              <li><b>Measured by the run:</b> Avg FPS, 1% Low, 5% Low, worst frame, frame count, score (score runs), resolution, preset, date, graphics API, and what limited the run (GPU busy time, CPU time per frame, stalls).</li>
-              <li><b>Detected by the browser:</b> WebGL renderer, CPU thread count, battery state and browser version, recorded in a separate labelled section. They never fill in your system details.</li>
-              <li><b>Provided by you:</b> GPU (from the official catalog), OS and any optional system details. To make things easier, we sometimes suggest a value, our best guess, for details most people don't know offhand. Suggested values are always marked, and you can change or clear them.</li>
-              <li>Results stay in this browser unless you choose to share a link, export them or submit them to <a href="https://opengpubenchmarks.com/" target="_blank" rel="noopener">opengpubenchmarks.com</a>.</li>
-            </ul>
+          <aside class="panel run-explainer" aria-labelledby="explainer-title">
+            <h2 class="panel-title" id="explainer-title"><span class="kana" aria-hidden="true">解説</span>What a custom run does</h2>
+            <p>Start flies the fixed route through the city once and times every frame. You get average FPS, 1% and 5% lows, the worst frame, and whether your GPU or CPU held it back. The result stays in this browser until you share, export or submit it.</p>
+            <h3>Resolution</h3>
+            <p>How many pixels each frame draws, always at exactly this size and only scaled to fit your screen. 4K is 9× the pixels of 720p, so it leans hardest on the GPU.</p>
+            <h3>Graphics preset</h3>
+            <p>How full the city is and how it's lit. Each step up adds towers, signs, traffic and rain, plus heavier effects; the table below shows exactly what changes.</p>
+            <h3>Duration</h3>
+            <p>Longer runs smooth out one-off hitches. Every run starts at the beginning of the flight, so compare runs of the same length.</p>
+            <p>For a number that compares across devices, use a <b>Score run</b> below. To see whether your device slows down as it heats up, use a <b>Stress test</b>.</p>
             <p class="about-more"><a href="#/about">About, privacy &amp; FAQ →</a></p>
           </aside>
+
+          <section class="panel preset-panel" aria-labelledby="preset-table-title">
+            <h2 class="panel-title" id="preset-table-title"><span class="kana" aria-hidden="true">画質</span>What each preset changes</h2>
+            <div class="preset-table-wrap" id="preset-table" tabindex="0" role="region" aria-labelledby="preset-table-title"></div>
+            <p class="config-note">Shadows is the shadow map size (sharper and costlier as it grows). Reflections are mirror-like wet streets, which draw the city a second time. Light rays are volumetric haze; the number is its quality steps per pixel.</p>
+          </section>
         </div>
 
         <details class="panel compare-entry" id="compare-entry">
@@ -163,6 +162,18 @@
           </form>
           <p class="cmp-error" id="cmp-entry-error" role="alert" hidden></p>
         </details>
+
+        <section class="panel score-runs" aria-labelledby="score-runs-title">
+          <h2 class="panel-title" id="score-runs-title"><span class="kana" aria-hidden="true">採点</span>Score runs</h2>
+          <p class="config-note">Fixed tests with locked settings, so every score is the same workload. A faster or overclocked GPU scores higher. You get FPS, the score, and a breakdown of whether your GPU or CPU was the limit.</p>
+          <div class="score-run-buttons" id="score-runs"></div>
+        </section>
+
+        <section class="panel score-runs" aria-labelledby="stress-runs-title">
+          <h2 class="panel-title" id="stress-runs-title"><span class="kana" aria-hidden="true">耐久</span>Stress tests</h2>
+          <p class="config-note">Repeats the 96 s flight 6 times (about 10 minutes) to show whether performance drops as your device heats up. You get a stability % (slowest lap ÷ fastest lap) and every lap's FPS. Plug in and keep this tab in front. Entry runs on phones; Extreme is for desktop GPUs.</p>
+          <div class="score-run-buttons" id="stress-runs"></div>
+        </section>
       </section>
 
       <!-- Run: HUD lives inside the stage, which sits below the in-flow banner -->
