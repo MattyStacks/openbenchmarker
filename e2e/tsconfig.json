@@ -1,0 +1,5 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "types": ["node", "@webgpu/types"], "noEmit": true },
+  "include": [".", "../playwright.config.ts"]
+}

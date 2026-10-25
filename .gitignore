@@ -153,3 +153,8 @@ vite.config.ts.timestamp-*
 
 # Headless capture output (scripts/capture.mjs)
 shots/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/

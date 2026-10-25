@@ -23,6 +23,8 @@ You can keep results in your browser or submit them to
 npm install
 npm run dev        # local dev server
 npm test           # Vitest unit tests
+npm run test:coverage   # unit tests + coverage report (coverage/)
+npm run test:e2e        # Playwright browser tests in e2e/ (starts its own dev server)
 npm run build      # type-check + production build into dist/
 npm run preview    # serve dist/ locally
 npm run deploy     # build + wrangler deploy (production)
@@ -525,6 +527,7 @@ src/engine/scenes.ts          makeFlythrough: camera, composer, sanitize, bloom 
 scripts/refresh-catalog.mjs
 scripts/capture.mjs           headless screenshots / load reports (Playwright, dev only)
 tests/                        Vitest unit tests
+e2e/                          Playwright browser tests (playwright.config.ts)
 ```
 
 ### Headless captures (development)
@@ -544,6 +547,27 @@ node scripts/capture.mjs --og public/og-image.png --t 8
 Headless Chromium renders WebGL in software (SwiftShader), so images are exact but timings
 only compare relative load. Sign lettering uses the system's bold sans-serif (as v1 did);
 the katakana-style glyphs are drawn as strokes in code, so they need no CJK font.
+
+### Browser tests (e2e)
+
+`npm run test:e2e` runs `e2e/*.spec.ts` with Playwright against a dev server on port 5179. Run
+`npx playwright install chromium` once per machine. Unit tests that need a DOM start with
+`// @vitest-environment happy-dom`; everything else runs in Node.
+
+By default the tests use Playwright's bundled Chromium: SwiftShader WebGL, no WebGPU, no timer
+queries. That checks that pages work, not how fast they run. To test on a real GPU, choose the
+browser with environment variables, so nothing machine-specific is committed:
+
+```sh
+PW_CHANNEL=msedge PW_ARGS="--force-high-performance-gpu" npm run test:e2e   # installed Edge (or chrome)
+PW_ARGS="--enable-unsafe-webgpu --enable-features=Vulkan" npm run test:e2e  # Linux: WebGPU over Vulkan
+PW_CDP_URL=http://127.0.0.1:9333 npm run test:e2e   # a browser you started with --remote-debugging-port
+```
+
+`PW_CDP_URL` covers browsers Playwright can't launch well itself, such as Windows Edge driven from
+WSL (start it with `--remote-debugging-port=9333 --force-high-performance-gpu`; WSL needs mirrored
+networking to reach the dev server). The "reports graphics capabilities" test prints which
+renderer, WebGPU adapter and timer queries the browser under test has.
 
 ## Notes on measurement
 
