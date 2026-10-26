@@ -21,14 +21,43 @@ element from the storyboard should look at it.
 Each `Pxx-*.md` file is one self-contained plan that **merges and deploys to production on its own**.
 Feed one at a time to Claude Code:
 
-> Read `docs/plans/ashen-horizon/README.md` and `docs/plans/ashen-horizon/<plan file>`. Plan and implement **only that plan**.
-> Follow the shared rules, invariants and Definition of done in the README. Read the files the plan
-> lists before planning. If the code differs from what the plan says, the code wins; fix the plan
-> docs in the same PR.
+> Read `docs/plans/ashen-horizon/README.md`, `docs/plans/ashen-horizon/STATUS.md` and
+> `docs/plans/ashen-horizon/<plan file>`, plus its `notes/` file if one exists. Plan and implement
+> **only that plan**. Follow the shared rules, invariants, "Notes, memory and branches" and
+> Definition of done in the README. Read the files the plan lists before planning. If the code
+> differs from what the plan says, the code wins; fix the plan docs in the same PR.
 
 Plans run in index order unless the index says otherwise. **P20 is required and runs right after
 P14, before P15.** P21 and P24 are optional and can be
 skipped or done after launch.
+
+## Notes, memory and branches: everything stays in this folder
+
+Matt works on more than one PC, so nothing about Ashen Horizon may exist on one machine only. This
+folder, in git, is the project's memory.
+
+- **`STATUS.md`** holds cross-plan memory: where the work is, how to resume, answered open
+  questions, tooling gaps, test machines and history. Update it whenever any of that changes, and at
+  the end of every session.
+- **`notes/Pxx-<slug>.md`**, one per plan (PM plans too), is copied from `notes/TEMPLATE.md` as the
+  **first commit on the plan's branch**. It holds that plan's implementation plan, decisions,
+  changes, research findings, verification results, follow-ups and a session log.
+  - Write the implementation plan there before coding. A plan made in Claude Code's plan mode is
+    saved only on the local machine, so copy it in full.
+  - Keep the notes current as the work goes, not only at the end.
+- **`notes/<topic>.md`** holds research or setup knowledge that spans plans, e.g.
+  `notes/test-machines.md`.
+- **A new branch for every deliverable.** Every plan, PM model set and docs-only change gets its
+  own branch from the latest `main` (see "Release model").
+- **Push the branch** to `origin` after each notes update and at the end of every session, so
+  unmerged work and its notes can be picked up on another PC.
+- **When a plan is done:** set its notes to `done`, update `STATUS.md` and mark the plan done in
+  the index below. These merge with the plan.
+- **Claude's local memory** holds only a pointer to this folder. Don't save Ashen plans, decisions
+  or findings there.
+- **What stays local:** only what has to. That means secrets and credentials (`.env`, Wrangler
+  login), machine-specific scripts and config (e.g. `~/.local/bin/edge-gpu-e2e`; the repo stays
+  portable), and build and test output. Describe them in `notes/`, minus any secrets.
 
 ## Release model: no big-bang release
 
@@ -37,7 +66,8 @@ skipped or done after launch.
 - **One branch and one Cloudflare preview per plan**, as done before for `feature/share-results` and
   `feature/stress-tests`:
   1. Branch from the latest `main`: `feature/<plan-slug>`, e.g. `feature/p04-benchmarks-hub`. Each
-     plan file lists its branch name.
+     plan file lists its branch name. The first commit adds the plan's `notes/` file. Push the
+     branch to `origin` right away.
   2. Build and test on the branch, then deploy its own Worker Preview:
      `npm run preview:deploy -- <plan-slug>`. It is served at `https://<plan-slug>.opengpubenchmarker.com`
      and `https://<plan-slug>-openbenchmarker.mattys.workers.dev`, and never touches production.
@@ -81,7 +111,8 @@ skipped or done after launch.
 4. **Merge and deploy:** PR into `main`, merge, `npm run deploy` from `main`, then delete the preview
    and the branch.
 5. Docs are updated: affected README sections, `docs/share-links.md`,
-   `docs/upstream-submission-changes.md`, `TODO.md`, and this folder (mark the plan done in the index).
+   `docs/upstream-submission-changes.md`, `TODO.md`, and this folder: mark the plan done in the
+   index, set its `notes/` file to `done` and update `STATUS.md`.
 6. Nothing half-finished is visible to the public.
 
 ## Invariants (non-negotiable)
