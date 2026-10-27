@@ -1,6 +1,6 @@
 # Upstream TODOs (open-gpu-benchmarks)
 
-These are follow-ups for [MattyStacks/open-gpu-benchmarks](https://github.com/MattyStacks/open-gpu-benchmarks), noted on 2026-10-23 during Plan 6. Each item has a draft. Hand this file to a Claude session in that repo. Validating the extra result fields (score, `rendered_with`, `diagnostics`, `detected`) is a separate task, covered in [upstream-submission-changes.md](upstream-submission-changes.md).
+These are follow-ups for [MattyStacks/open-gpu-benchmarks](https://github.com/MattyStacks/open-gpu-benchmarks), first noted on 2026-10-23 during Plan 6, with items 4 and 5 added on 2026-10-27. Each item has a draft. Hand this file to a Claude session in that repo. Items 4 and 5 point to [upstream-submission-changes.md](upstream-submission-changes.md) for the full code; that file is public at https://github.com/MattyStacks/openbenchmarker/blob/main/docs/upstream-submission-changes.md.
 
 Upstream state when this was written: the catalog holds one product (`desktop/nvidia/rtx_5080_16gb_fe`) plus 309 `reference/` base models. `.github/ISSUE_TEMPLATE/` holds only `benchmark.yml` ("Benchmark result", turned into a PR by a bot). Blank issues are on, because there's no `config.yml`.
 
@@ -28,10 +28,10 @@ Steps for a Claude session, one request at a time:
 - [ ] Find the chip's reference file under `data/gpus/reference/<vendor>/`, for example `rtx_4070_super_12gb.yaml`.
 - [ ] Pick the ID per `data/gpus/README.md` ("Picking the ID"). For example:
   - desktop: `<gpu_model>_<vram>gb_<brand>_<product_line>`
-  - laptop: `<gpu_model>_<vram>gb_<oem>_<model>` or `…_generic`
+  - laptop: `<reference>_reference`, for example `rtx_5090_laptop_24gb_reference` (once item 5 lands; until then the README says `<oem>_<model>` or `…_generic`)
 - [ ] Copy `templates/catalog_desktop.yaml` (or `catalog_laptop.yaml`) to `data/gpus/<form_factor>/<vendor>/<id>.yaml`. Set `base:` to the reference file, fill in identity and board-partner fields, and add `sources` (the maker's spec page, with an `accessed` date).
 - [ ] Run the checks (`python scripts/validate.py` or the PR checks). Open a PR that links the issue (`Closes #N`), and reply on the issue once it's merged.
-- [ ] Then, in **openbenchmarker**: `npm run refresh-catalog`, `npm test`, commit, deploy. The new card appears in the results page's GPU list. People who chose "My GPU isn't listed" can reopen their saved result from My Results and submit it.
+- [ ] Then, in **openbenchmarker**: `npm run refresh-catalog`, `npm test`, commit, deploy. The new card appears in the results page's GPU list. People who chose "My GPU isn't listed" can reopen their saved result from My Results and submit it. The results page also builds the GPU's catalog file for them, to add in the same PR as their result (item 5), so some requests will arrive as a PR instead.
 
 ## 2. Let the "Benchmark result" issue form take Open GPU Benchmarker runs
 
@@ -117,6 +117,40 @@ Then, in **openbenchmarker**:
 - [ ] The CSV `status` column shows `incomplete` for phone runs today, and stays that way until this lands. Once phone runs can be submitted, `incomplete` is correct for phones too, so check that the wording still fits.
 - [ ] The README sections "Phones and tablets" and "Honest-data rules", and the FAQ.
 
-## 4. Later, undecided
+## 4. Validate the extra result fields and the overclock block
+
+Open GPU Benchmarker (game_id `openbenchmarker_neon_flythrough`) writes more than checks.py knows about. Today it all passes, because unknown keys are ignored, but nothing is validated or used. The full YAML example and ready-to-use Python are in upstream-submission-changes.md, sections 1–4.
+
+What's new in the YAML:
+- top level: `overclock:` (only with `overclocked: true`), with `core_clock_offset_mhz`, `memory_clock_offset_mhz` and `power_limit_pct`, each present only when filled in
+- top level: `detected:`, values read from the browser, never typed in by the submitter
+- each result entry: run details (`p5_low`, `frame_count`, `timing_method`, …), `score` + `score_test` on score runs, `rendered_with` and `diagnostics`
+
+- [ ] `scripts/checks.py`: add the field tables and `check_typed()` / `check_openbenchmarker_entry()` from section 1, called only for this game_id. Also add the top-level checks: `overclocked` is a bool, `overclock:` needs `overclocked: true` and ints in range, `detected:` is typed.
+- [ ] `check_outliers`: skip runs that are overclocked or CPU-limited (`diagnostics.limit` cpu/driver/mixed), with an info note instead of the 25% error (section 2).
+- [ ] Optional: add `openbenchmarker` to `P1_LOW_METHODS` (section 3). Merge it upstream first, then switch `PROOF_METHOD` in openbenchmarker's `src/benchmark/validate.ts` from `other` to `openbenchmarker`.
+- [ ] Add `templates/community_openbenchmarker.yaml`, add `docs/COMMUNITY_SUBMISSIONS.md` headings for the new rule ids, and document `overclock:` and `detected:` (section 4).
+- [ ] Tests: a sample YAML with `overclock:`, `detected:`, diagnostics and a score validates, and each bad value fails with the right rule id.
+
+## 5. Catalog IDs: `_reference` when the exact model isn't known
+
+The results page builds an unlisted GPU's ID from the lookup command's output (PCI name, VRAM, board vendor, laptop or desktop) and gives the person the catalog file with `base:` set to the reference. `check_catalog_id` already accepts these IDs, so this is mostly a README and policy change (upstream-submission-changes.md, section 5).
+
+| Form factor | Pattern | Example |
+| --- | --- | --- |
+| laptop | `<reference>_reference` | `rtx_5090_laptop_24gb_reference`, `rx_7600m_xt_8gb_reference` |
+| desktop, GPU vendor's own card | `<reference>_fe` / `_reference` / `_le` | `rtx_5080_16gb_fe` (unchanged) |
+| desktop, brand and line known | `<reference>_<brand>_<product_line>` | `rtx_5080_16gb_gigabyte_gaming_oc` (unchanged) |
+| desktop, brand known, line not | `<reference>_<brand>_reference` | `rtx_5080_16gb_gigabyte_reference` |
+| desktop, brand not known | `<reference>_reference` | `rtx_5080_16gb_reference` |
+
+- [ ] Rewrite "Picking the ID" in `data/gpus/README.md` to match this table. Laptop IDs leave out the laptop's maker and model: laptop GPUs are the chip vendor's design.
+- [ ] Replace the `_generic` rule with `reference`. In `check_catalog_id`, update the laptop shape hint and the `id-generic` checks (drop them, or make `generic` an error that says to use `_reference`). Decide whether `_reference` products should get a warning so named models still win.
+- [ ] Rename the `rtx_4070_laptop_8gb_generic` example (and the file, if there is one) to `rtx_4070_laptop_8gb_reference`.
+- [ ] Note that `rx_9070_xt_16gb_reference` now covers AMD's own card and an unknown board alike: both use the reference specs.
+- [ ] Check that the file the tool generates passes as is, for example `data/gpus/laptop/nvidia/rtx_5090_laptop_24gb_reference.yaml`, which has `id`, `base`, `identity.name`, `identity.gpu_vendor`, `classification.form_factor` and `memory.capacity_gb` (branded desktops also get `identity.board_partner`). If more fields are needed, list them so openbenchmarker's `catalogFile()` in `src/benchmark/gpu-id.ts` can add them.
+- [ ] Done when a PR with that GPU file plus a result using its gpu_id passes CI.
+
+## 6. Later, undecided
 
 - [ ] A dedicated `gpu_request.yml` issue form with fields `gpu_name`, `form_factor`, `vendor` and `product_url`. The prefill would become `?template=gpu_request.yml&gpu_name=…`. Possibly automate catalog additions from it. Not decided; requests stay manual for now (item 1).
