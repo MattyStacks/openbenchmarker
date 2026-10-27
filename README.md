@@ -327,7 +327,7 @@ This tool feeds a public dataset, so:
   `system.os` (`windows`|`linux`), and `proof.method`. The resolution must be
   `720p`, `1080p`, `1440p` or `4K`, and match the rendered pixel size: older results
   from the removed Native option at any other size stay local only. A `score` must match its
-  score run's locked settings and `round(avg_fps × 100)`. `overclocked` is optional (yes/no). `memory_channels` is optional, a whole number from 1 to 32. Linux-only fields on a
+  score run's locked settings and `round(avg_fps × 100)`. `overclocked` is optional (yes/no); new runs start at no. `memory_channels` is optional, a whole number from 1 to 32. Linux-only fields on a
   Windows run fail. Blank optional fields are left out of the YAML. YAML
   download and copy stay disabled until validation passes.
 

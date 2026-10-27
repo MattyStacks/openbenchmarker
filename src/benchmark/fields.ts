@@ -111,6 +111,13 @@ export function emptySystem(): SystemInfo {
 }
 
 /**
+ * Starting values for a brand-new run, passed to completeSystem as if saved: overclocked starts at
+ * "no", since most runs are at stock clocks. A plain default, not a suggestion; the user can pick
+ * yes or blank.
+ */
+export const NEW_RUN_SYSTEM: Readonly<Partial<SystemInfo>> = { overclocked: "no" };
+
+/**
  * The saved `system` with every known field present. Unknown keys are kept (a newer version may
  * have written them); missing ones become "" unless a suggestion applies. A field that is present
  * but "" was cleared by the user and stays cleared.

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { BENCHMARK, BENCHMARK_VERSION } from "../benchmark/catalog";
 import { browserName, isSoftwareRenderer, liveVerdict, parseBackend } from "../benchmark/diagnose";
+import { NEW_RUN_SYSTEM } from "../benchmark/fields";
 import { computeRunStats, graphPoints, lapStats, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimesInto, scoreFor, type TimedBatch } from "../benchmark/metrics";
 import { STRESS_LAP_SECONDS, WARMUP_SECONDS, getPreset, getResolution, getScoreTest, getStressTest, matchesScoreTest, stressDuration } from "../benchmark/presets";
 import { emptySystem, type BenchResult, type GraphicsApi, type RunDiagnostics } from "../benchmark/types";
@@ -409,7 +410,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       system: emptySystem(),
     };
     // A brand-new result: registry suggestions (marked) fill what a browser can't read.
-    const result = withSystem(measured, {});
+    const result = withSystem(measured, NEW_RUN_SYSTEM);
     upsertResult(result);
     if (valid) markFinished(resolution, preset.id);
     cleanup();

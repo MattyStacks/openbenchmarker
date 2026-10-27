@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BENCHMARK, GPU_CATALOG } from "../src/benchmark/catalog";
 import { toCsv, toJson, toYaml } from "../src/benchmark/exporter";
-import { SYSTEM_FIELDS, completeSystem, emptySystem } from "../src/benchmark/fields";
+import { SYSTEM_FIELDS, completeSystem, emptySystem, NEW_RUN_SYSTEM } from "../src/benchmark/fields";
 import type { BenchResult, DeviceContext } from "../src/benchmark/types";
 import { validateSubmission } from "../src/benchmark/validate";
 import { withSystem } from "../src/app/store";
@@ -66,6 +66,22 @@ describe("memory_channels", () => {
     const j = JSON.parse(toJson(result({ system: { ...emptySystem(), memoryChannels: "4" }, suggested: ["memoryChannels"] })));
     expect(j.system.memoryChannels).toBe("4");
     expect(j.suggested).toEqual(["memoryChannels"]);
+  });
+});
+
+describe("overclocked default", () => {
+  it("a new run starts at no, as a plain default on desktops and phones", () => {
+    const d = withSystem(result(), NEW_RUN_SYSTEM);
+    expect(d.system).toEqual({ ...emptySystem(), overclocked: "no" });
+    expect(d.suggested).toBeUndefined();
+    const p = withSystem(result({ device: PHONE, mobile: true }), NEW_RUN_SYSTEM);
+    expect(p.system).toMatchObject({ overclocked: "no", memoryChannels: "4" });
+    expect(p.suggested).toEqual(["memoryChannels"]);
+  });
+
+  it("goes into the YAML as false, with no comment", () => {
+    const r = withSystem(result(), { ...NEW_RUN_SYSTEM, gpuId: GPU, os: "windows" });
+    expect(toYaml(r)).toMatch(/^overclocked: false$/m);
   });
 });
 
