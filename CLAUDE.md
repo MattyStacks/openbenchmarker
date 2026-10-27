@@ -14,6 +14,15 @@ The Ashen Horizon benchmark's plans, progress, decisions and working notes all l
 - Every deliverable gets a new branch from the latest `main`. Push it so the work isn't on one
   machine only.
 
+## Deploy a preview for review
+
+After finishing a change to the site on a branch, once `npm test` and `npm run build` pass, deploy
+a preview without being asked: `npm run preview:deploy -- <branch-name>` (README, "Testing on a
+phone (LAN) and preview deploys"). Give Matt both preview links,
+`https://<branch-name>.opengpubenchmarker.com` and
+`https://<branch-name>-openbenchmarker.mattys.workers.dev`, and say what to test there. Redeploy
+the same name after later changes on that branch. Docs-only or test-only changes don't need one.
+
 ## Keep repo config portable
 
 Matt works on more than one PC and may switch OS. Don't commit anything that only works on one
