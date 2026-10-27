@@ -1,4 +1,4 @@
-import { BENCHMARK_VERSION, findGpu } from "../benchmark/catalog";
+import { BENCHMARK_VERSION, NOT_LISTED, findGpu } from "../benchmark/catalog";
 import { download, suggestedFileName, toCsv, toJson, toYaml } from "../benchmark/exporter";
 import { VERDICT_LABEL, diagnose } from "../benchmark/diagnose";
 import { round1 } from "../benchmark/metrics";
@@ -17,6 +17,7 @@ import {
   gpuLine,
   mixesMajors,
   sortRuns,
+  canExportYaml,
   submissionStatus,
   tableStatus,
   type FacetKey,
@@ -87,12 +88,12 @@ function card(r: BenchResult): string {
   const statusHtml =
     st.kind === "ready"
       ? `<span class="rc-status good">✓ Ready to submit</span>`
-      : st.kind === "next-step" || st.kind === "gpu-not-listed"
+      : st.kind === "next-step" || st.kind === "gpu-not-listed" || st.kind === "ready-unlisted"
         ? `<span class="rc-status">${esc(st.text)}</span>`
         : st.kind === "invalid"
           ? `<span class="rc-status bad">${esc(st.text)}</span>`
           : "";
-  const yamlOk = st.kind === "ready";
+  const yamlOk = st.kind === "ready" || st.kind === "ready-unlisted";
   return `<article class="run-card${r.valid ? "" : " invalid"}" data-id="${esc(r.id)}">
     <details class="rc-main">
       <summary>
@@ -140,7 +141,7 @@ function details(r: BenchResult): string {
   const v = r.diag ? diagnose(r).verdict : null;
   const s = r.system ?? {};
   const sys: [string, string][] = [
-    ["GPU (catalog)", s.gpuId ? (findGpu(s.gpuId)?.name ?? s.gpuId) : ""],
+    ["GPU (catalog)", s.gpuId === NOT_LISTED ? `${s.gpuName || "not listed"} (not in the catalog yet${s.gpuIdRequested ? `, requested as ${s.gpuIdRequested}` : ""})` : s.gpuId ? (findGpu(s.gpuId)?.name ?? s.gpuId) : ""],
     ["OS", s.os],
     ["OS version", s.osDetail],
     ["CPU", s.cpu],
@@ -322,7 +323,7 @@ export function renderHistory(): void {
       });
     } else if (act === "json" && r) download(suggestedFileName(r, "json"), toJson(r), "application/json");
     else if (act === "csv" && r) download(suggestedFileName(r, "csv"), toCsv([r]), "text/csv");
-    else if (act === "yaml" && r && submissionStatus(r).kind === "ready") download(suggestedFileName(r, "yaml"), toYaml(r), "application/x-yaml");
+    else if (act === "yaml" && r && canExportYaml(r)) download(suggestedFileName(r, "yaml"), toYaml(r), "application/x-yaml");
     else if (act === "submit" && r) openResult(r.id, "submit");
     else if (act === "delete" && r) {
       if (!confirm("Delete this result from this browser?")) return;

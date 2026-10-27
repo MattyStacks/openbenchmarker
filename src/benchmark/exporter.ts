@@ -1,8 +1,8 @@
-import { BENCHMARK, UPSTREAM_REPO } from "./catalog";
+import { BENCHMARK, NOT_LISTED, UPSTREAM_REPO } from "./catalog";
 import { diagnose, isMaskedRenderer } from "./diagnose";
 import { round1, stability } from "./metrics";
 import { WARMUP_SECONDS } from "./presets";
-import { OVERCLOCK_FIELDS, SYSTEM_FIELDS, fieldApplies, type SystemField } from "./fields";
+import { OVERCLOCK_FIELDS, SYSTEM_FIELDS, fieldApplies, submittedGpuId, type SystemField } from "./fields";
 import type { BenchResult } from "./types";
 import { PROOF_METHOD, validateSubmission } from "./validate";
 
@@ -127,12 +127,16 @@ export function toYaml(r: BenchResult): string {
   const errors = validateSubmission(r);
   if (errors.length) throw new Error(`Not submittable: ${errors.join("; ")}`);
   const s = r.system;
+  const gpuId = submittedGpuId(s);
   const lines = [
     `# Captured by Open GPU Benchmarker ${r.benchmarkVersion} (https://opengpubenchmarker.com/), benchmark "${BENCHMARK.name}".`,
     `# Timed in the browser: Avg FPS = frames / wall-clock; lows from ${r.timing === "gpu-timer" ? "GPU timer queries" : "per-batch frame times"}. Hardware fields under system: were entered by the submitter; detected: was read from the browser.`,
-    `# Save as data/community/${s.gpuId}/${suggestedFileName(r, "yaml")} in a PR to ${UPSTREAM_REPO}`,
+    `# Save as data/community/${gpuId}/${suggestedFileName(r, "yaml")} in a PR to ${UPSTREAM_REPO}`,
     `# Submitted data is public under CC BY 4.0 (data/LICENSE) and cannot be taken back.`,
-    `gpu_id: ${s.gpuId}`,
+    ...(s.gpuId === NOT_LISTED
+      ? [`# This GPU isn't in the catalog yet: add data/gpus entry ${gpuId} for ${q(s.gpuName.trim())} first or in the same PR, or the checks fail.`]
+      : []),
+    `gpu_id: ${gpuId}`,
     `game_id: ${r.gameId}`,
     `date: ${q(r.date)}`,
     `version: ${q(r.benchmarkVersion)}`,

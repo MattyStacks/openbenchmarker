@@ -2,7 +2,7 @@ import { BENCHMARKS, NOT_LISTED, UPSTREAM_ISSUES, findGpu } from "./catalog";
 import { isSoftwareRenderer } from "./diagnose";
 import { scoreFor } from "./metrics";
 import { RESOLUTIONS, getPreset, getScoreTest, matchesScoreTest, standardResolution } from "./presets";
-import { LINUX_ONLY_FIELDS, SYSTEM_FIELDS, fieldApplies } from "./fields";
+import { LINUX_ONLY_FIELDS, SYSTEM_FIELDS, fieldApplies, submittedGpuId } from "./fields";
 import type { BenchResult } from "./types";
 
 /** Mirrors upstream proof.method for this tool. */
@@ -30,8 +30,14 @@ export function validateSubmission(r: BenchResult | null | undefined): string[] 
 
   const gpuId = (s.gpuId ?? "").trim();
   if (!gpuId) errors.push("GPU: choose your exact GPU from the catalog");
-  else if (gpuId === NOT_LISTED)
-    errors.push(`GPU: not in the catalog yet. Request it or add it (${UPSTREAM_ISSUES}), then submit once it's listed`);
+  else if (gpuId === NOT_LISTED) {
+    // Submittable with a warning (submissionWarnings): the requested id fails upstream checks until
+    // the GPU is added to the catalog.
+    if (!(s.gpuName ?? "").trim()) errors.push("Your GPU: type its exact name (brand, model and memory)");
+    const requested = (s.gpuIdRequested ?? "").trim();
+    if (!requested) errors.push(`Requested gpu_id: enter the catalog ID you're requesting (e.g. rx_9070_xt_16gb), or request your GPU first (${UPSTREAM_ISSUES})`);
+    else if (findGpu(requested)) errors.push(`Requested gpu_id: '${requested}' is already in the catalog; choose it from the GPU list`);
+  }
   else if (!findGpu(gpuId)) errors.push(`GPU: '${gpuId}' is not a catalog gpu_id; free-text GPU names are not accepted`);
 
   if (!BENCHMARKS.some((b) => b.gameId === r.gameId)) errors.push(`Benchmark: game_id '${r.gameId}' is not this tool's benchmark`);
@@ -84,6 +90,19 @@ export function validateSubmission(r: BenchResult | null | undefined): string[] 
     if (mixed.length) errors.push(`OS fields: ${mixed.join(", ")} ${mixed.length > 1 ? "are" : "is"} Linux-only but OS is windows; clear ${mixed.length > 1 ? "them" : "it"}`);
   }
   return errors;
+}
+
+/**
+ * What may make a submission that passes validateSubmission fail upstream anyway. Today: a GPU that
+ * isn't in the catalog yet, whose requested gpu_id fails upstream checks until the GPU is added.
+ */
+export function submissionWarnings(r: BenchResult | null | undefined): string[] {
+  const s = r?.system;
+  if (!s || s.gpuId !== NOT_LISTED) return [];
+  const id = submittedGpuId(s);
+  return [
+    `Your GPU${id ? ` (${id})` : ""} isn't in the Open GPU Benchmarks catalog yet, so this submission will fail upstream checks unless the GPU is added to the catalog first, or in the same pull request.`,
+  ];
 }
 
 /** Short labels of what blocks submission, e.g. ["GPU", "OS"], for history rows. */

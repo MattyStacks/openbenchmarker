@@ -55,7 +55,7 @@ function linkRows(r: SharedRun): [string, string, string][] {
     ["Device type", d.deviceType, "Phone, tablet or desktop."],
     ["iOS engine", d.webkitEngine ? "yes" : "no", "On iPhone and iPad every browser uses Safari's engine."],
     ["GPU name", d.gpuLabel ?? "not reported", "As the browser reported it (often generic), up to 63 bytes."],
-    ["Your GPU", r.gpuId ?? "not filled in", "The exact GPU you picked from the catalog on the results page, if you did."],
+    ["Your GPU", r.gpuId ?? "not filled in", "The exact GPU you picked from the catalog on the results page (or the catalog ID you requested for one that isn't listed yet), if you did."],
     ["Overclocked", overclockLabel(r.overclock) || "not filled in", "Whether you said the GPU was overclocked and, if so, the core clock, memory clock and power limit you raised, so others can set up the same test."],
     ["Check value", "1 byte", "Catches links that got cut off or mangled when copied."],
   ];
@@ -193,7 +193,8 @@ export function aboutHtml(): string {
 
     <section id="gpu" class="card about-sec">
       <h2>Don't see your GPU?</h2>
-      <p>The GPU catalog is new and growing, and every card added helps. ${ext(UPSTREAM_ISSUES, "Request it with an issue")} (no coding needed), or ${ext(UPSTREAM_TEMPLATES, "add it with a pull request")} using the ${ext(UPSTREAM_CATALOG_README, "ID rules")}. The results page fills the request with the GPU name your browser reported, as a starting point you can edit; it's sent to GitHub only when you click it and submit the issue. Once your GPU is listed, open your result from My Results and submit it.</p>
+      <p>The GPU catalog is new and growing, and every card added helps. ${ext(UPSTREAM_ISSUES, "Request it with an issue")} (no coding needed), or ${ext(UPSTREAM_TEMPLATES, "add it with a pull request")} using the ${ext(UPSTREAM_CATALOG_README, "ID rules")}. The results page fills the request with the GPU name you typed, or the one your browser reported, as a starting point you can edit; it's sent to GitHub only when you click it and submit the issue.</p>
+      <p>Until it's listed, choose "My GPU isn't listed" and type your GPU's name and the catalog ID you're requesting. They're saved with your results and filled in on your next runs, so you can keep running and saving. You can download the submission YAML right away, but it will fail the dataset's checks unless your GPU is added to the catalog first, or in the same pull request. Or wait until it's listed, then open your result from My Results, pick it and submit.</p>
     </section>
 
     <section id="phones" class="card about-sec">

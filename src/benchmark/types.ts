@@ -35,6 +35,9 @@ export function unknownDevice(): DeviceContext {
  */
 export interface SystemInfo {
   gpuId: string;
+  /** Only when gpuId is "My GPU isn't listed": the GPU's name, and the catalog id requested for it. */
+  gpuName: string;
+  gpuIdRequested: string;
   os: string; // "" | "windows" | "linux"
   osDetail: string;
   cpu: string;

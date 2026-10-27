@@ -57,6 +57,27 @@ test("carried details, overclock section and driver commands", async ({ page }) 
   expect(errors).toEqual([]);
 });
 
+test("a GPU that isn't listed can be typed in, saved and submitted with a warning", async ({ page }) => {
+  await page.goto(`/#/result/${RESULT.id}`);
+  const form = page.locator("#sys-form");
+  await expect(form.locator('[name="gpuName"]')).toBeHidden();
+  await form.locator('[name="gpuId"]').selectOption("__not_listed__");
+  await expect(page.locator("#val-box")).toContainText("Your GPU: type its exact name");
+  await expect(page.locator("#exp-yaml")).toBeDisabled();
+
+  await form.locator('[name="gpuName"]').fill("AMD Radeon RX 9070 XT 16 GB");
+  await form.locator('[name="gpuIdRequested"]').fill("rx_9070_xt_16gb");
+  await expect(page.locator("#val-box")).toContainText("Submitting may fail");
+  await expect(page.locator("#exp-yaml")).toBeEnabled();
+  await expect(page.locator("#yaml-preview")).toContainText("gpu_id: rx_9070_xt_16gb");
+  await expect(page.locator("#submit-steps")).toContainText("add rx_9070_xt_16gb to data/gpus/");
+  await expect(page.locator("#gpu-request")).toHaveAttribute("href", /AMD%20Radeon%20RX%209070%20XT%2016%20GB/);
+
+  await page.reload();
+  await expect(form.locator('[name="gpuName"]')).toHaveValue("AMD Radeon RX 9070 XT 16 GB");
+  await expect(form.locator('[name="gpuIdRequested"]')).toHaveValue("rx_9070_xt_16gb");
+});
+
 test("the share link carries the GPU and overclock filled in after the page opened", async ({ page }) => {
   await page.goto(`/#/result/${RESULT.id}`);
   const form = page.locator("#sys-form");

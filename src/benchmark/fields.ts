@@ -1,3 +1,4 @@
+import { NOT_LISTED } from "./catalog";
 import type { BenchResult, SystemInfo } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -20,9 +21,11 @@ export interface SystemField {
   yaml: string;
   /**
    * "top" fields sit at the top of the YAML (gpu_id, overclocked); "system" fields under system:;
-   * "overclock" fields under overclock:, only when overclocked is yes (otherwise kept but ignored).
+   * "overclock" fields under overclock:, only when overclocked is yes; "unlisted" fields describe a
+   * GPU that isn't in the catalog yet, only when the GPU is "My GPU isn't listed". Fields that
+   * don't apply are kept but ignored.
    */
-  section: "top" | "system" | "overclock";
+  section: "top" | "system" | "overclock" | "unlisted";
   label: string;
   kind: FieldKind;
   required?: boolean;
@@ -65,12 +68,40 @@ export const MAX_CORE_OFFSET_MHZ = 3000;
 export const MAX_MEMORY_OFFSET_MHZ = 10000;
 export const MAX_POWER_LIMIT_PCT = 300;
 
+/** Shape of a catalog gpu_id, as the catalog writes them (e.g. rtx_5080_16gb_fe). */
+export const GPU_ID_SHAPE = /^[a-z0-9][a-z0-9_.-]{0,62}$/;
+
 /**
  * CSV column order. The system: fields are in upstream YAML order; the two top-level fields
  * (gpu_id first, overclocked after frame_generation) are placed by toYaml itself.
  */
 export const SYSTEM_FIELDS: readonly SystemField[] = [
   { key: "gpuId", yaml: "gpu_id", section: "top", label: "GPU", kind: "choice", required: true, carry: true, gpuSpecific: true },
+  // A GPU the catalog doesn't list yet: saved with the result, and submittable with a warning (the
+  // gpu_id fails upstream checks until the GPU is added to the catalog).
+  {
+    key: "gpuName",
+    yaml: "gpu_name",
+    section: "unlisted",
+    label: "Your GPU",
+    kind: "text",
+    placeholder: "e.g. AMD Radeon RX 9070 XT 16 GB",
+    help: "The exact product: brand, model and memory.",
+    carry: true,
+    gpuSpecific: true,
+  },
+  {
+    key: "gpuIdRequested",
+    yaml: "gpu_id_requested",
+    section: "unlisted",
+    label: "Requested gpu_id",
+    kind: "text",
+    placeholder: "e.g. rx_9070_xt_16gb",
+    help: "The catalog ID you're asking for (lowercase letters, digits and _), used as gpu_id in the YAML.",
+    validate: (v) => (GPU_ID_SHAPE.test(v) ? null : `Requested gpu_id: '${v}' must be lowercase letters, digits and _ (like rx_9070_xt_16gb)`),
+    carry: true,
+    gpuSpecific: true,
+  },
   { key: "os", yaml: "os", section: "system", label: "OS", kind: "choice", required: true, carry: true },
   { key: "osDetail", yaml: "os_detail", section: "system", label: "OS version", kind: "text", placeholder: "e.g. Windows 11 Pro 24H2", carry: true },
   { key: "cpu", yaml: "cpu", section: "system", label: "CPU", kind: "text", placeholder: "e.g. AMD Ryzen 7 7800X3D", carry: true },
@@ -165,9 +196,21 @@ export const LINUX_ONLY_FIELDS = SYSTEM_FIELDS.filter((f) => f.linux).map((f) =>
 
 export const OVERCLOCK_FIELDS = SYSTEM_FIELDS.filter((f) => f.section === "overclock");
 
-/** Whether a field counts (validated, exported): overclock details only when overclocked is yes. */
-export function fieldApplies(f: SystemField, s: Pick<SystemInfo, "overclocked">): boolean {
-  return f.section !== "overclock" || s.overclocked === "yes";
+export const UNLISTED_GPU_FIELDS = SYSTEM_FIELDS.filter((f) => f.section === "unlisted");
+
+/**
+ * Whether a field counts (validated, exported): overclock details only when overclocked is yes,
+ * the unlisted GPU's name and requested id only when the GPU isn't listed.
+ */
+export function fieldApplies(f: SystemField, s: Pick<SystemInfo, "overclocked" | "gpuId">): boolean {
+  if (f.section === "overclock") return s.overclocked === "yes";
+  if (f.section === "unlisted") return s.gpuId === NOT_LISTED;
+  return true;
+}
+
+/** The gpu_id a submission uses: the catalog pick, or the requested id for a GPU that isn't listed. */
+export function submittedGpuId(s: Pick<SystemInfo, "gpuId" | "gpuIdRequested">): string {
+  return s.gpuId === NOT_LISTED ? (s.gpuIdRequested ?? "").trim() : s.gpuId;
 }
 
 export function emptySystem(): SystemInfo {

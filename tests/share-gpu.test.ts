@@ -56,7 +56,13 @@ describe("what a saved result puts in a link", () => {
     expect(Object.keys(r).sort()).toEqual(Object.keys(sharedRunFrom(result())).concat("gpuId").sort());
   });
 
-  it("left out when blank, not listed, not in the catalog, or not said", () => {
+  it("an unlisted GPU shares its requested id, if it's well formed", () => {
+    expect(sharedRunFrom(result({ gpuId: NOT_LISTED, gpuName: "Radeon RX 9070 XT", gpuIdRequested: "rx_9070_xt_16gb" })).gpuId).toBe("rx_9070_xt_16gb");
+    expect(sharedRunFrom(result({ gpuId: NOT_LISTED, gpuName: "Radeon RX 9070 XT", gpuIdRequested: "RX 9070" })).gpuId).toBeUndefined();
+    expect(JSON.stringify(sharedRunFrom(result({ gpuId: NOT_LISTED, gpuName: "Radeon RX 9070 XT", gpuIdRequested: "rx_9070_xt_16gb" })))).not.toContain("Radeon");
+  });
+
+  it("left out when blank, not listed without an id, not in the catalog, or not said", () => {
     for (const gpuId of ["", NOT_LISTED, "made_up_gpu"]) {
       const r = sharedRunFrom(result({ gpuId }));
       expect(r.gpuId).toBeUndefined();

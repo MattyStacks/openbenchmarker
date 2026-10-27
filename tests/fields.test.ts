@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { BENCHMARK, GPU_CATALOG } from "../src/benchmark/catalog";
+import { BENCHMARK, GPU_CATALOG, NOT_LISTED } from "../src/benchmark/catalog";
 import { toCsv, toJson, toYaml } from "../src/benchmark/exporter";
 import { SYSTEM_FIELDS, carriedSystem, carrySource, completeSystem, emptySystem, NEW_RUN_SYSTEM } from "../src/benchmark/fields";
 import type { BenchResult, DeviceContext } from "../src/benchmark/types";
-import { validateSubmission } from "../src/benchmark/validate";
+import { missingLabels, submissionWarnings, validateSubmission } from "../src/benchmark/validate";
 import { withSystem } from "../src/app/store";
 import { csvCells } from "./csv";
 
@@ -184,7 +184,7 @@ describe("carrying details to the next run", () => {
 
   it("copies what rarely changes, not kernel, Mesa or Proton", () => {
     const c = carriedSystem(saved(filled), result());
-    expect(c).toEqual({ gpuId: GPU, os: "linux", osDetail: "Fedora 41", cpu: "Ryzen 7 7800X3D", memoryGb: "32", memoryType: "DDR5-6000", memoryChannels: "2", driver: "Mesa 24.2.5", distro: "Fedora", overclocked: "yes", ocCoreMhz: "150", ocMemoryMhz: "1000", ocPowerPct: "110" });
+    expect(c).toEqual({ gpuId: GPU, gpuName: "", gpuIdRequested: "", os: "linux", osDetail: "Fedora 41", cpu: "Ryzen 7 7800X3D", memoryGb: "32", memoryType: "DDR5-6000", memoryChannels: "2", driver: "Mesa 24.2.5", distro: "Fedora", overclocked: "yes", ocCoreMhz: "150", ocMemoryMhz: "1000", ocPowerPct: "110" });
   });
 
   it("a new run gets them as plain values (not suggestions), and they go into the YAML", () => {
@@ -224,5 +224,38 @@ describe("carrying details to the next run", () => {
     const j = JSON.parse(toJson(ready({}, { carriedFrom: "2026-10-27 14:02" })));
     expect(j).not.toHaveProperty("carriedFrom");
     expect(toCsv([ready({}, { carriedFrom: "2026-10-27 14:02" })])).not.toContain("2026-10-27 14:02");
+  });
+});
+
+describe("a GPU that isn't in the catalog yet", () => {
+  const unlisted = (sys: Partial<BenchResult["system"]> = {}) => ready({ gpuId: NOT_LISTED, gpuName: "AMD Radeon RX 9070 XT 16 GB", gpuIdRequested: "rx_9070_xt_16gb", ...sys });
+
+  it("needs its name and a well-formed requested gpu_id, then validates with a warning", () => {
+    expect(validateSubmission(unlisted())).toEqual([]);
+    expect(submissionWarnings(unlisted())[0]).toMatch(/rx_9070_xt_16gb\) isn't in the Open GPU Benchmarks catalog yet, so this submission will fail upstream checks/);
+    expect(submissionWarnings(ready())).toEqual([]);
+    expect(missingLabels(validateSubmission(unlisted({ gpuName: "", gpuIdRequested: "" })))).toEqual(["Your GPU", "Requested gpu_id"]);
+    for (const id of ["RX 9070 XT", "Rx_9070", "_rx", "rx 9070"]) expect(validateSubmission(unlisted({ gpuIdRequested: id }))[0]).toMatch(/^Requested gpu_id: '.*' must be/);
+    expect(validateSubmission(unlisted({ gpuIdRequested: GPU }))[0]).toMatch(/already in the catalog; choose it from the GPU list/);
+  });
+
+  it("the YAML uses the requested id and says the GPU has to be added", () => {
+    const y = toYaml(unlisted());
+    expect(y).toMatch(/^# This GPU isn't in the catalog yet: add data\/gpus entry rx_9070_xt_16gb for "AMD Radeon RX 9070 XT 16 GB" first or in the same PR, or the checks fail\.\ngpu_id: rx_9070_xt_16gb$/m);
+    expect(y).toMatch(/^# Save as data\/community\/rx_9070_xt_16gb\//m);
+    expect(y).not.toMatch(/__not_listed__|gpu_name|gpu_id_requested/);
+  });
+
+  it("name and requested id are CSV columns only while the GPU is not listed", () => {
+    expect(csvRow(unlisted())).toMatchObject({ gpu_id: NOT_LISTED, gpu_name: "AMD Radeon RX 9070 XT 16 GB", gpu_id_requested: "rx_9070_xt_16gb" });
+    const picked = ready({ gpuName: "old", gpuIdRequested: "old_id" });
+    expect(csvRow(picked)).toMatchObject({ gpu_name: "", gpu_id_requested: "" });
+    expect(validateSubmission(ready({ gpuIdRequested: "NOT VALID" }))).toEqual([]);
+  });
+
+  it("are carried to the next run with the GPU", () => {
+    const c = carriedSystem(unlisted(), result());
+    expect(c).toMatchObject({ gpuId: NOT_LISTED, gpuName: "AMD Radeon RX 9070 XT 16 GB", gpuIdRequested: "rx_9070_xt_16gb" });
+    expect(carriedSystem(unlisted(), result({ device: { ...DESK, gpuLabel: "Intel(R) Arc(TM) Graphics" } }))).not.toHaveProperty("gpuName");
   });
 });

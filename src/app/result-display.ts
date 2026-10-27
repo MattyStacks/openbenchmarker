@@ -54,6 +54,7 @@ export type SubmissionStatus =
   /** Stress tests show stability; they are never submitted. */
   | { kind: "stress"; text: "" }
   | { kind: "ready"; text: string }
+  | { kind: "ready-unlisted"; text: string }
   | { kind: "gpu-not-listed"; text: string }
   | { kind: "next-step"; text: string; missing: string[] };
 
@@ -66,9 +67,16 @@ export function submissionStatus(r: BenchResult): SubmissionStatus {
   if (isHandheld(runClass(r))) return { kind: "handheld", text: "" };
   if (r.stressTest) return { kind: "stress", text: "" };
   const errs = validateSubmission(r);
-  if (!errs.length) return { kind: "ready", text: "Ready to submit" };
+  if (!errs.length)
+    return r.system.gpuId === NOT_LISTED ? { kind: "ready-unlisted", text: "GPU not in the catalog yet: submitting may fail" } : { kind: "ready", text: "Ready to submit" };
   if (r.system.gpuId === NOT_LISTED) return { kind: "gpu-not-listed", text: "GPU not in the catalog yet" };
   return { kind: "next-step", text: "Add your system details to submit", missing: missingLabels(errs) };
+}
+
+/** YAML can be downloaded: ready, or ready apart from a GPU the catalog doesn't list yet (with a warning). */
+export function canExportYaml(r: BenchResult): boolean {
+  const k = submissionStatus(r).kind;
+  return k === "ready" || k === "ready-unlisted";
 }
 
 export function canShare(r: BenchResult): boolean {
@@ -133,6 +141,7 @@ export function tableStatus(r: BenchResult): { cls: "good" | "next" | "muted" | 
   const s = submissionStatus(r);
   if (s.kind === "ready") return { cls: "good", text: "✓ Ready to submit" };
   if (s.kind === "gpu-not-listed") return { cls: "next", text: "Add your GPU →" };
+  if (s.kind === "ready-unlisted") return { cls: "next", text: "⚠ GPU not listed yet" };
   if (s.kind === "next-step") return { cls: "next", text: `Needs: ${s.missing.join(", ")}` };
   if (s.kind === "handheld" || s.kind === "stress") return { cls: "muted", text: "Share only" };
   return { cls: "bad", text: s.text };

@@ -1,4 +1,4 @@
-import { findGpu } from "./catalog";
+import { NOT_LISTED, findGpu } from "./catalog";
 import { OVERCLOCK_FIELDS } from "./fields";
 import { unknownDevice, type BenchResult, type BrowserId, type DeviceContext, type DeviceType, type GraphicsApi, type OsId } from "./types";
 import type { TimingMethod } from "./metrics";
@@ -269,7 +269,9 @@ function parseVersion(v: string): [number, number, number] | null {
 function sharedSystem(r: BenchResult): Pick<SharedRun, "gpuId" | "overclock"> {
   const s = r.system;
   if (!s) return {};
-  const gpuId = findGpu(s.gpuId) && GPU_ID_RE.test(s.gpuId) ? s.gpuId : undefined;
+  // A catalog pick, or the requested id of a GPU that isn't listed yet (readers show the id).
+  const picked = s.gpuId === NOT_LISTED ? (s.gpuIdRequested ?? "").trim() : findGpu(s.gpuId) ? s.gpuId : "";
+  const gpuId = GPU_ID_RE.test(picked) ? picked : undefined;
   let overclock: SharedOverclock | undefined;
   if (s.overclocked === "no") overclock = { overclocked: false };
   else if (s.overclocked === "yes") {

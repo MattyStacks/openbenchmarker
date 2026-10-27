@@ -66,11 +66,11 @@ describe("validateSubmission", () => {
     expect(missingLabels(errs)).toEqual(["Device"]);
   });
 
-  it("NOT_LISTED is blocked and points upstream", () => {
+  it("NOT_LISTED asks for the GPU's name and requested id, and points upstream", () => {
     const errs = validateSubmission(withSys({ gpuId: NOT_LISTED, os: "windows" }));
-    expect(errs).toHaveLength(1);
-    expect(errs[0]).toMatch(/not in the catalog/);
-    expect(errs[0]).toMatch(/github\.com\/MattyStacks\/open-gpu-benchmarks\/issues/);
+    expect(missingLabels(errs)).toEqual(["Your GPU", "Requested gpu_id"]);
+    expect(errs[1]).toMatch(/github\.com\/MattyStacks\/open-gpu-benchmarks\/issues/);
+    expect(validateSubmission(withSys({ gpuId: NOT_LISTED, os: "windows", gpuName: "Radeon RX 9070 XT", gpuIdRequested: "rx_9070_xt_16gb" }))).toEqual([]);
   });
 
   it("free-text GPU names are rejected", () => {

@@ -20,9 +20,9 @@ import { clearPending, pendingCode, setPending } from "./challenge";
 import { LABELS, bindCompareBoxes, compareBoxHtml, comparePanelHtml } from "./compare-view";
 import { prefillFromShare } from "./home";
 import { commandsFor } from "../benchmark/sysinfo";
-import { LINUX_ONLY_FIELDS, OVERCLOCK_FIELDS, SYSTEM_FIELDS, fieldFor, type SystemField } from "../benchmark/fields";
+import { LINUX_ONLY_FIELDS, OVERCLOCK_FIELDS, SYSTEM_FIELDS, UNLISTED_GPU_FIELDS, fieldFor, submittedGpuId, type SystemField } from "../benchmark/fields";
 import type { BenchResult, SystemInfo } from "../benchmark/types";
-import { validateSubmission } from "../benchmark/validate";
+import { submissionWarnings, validateSubmission } from "../benchmark/validate";
 import { $, esc } from "./dom";
 import { BATCH_MS } from "./env";
 import { deviceLine, gpuLine, isHandheld, runClass } from "./result-display";
@@ -67,11 +67,12 @@ function browserHints(): { renderer: string; threads: string; ua: string } {
   return { renderer: rendererStr, threads: String(navigator.hardwareConcurrency ?? "unknown"), ua: navigator.userAgent };
 }
 
-/** Typed-in fields of the system form, from the field registry (overclock details go under Overclocked). */
-const TEXT_FIELDS = SYSTEM_FIELDS.filter((f) => (f.kind === "text" || f.kind === "digits") && f.section !== "overclock");
+/** Typed-in fields of the system form, from the field registry (overclock details go under Overclocked, an unlisted GPU's under GPU). */
+const TEXT_FIELDS = SYSTEM_FIELDS.filter((f) => (f.kind === "text" || f.kind === "digits") && f.section !== "overclock" && f.section !== "unlisted");
 
 function inputField(f: SystemField): string {
-  return `<label class="field${f.linux ? " linux-only" : ""}"><span>${esc(f.label)} <em>optional${f.linux ? ", Linux only" : ""}</em> <b class="suggested-tag" data-suggested="${f.key}" hidden>suggested</b></span><input name="${f.key}" placeholder="${esc(f.placeholder ?? "")}" ${f.inputmode ? `inputmode="${f.inputmode}"` : ""}${f.help ? ` aria-describedby="help-${f.key}"` : ""} />${f.help ? `<small class="field-help" id="help-${f.key}">${esc(f.help)}</small>` : ""}</label>`;
+  const need = f.section === "unlisted" ? "needed to submit" : `optional${f.linux ? ", Linux only" : ""}`;
+  return `<label class="field${f.linux ? " linux-only" : ""}"><span>${esc(f.label)} <em>${need}</em> <b class="suggested-tag" data-suggested="${f.key}" hidden>suggested</b></span><input name="${f.key}" placeholder="${esc(f.placeholder ?? "")}" ${f.inputmode ? `inputmode="${f.inputmode}"` : ""}${f.help ? ` aria-describedby="help-${f.key}"` : ""} />${f.help ? `<small class="field-help" id="help-${f.key}">${esc(f.help)}</small>` : ""}</label>`;
 }
 
 const fmtMs = (x: number | null | undefined) => (x === null || x === undefined || !Number.isFinite(x) ? "n/a" : `${x.toFixed(2)} ms`);
@@ -249,12 +250,14 @@ export function renderResults(r: BenchResult): void {
         <p class="muted tiny">The catalog is new and growing: ${GPU_CATALOG.length} GPU${GPU_CATALOG.length === 1 ? "" : "s"} as of ${esc(CATALOG_SNAPSHOT_DATE)} (<a href="${UPSTREAM_REPO}/tree/main/data/gpus" target="_blank" rel="noopener">catalog</a>). Don't see yours? Choose "My GPU isn't listed".</p>
         <div id="gpu-blocked" class="blocked" hidden>
           <p><b>Your GPU isn't in the catalog yet — help add it!</b> The catalog is new and growing, and every card added makes the dataset more useful for everyone.</p>
+          ${UNLISTED_GPU_FIELDS.map(inputField).join("")}
+          <p class="muted tiny">Saved with this result and filled in on your next runs, so you can keep running and saving until your GPU is added. <a href="${UPSTREAM_CATALOG_README}" target="_blank" rel="noopener">ID rules</a></p>
           <div class="blocked-links">
-            <p><a class="btn btn-primary" href="${esc(gpuRequestUrl(r.device?.gpuLabel))}" target="_blank" rel="noopener">Request your GPU (open an issue) →</a> <span class="muted tiny">Easiest, no coding needed.</span></p>
+            <p><a class="btn btn-primary" id="gpu-request" href="${esc(gpuRequestUrl(r.system.gpuName || r.device?.gpuLabel))}" target="_blank" rel="noopener">Request your GPU (open an issue) →</a> <span class="muted tiny">Easiest, no coding needed.</span></p>
             <p><a class="btn" href="${UPSTREAM_TEMPLATES}" target="_blank" rel="noopener">Add it yourself (pull request) →</a> <span class="muted tiny">If you're comfortable with GitHub (<a href="${UPSTREAM_CATALOG_README}" target="_blank" rel="noopener">ID rules</a>).</span></p>
           </div>
-          ${r.device?.gpuLabel ? `<p class="muted tiny">Starting point for your request: <b>${esc(r.device.gpuLabel)}</b> (reported by your browser). Edit it on GitHub to the exact card: brand, model and memory.</p>` : ""}
-          <p>Once it's listed, you can come back and submit this result. It stays saved in My Results until then.</p>
+          ${r.device?.gpuLabel ? `<p class="muted tiny">The request starts from the name you type above, or if that's blank, <b>${esc(r.device.gpuLabel)}</b> (reported by your browser). Edit it on GitHub to the exact card: brand, model and memory.</p>` : ""}
+          <p>You can submit now, but it <b>will fail the dataset's checks</b> unless your GPU is added to the catalog first, or in the same pull request. Or wait until it's listed, then pick it from the list above and submit.</p>
         </div>
         <label class="field"><span>Operating system <em>required</em></span>
           <select name="os"><option value="">— Select —</option><option value="windows">windows</option><option value="linux">linux</option></select></label>
@@ -390,23 +393,27 @@ export function renderResults(r: BenchResult): void {
     // Linux-only inputs stay visible once filled, so a windows/linux mix can be seen and fixed.
     form.classList.toggle("show-linux", r.system.os === "linux" || LINUX_ONLY_FIELDS.some((k) => r.system[k].trim()));
     form.classList.toggle("show-oc", r.system.overclocked === "yes");
-    // Not listed: the way to add the GPU replaces the submit controls (no dead-end buttons).
+    // Not listed: the GPU's name and requested id, the ways to add it, and a warning on submit.
     const notListed = r.system.gpuId === NOT_LISTED;
     $("#gpu-blocked").hidden = !notListed;
-    $("#submit-export").hidden = notListed;
-    $("#submit-preview").hidden = notListed;
+    if (notListed) $<HTMLAnchorElement>("#gpu-request").href = gpuRequestUrl(r.system.gpuName || r.device?.gpuLabel);
+    const warnings = ok ? submissionWarnings(r) : [];
     $("#val-box").innerHTML = ok
-      ? `<p class="ok">✓ Ready to submit: all required fields valid.</p>`
+      ? warnings.length
+        ? `<div class="warn-box" role="note"><b>⚠ Submitting may fail.</b><ul>${warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul><p class="tiny">Your result is saved either way; the YAML is ready below.</p></div>`
+        : `<p class="ok">✓ Ready to submit: all required fields valid.</p>`
       : `<div class="next-step"><b>Add your system details to submit</b> (saving, sharing and export work anyway):<ul>${errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul></div>`;
     $<HTMLButtonElement>("#exp-yaml").disabled = !ok;
     $<HTMLButtonElement>("#copy-yaml").disabled = !ok;
     const yaml = ok ? toYaml(r) : "";
+    const gpuId = submittedGpuId(r.system);
     $("#yaml-preview").textContent = ok ? yaml : "The YAML appears here once every required field is valid.";
     $("#yaml-preview").classList.toggle("disabled", !ok);
     $("#submit-steps").innerHTML = ok
       ? `<h3>How to submit</h3><ol>
-          <li>Open a pull request to <a href="${UPSTREAM_REPO}" target="_blank" rel="noopener">MattyStacks/open-gpu-benchmarks</a> adding <code>data/community/${esc(r.system.gpuId)}/${esc(suggestedFileName(r, "yaml"))}</code> with the YAML above
-            (<a target="_blank" rel="noopener" href="${UPSTREAM_REPO}/new/main/data/community/${encodeURIComponent(r.system.gpuId)}?filename=${encodeURIComponent(suggestedFileName(r, "yaml"))}&value=${encodeURIComponent(yaml)}">open GitHub's new-file form</a>).</li>
+          ${notListed ? `<li>Your GPU isn't in the catalog yet: in the same pull request, add <code>${esc(gpuId)}</code> to <code>data/gpus/</code> using upstream's <a href="${UPSTREAM_TEMPLATES}" target="_blank" rel="noopener">templates</a> (<a href="${UPSTREAM_CATALOG_README}" target="_blank" rel="noopener">ID rules</a>). Without it, the checks fail.</li>` : ""}
+          <li>Open a pull request to <a href="${UPSTREAM_REPO}" target="_blank" rel="noopener">MattyStacks/open-gpu-benchmarks</a> adding <code>data/community/${esc(gpuId)}/${esc(suggestedFileName(r, "yaml"))}</code> with the YAML above
+            (<a target="_blank" rel="noopener" href="${UPSTREAM_REPO}/new/main/data/community/${encodeURIComponent(gpuId)}?filename=${encodeURIComponent(suggestedFileName(r, "yaml"))}&value=${encodeURIComponent(yaml)}">open GitHub's new-file form</a>).</li>
           <li>If <code>${BENCHMARK.gameId}</code> isn't in <code>data/games.yaml</code> yet, add this entry in the same PR (alphabetical by name):<pre class="yaml">${esc(gamesYamlEntry(Number(r.date.slice(0, 4))))}</pre></li>
           <li>Run <code>python scripts/validate.py results</code> upstream, or let the PR checks run.</li></ol>`
       : "";

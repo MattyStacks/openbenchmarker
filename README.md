@@ -323,20 +323,26 @@ This tool feeds a public dataset, so:
   old "Chrome N" stays unknown because other Chromium browsers recorded the same) or
   "unknown". Limit: iPadOS Safari sends a Mac UA, so an iPad is recognised only by a Mac UA
   plus more than one touch point; a touch-screen Mac would be misread as an iPad. See [docs/privacy-audit.md](docs/privacy-audit.md).
-- The GPU must be an exact `gpu_id` from the upstream catalog. Free text is
-  rejected. If your GPU isn't listed yet, the results page swaps the submit controls for two
-  ways to add it: **Request your GPU** (a prefilled GitHub issue, no coding needed) or **Add it
-  yourself** (a pull request using upstream's
-  [templates](https://github.com/MattyStacks/open-gpu-benchmarks/tree/main/templates)). Once it's
-  listed, reopen the result from My Results and submit it. Saving, sharing and JSON/CSV export work
-  in the meantime.
-- The request issue is prefilled with the GPU name **as reported by the browser**, labelled as an
-  editable starting point (`gpuRequestUrl` in `src/benchmark/catalog.ts`). That name only seeds a
-  catalog request. It never goes into a result or a `system:` field, and it reaches GitHub only
-  when the user clicks the link and submits the issue.
+- The GPU should be an exact `gpu_id` from the upstream catalog. If your GPU isn't listed yet,
+  choose **My GPU isn't listed**: the form then asks for **Your GPU** (its name) and the
+  **Requested gpu_id** (the catalog ID you're asking for, lowercase letters, digits and `_`). Both
+  are saved with the result and carried to later runs, so you can keep running and saving until
+  the GPU is added. The same panel offers **Request your GPU** (a prefilled GitHub issue, no coding
+  needed) and **Add it yourself** (a pull request using upstream's
+  [templates](https://github.com/MattyStacks/open-gpu-benchmarks/tree/main/templates)). The YAML
+  can still be downloaded, using the requested id as `gpu_id`, with a warning
+  (`submissionWarnings` in `validate.ts`) and a YAML comment that the submission fails upstream
+  checks unless the GPU is added to the catalog first or in the same pull request. Or, once it's
+  listed, reopen the result from My Results, pick it and submit. Share links carry the requested
+  id (not the name).
+- The request issue is prefilled with the GPU name you typed or, if blank, the name **as
+  reported by the browser**, labelled as an editable starting point (`gpuRequestUrl` in
+  `src/benchmark/catalog.ts`). The browser's name only seeds a catalog request: it never goes into
+  a result or a `system:` field, and it reaches GitHub only when the user clicks the link and
+  submits the issue.
 - Validation (`src/benchmark/validate.ts`) fails closed and mirrors upstream
   `templates/community_submission.yaml` and `scripts/checks.py`. Required:
-  catalog `gpu_id`, `game_id`, date, resolution, preset, `avg_fps`, `p1_low`,
+  catalog `gpu_id` (or, for an unlisted GPU, its name and a well-formed requested id), `game_id`, date, resolution, preset, `avg_fps`, `p1_low`,
   `system.os` (`windows`|`linux`), and `proof.method`. The resolution must be
   `720p`, `1080p`, `1440p` or `4K`, and match the rendered pixel size: older results
   from the removed Native option at any other size stay local only. A `score` must match its

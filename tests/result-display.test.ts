@@ -11,6 +11,7 @@ import {
   mixesMajors,
   runClass,
   sortRuns,
+  canExportYaml,
   submissionStatus,
   tableStatus,
 } from "../src/app/result-display";
@@ -64,6 +65,11 @@ describe("display rules table", () => {
 
   it("desktop runs with an unlisted GPU: a way to add it, not a missing field", () => {
     expect(submissionStatus(result({ device: DESK, mobile: false, system: { ...READY_SYS, gpuId: NOT_LISTED } }))).toEqual({ kind: "gpu-not-listed", text: "GPU not in the catalog yet" });
+    const named = result({ device: DESK, mobile: false, system: { ...READY_SYS, gpuId: NOT_LISTED, gpuName: "Radeon RX 9070 XT", gpuIdRequested: "rx_9070_xt_16gb" } });
+    expect(submissionStatus(named)).toEqual({ kind: "ready-unlisted", text: "GPU not in the catalog yet: submitting may fail" });
+    expect(tableStatus(named)).toEqual({ cls: "next", text: "⚠ GPU not listed yet" });
+    expect(canExportYaml(named)).toBe(true);
+    expect(canExportYaml(result({ device: DESK, mobile: false, system: { ...READY_SYS, gpuId: NOT_LISTED } }))).toBe(false);
   });
 
   it("unknown (old) runs: same calm wording as desktop", () => {
