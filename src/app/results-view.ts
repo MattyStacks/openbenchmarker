@@ -19,7 +19,9 @@ import { decodeShare, encodeShare, shareBlocker, sharedRunFrom, type SharedRun }
 import { clearPending, pendingCode, setPending } from "./challenge";
 import { LABELS, bindCompareBoxes, compareBoxHtml, comparePanelHtml } from "./compare-view";
 import { prefillFromShare } from "./home";
-import { commandsFor } from "../benchmark/sysinfo";
+import { SYSINFO_COMMANDS } from "../benchmark/sysinfo";
+import { catalogFile } from "../benchmark/gpu-id";
+import { bindGpuHelper, gpuFileHtml, gpuHelperHtml, osSwitchHtml, renderGpuFile, type CmdOs } from "./gpu-helper";
 import { LINUX_ONLY_FIELDS, OVERCLOCK_FIELDS, SYSTEM_FIELDS, UNLISTED_GPU_FIELDS, fieldFor, submittedGpuId, type SystemField } from "../benchmark/fields";
 import type { BenchResult, SystemInfo } from "../benchmark/types";
 import { submissionWarnings, validateSubmission } from "../benchmark/validate";
@@ -250,8 +252,10 @@ export function renderResults(r: BenchResult): void {
         <p class="muted tiny">The catalog is new and growing: ${GPU_CATALOG.length} GPU${GPU_CATALOG.length === 1 ? "" : "s"} as of ${esc(CATALOG_SNAPSHOT_DATE)} (<a href="${UPSTREAM_REPO}/tree/main/data/gpus" target="_blank" rel="noopener">catalog</a>). Don't see yours? Choose "My GPU isn't listed".</p>
         <div id="gpu-blocked" class="blocked" hidden>
           <p><b>Your GPU isn't in the catalog yet — help add it!</b> The catalog is new and growing, and every card added makes the dataset more useful for everyone.</p>
-          ${UNLISTED_GPU_FIELDS.map(inputField).join("")}
+          ${gpuHelperHtml(r.system.os === "linux" ? "linux" : "windows")}
+          ${UNLISTED_GPU_FIELDS.filter((f) => f.kind === "text").map(inputField).join("")}
           <p class="muted tiny">Saved with this result and filled in on your next runs, so you can keep running and saving until your GPU is added. <a href="${UPSTREAM_CATALOG_README}" target="_blank" rel="noopener">ID rules</a></p>
+          ${gpuFileHtml()}
           <div class="blocked-links">
             <p><a class="btn btn-primary" id="gpu-request" href="${esc(gpuRequestUrl(r.system.gpuName || r.device?.gpuLabel))}" target="_blank" rel="noopener">Request your GPU (open an issue) →</a> <span class="muted tiny">Easiest, no coding needed.</span></p>
             <p><a class="btn" href="${UPSTREAM_TEMPLATES}" target="_blank" rel="noopener">Add it yourself (pull request) →</a> <span class="muted tiny">If you're comfortable with GitHub (<a href="${UPSTREAM_CATALOG_README}" target="_blank" rel="noopener">ID rules</a>).</span></p>
@@ -348,16 +352,16 @@ export function renderResults(r: BenchResult): void {
     const el = form.elements.namedItem(k) as HTMLInputElement | HTMLSelectElement | null;
     if (el) el.value = v;
   }
-  // Read-only lookup commands for the chosen OS. Shown only; the page never runs them.
-  let cmdsOs: string | null = null;
+  // Read-only lookup commands, Windows unless the form says Linux. Shown only; the page never runs them.
+  let cmdOs: CmdOs = r.system.os === "linux" ? "linux" : "windows";
+  let formOs = r.system.os;
   const renderCommands = () => {
-    if (cmdsOs === r.system.os) return;
-    cmdsOs = r.system.os;
-    const set = commandsFor(r.system.os);
+    const set = SYSINFO_COMMANDS[cmdOs];
     const fieldLabel = (f: string) => (f === "gpu" ? "GPU (above)" : (fieldFor(f)?.label ?? f));
-    $("#os-cmds").innerHTML = set
-      ? `<div class="cmds">
-          <h3>Find these values on this ${r.system.os === "windows" ? "PC" : "machine"} <span class="muted">(${esc(set.shell)})</span></h3>
+    $("#os-cmds").innerHTML = `<div class="cmds">
+          <h3>Find these values on this ${cmdOs === "windows" ? "PC" : "machine"} <span class="muted">(${esc(set.shell)})</span></h3>
+          ${osSwitchHtml("cmd-os", cmdOs)}
+          ${cmdOs === "windows" ? `<p class="muted tiny">On Linux? Switch to Linux above for the same lookups in a terminal.</p>` : ""}
           <p class="muted tiny">${esc(set.howToOpen)} These commands only read information. This page never runs them or reads your system: you copy the values into the fields yourself.</p>
           <div class="cmd"><div class="cmd-head"><b>Everything at once</b><button type="button" class="btn btn-sm" data-copy="all">Copy</button></div><pre>${esc(set.all)}</pre></div>
           ${set.commands
@@ -366,13 +370,38 @@ export function renderResults(r: BenchResult): void {
               ${c.command ? `<pre>${esc(c.command)}</pre>` : ""}${c.note ? `<p class="muted tiny">${esc(c.note)}</p>` : ""}</div>`,
             )
             .join("")}
-        </div>`
-      : `<p class="muted tiny">Choose an operating system to see commands that look up these values for you.</p>`;
+        </div>`;
   };
+  const helper = bindGpuHelper($("#gpu-blocked"), {
+    os: () => cmdOs,
+    setOs: (os) => setCmdOs(os),
+    apply: (vals) => {
+      for (const [k, v] of Object.entries(vals)) {
+        (r.system as unknown as Record<string, string>)[k] = v;
+        const el = form.elements.namedItem(k) as HTMLInputElement | HTMLSelectElement | null;
+        if (el) el.value = v;
+      }
+      saveEdit();
+    },
+    pickListed: (id) => {
+      r.system.gpuId = id;
+      (form.elements.namedItem("gpuId") as HTMLSelectElement).value = id;
+      saveEdit();
+    },
+  });
+  function setCmdOs(os: CmdOs): void {
+    cmdOs = os;
+    renderCommands();
+    helper.renderOs();
+  }
+  $("#os-cmds").addEventListener("change", (e) => {
+    const el = e.target as HTMLInputElement;
+    if (el.name === "cmd-os") setCmdOs(el.value as CmdOs);
+  });
   $("#os-cmds").addEventListener("click", async (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-copy]");
-    const set = commandsFor(r.system.os);
-    if (!btn || !set) return;
+    const set = SYSINFO_COMMANDS[cmdOs];
+    if (!btn) return;
     const text = btn.dataset.copy === "all" ? set.all : set.commands[Number(btn.dataset.copy)].command;
     try {
       await navigator.clipboard.writeText(text);
@@ -384,9 +413,14 @@ export function renderResults(r: BenchResult): void {
     }
     setTimeout(() => (btn.textContent = "Copy"), 1800);
   });
+  renderCommands();
 
   const refresh = () => {
-    renderCommands();
+    // Choosing an OS in the form shows its commands; the switch alone doesn't change the form.
+    if (r.system.os !== formOs) {
+      formOs = r.system.os;
+      if (formOs === "windows" || formOs === "linux") setCmdOs(formOs);
+    }
     form.querySelectorAll<HTMLElement>("[data-suggested]").forEach((t) => (t.hidden = !r.suggested?.includes(t.dataset.suggested as keyof SystemInfo)));
     const errors = validateSubmission(r);
     const ok = errors.length === 0;
@@ -396,7 +430,10 @@ export function renderResults(r: BenchResult): void {
     // Not listed: the GPU's name and requested id, the ways to add it, and a warning on submit.
     const notListed = r.system.gpuId === NOT_LISTED;
     $("#gpu-blocked").hidden = !notListed;
-    if (notListed) $<HTMLAnchorElement>("#gpu-request").href = gpuRequestUrl(r.system.gpuName || r.device?.gpuLabel);
+    if (notListed) {
+      $<HTMLAnchorElement>("#gpu-request").href = gpuRequestUrl(r.system.gpuName || r.device?.gpuLabel);
+      renderGpuFile($("#gpu-blocked"), r.system);
+    }
     const warnings = ok ? submissionWarnings(r) : [];
     $("#val-box").innerHTML = ok
       ? warnings.length
@@ -407,17 +444,34 @@ export function renderResults(r: BenchResult): void {
     $<HTMLButtonElement>("#copy-yaml").disabled = !ok;
     const yaml = ok ? toYaml(r) : "";
     const gpuId = submittedGpuId(r.system);
+    const ff = r.system.gpuFormFactor;
+    const gpuFile = notListed && (ff === "desktop" || ff === "laptop") ? catalogFile(gpuId, r.system.gpuName, ff) : null;
     $("#yaml-preview").textContent = ok ? yaml : "The YAML appears here once every required field is valid.";
     $("#yaml-preview").classList.toggle("disabled", !ok);
     $("#submit-steps").innerHTML = ok
       ? `<h3>How to submit</h3><ol>
-          ${notListed ? `<li>Your GPU isn't in the catalog yet: in the same pull request, add <code>${esc(gpuId)}</code> to <code>data/gpus/</code> using upstream's <a href="${UPSTREAM_TEMPLATES}" target="_blank" rel="noopener">templates</a> (<a href="${UPSTREAM_CATALOG_README}" target="_blank" rel="noopener">ID rules</a>). Without it, the checks fail.</li>` : ""}
+          ${
+            notListed
+              ? gpuFile
+                ? `<li>Your GPU isn't in the catalog yet: in the same pull request, add <code>${esc(gpuFile.path)}</code> with your GPU's catalog file (under GPU in the form). Without it, the checks fail.</li>`
+                : `<li>Your GPU isn't in the catalog yet: in the same pull request, add <code>${esc(gpuId)}</code> to <code>data/gpus/</code> using upstream's <a href="${UPSTREAM_TEMPLATES}" target="_blank" rel="noopener">templates</a> (<a href="${UPSTREAM_CATALOG_README}" target="_blank" rel="noopener">ID rules</a>). Without it, the checks fail.</li>`
+              : ""
+          }
           <li>Open a pull request to <a href="${UPSTREAM_REPO}" target="_blank" rel="noopener">MattyStacks/open-gpu-benchmarks</a> adding <code>data/community/${esc(gpuId)}/${esc(suggestedFileName(r, "yaml"))}</code> with the YAML above
             (<a target="_blank" rel="noopener" href="${UPSTREAM_REPO}/new/main/data/community/${encodeURIComponent(gpuId)}?filename=${encodeURIComponent(suggestedFileName(r, "yaml"))}&value=${encodeURIComponent(yaml)}">open GitHub's new-file form</a>).</li>
           <li>If <code>${BENCHMARK.gameId}</code> isn't in <code>data/games.yaml</code> yet, add this entry in the same PR (alphabetical by name):<pre class="yaml">${esc(gamesYamlEntry(Number(r.date.slice(0, 4))))}</pre></li>
           <li>Run <code>python scripts/validate.py results</code> upstream, or let the PR checks run.</li></ol>`
       : "";
   };
+  function saveEdit(): void {
+    // Reviewed by the user: the "filled in from" note has done its job.
+    if (r.carriedFrom) {
+      delete r.carriedFrom;
+      view.querySelector("#carried-note")?.remove();
+    }
+    upsertResult(r);
+    refresh();
+  }
   form.addEventListener("input", (e) => {
     const el = e.target as HTMLInputElement | HTMLSelectElement;
     if (el.name in r.system) {
@@ -427,13 +481,7 @@ export function renderResults(r: BenchResult): void {
         r.suggested = r.suggested.filter((k) => k !== el.name);
         if (!r.suggested.length) delete r.suggested;
       }
-      // Reviewed by the user: the "filled in from" note has done its job.
-      if (r.carriedFrom) {
-        delete r.carriedFrom;
-        view.querySelector("#carried-note")?.remove();
-      }
-      upsertResult(r);
-      refresh();
+      saveEdit();
     }
   });
   form.addEventListener("submit", (e) => e.preventDefault());

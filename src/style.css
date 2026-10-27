@@ -348,6 +348,16 @@ body[data-view="run"] { height: 100dvh; overflow: hidden; overscroll-behavior: n
 .sys-form .oc-details { display: none; margin: 0; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 10px; gap: 12px; min-width: 0; }
 .sys-form.show-oc .oc-details { display: grid; }
 .oc-details legend { padding: 0 4px; font-size: 13px; }
+.seg-sm span { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+.gpu-helper, .gpu-file { display: grid; gap: 8px; margin: 10px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); min-width: 0; }
+.gpu-helper h3, .gpu-file h3 { margin: 0; font-size: 14px; }
+.helper-steps { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
+.helper-steps li { display: grid; gap: 6px; min-width: 0; }
+.helper-steps textarea { width: 100%; box-sizing: border-box; font: 12px var(--mono); padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); resize: vertical; }
+[data-helper-result] { display: grid; gap: 8px; }
+[data-helper-result] p { margin: 0; }
+.helper-id code { font-size: 14px; color: var(--cyan); word-break: break-all; }
+.gpu-file pre.yaml { margin: 0; }
 .warn-box { padding: 10px 14px; border: 1px solid var(--amber); border-radius: 10px; background: rgba(255, 179, 64, 0.08); font-size: 14px; }
 .warn-box ul { margin: 6px 0; padding-left: 20px; }
 .warn-box p { margin: 0; }

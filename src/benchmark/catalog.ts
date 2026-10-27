@@ -14,6 +14,17 @@ export interface CatalogGpu {
 export const CATALOG_SNAPSHOT_DATE: string = snapshot.snapshotDate;
 export const GPU_CATALOG: readonly CatalogGpu[] = snapshot.gpus;
 
+/**
+ * Upstream reference files (data/gpus/reference/<vendor>/<id>.yaml): the shared specs of one GPU
+ * chip and memory size, e.g. rtx_5090_laptop_24gb. Results never use them; they're the `base:` a
+ * product builds on, and its id starts with them. Used to build the id of a GPU that isn't listed.
+ */
+export interface ReferenceGpu {
+  id: string;
+  vendor: string;
+}
+export const GPU_REFERENCES: readonly ReferenceGpu[] = snapshot.references;
+
 /** Sentinel for "my GPU is not in the catalog": blocks submission, never a gpu_id. */
 export const NOT_LISTED = "__not_listed__";
 

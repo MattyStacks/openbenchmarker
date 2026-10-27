@@ -1,12 +1,1250 @@
 {
-  "snapshotDate": "2026-10-23",
-  "source": "https://github.com/MattyStacks/open-gpu-benchmarks/tree/819da39987ddbeb0e2305a368f0c332f4972b9e6/data/gpus",
+  "snapshotDate": "2026-10-27",
+  "source": "https://github.com/MattyStacks/open-gpu-benchmarks/tree/fc94e56089f39b79ebbf6a474342747882f09f8d/data/gpus",
   "gpus": [
     {
       "id": "rtx_5080_16gb_fe",
       "name": "GeForce RTX 5080 Founders Edition",
       "vendor": "nvidia",
       "formFactor": "desktop"
+    }
+  ],
+  "references": [
+    {
+      "id": "hd_5450_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_5570_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_5670_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_5750_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_5770_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_5830_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_5850_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_5870_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_5970_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_6450_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_6570_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_6670_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_6750_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_6770_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_6850_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_6870_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_6950_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_6970_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_7730",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_7750_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_7770_ghz_edition_1gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_7790",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_7850_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_7870_ghz_edition_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_7950_3gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_7970_3gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_7970_ghz_edition_3gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_7990",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_8570m_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_8590m_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_8670m_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_8690m_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_8730m_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_8750m_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_8770m_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_8790m_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_8830m_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_8850m_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_8870m_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "hd_8970m_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r5_230_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r5_235_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r5_m230_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r5_m240",
+      "vendor": "amd"
+    },
+    {
+      "id": "r5_m240x",
+      "vendor": "amd"
+    },
+    {
+      "id": "r5_m255_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r5_m255x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r5_m315_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r5_m320_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r5_m330_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r5_m335_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r5_m335x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_240_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_250_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_250x_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_260_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_260x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_265_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_360_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_370_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m260_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m260x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m265_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m265ae",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m265x",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m270",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m340_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m350_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m360_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m365_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m365x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m370_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m375_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r7_m380_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_270_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_270x_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_280_3gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_280x_3gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_285",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_290",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_290x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_295x2_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_380_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_380x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_390_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_390x_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_fury_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_fury_x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m265x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m270x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m275x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m280_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m280x",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m285x",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m290x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m295x",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m360_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m365x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m375_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m375x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m380_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m385_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m385x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m390_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m390x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m395_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_m395x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "r9_nano_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "radeon_520_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "radeon_530_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "radeon_535_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "radeon_540_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "radeon_540x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "radeon_550x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "radeon_610_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "radeon_620_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "radeon_625_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "radeon_630_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "radeon_vii_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_460_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_470_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_480_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_5300_3gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_5300m_3gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_540_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_540x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_550_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_5500_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_5500_xt_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_5500m_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_550x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_560_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_560_oem_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_5600_6gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_5600_xt_6gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_5600m_6gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_560x_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_570_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_570_oem_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_5700_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_5700_xt_50th_anniversary_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_5700_xt_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_5700m_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_570x_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_580_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_580_oem_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_580x_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_590_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6300m_2gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_640_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6400_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6450m_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6500_xt_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6500_xt_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6500m_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6550m_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6550s_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6600_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6600_xt_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6600m_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6600s_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6650_xt_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6650m_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6650m_xt_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6700_10gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6700_xt_12gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6700m_10gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6700s_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6750_xt_12gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6800_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6800_xt_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6800m_12gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6800s_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6850m_xt_12gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6900_xt_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_6950_xt_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7400_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7600_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7600_xt_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7600m_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7600m_xt_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7600s_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7700_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7700_xt_12gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7700s_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7800_xt_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7800m_12gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7900_gre_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7900_xt_20gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7900_xtx_24gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_7900m_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_9050_4gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_9050_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_9060_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_9060_xt_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_9060_xt_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_9060_xt_lp_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_9070_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_9070_gre_12gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_9070_xt_16gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_vega_56_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_vega_64_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "rx_vega_64_liquid_cooled_8gb",
+      "vendor": "amd"
+    },
+    {
+      "id": "arc_130t",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_130v",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_140t",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_140v",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a310_4gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a310e_4gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a350e_4gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a350m_4gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a370e_4gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a370m_4gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a380_6gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a380e_6gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a530m",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a550m_8gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a570m_8gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a580_8gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a580e_16gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a730m_12gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a750_8gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a750e_16gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a770_16gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a770_8gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_a770m_16gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_b370",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_b390",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_b570_10gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "arc_b580_12gb",
+      "vendor": "intel"
+    },
+    {
+      "id": "gt_1030_2gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gt_1030_ddr4_2gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1050_2gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1050_3gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1050_ti_4gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1060_3gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1060_6gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1070_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1070_ti_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1080_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1080_ti_11gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1630_4gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1650_4gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1650_gddr6_4gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1650_super_4gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1660_6gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1660_super_6gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "gtx_1660_ti_6gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_2060_12gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_2060_6gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_2060_super_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_2070_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_2070_super_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_2080_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_2080_super_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_2080_ti_11gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3050_6gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3050_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3050_laptop_4gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3050_laptop_6gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3050_ti_laptop_4gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3060_12gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3060_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3060_laptop_6gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3060_ti_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3060_ti_gddr6x_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3070_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3070_laptop_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3070_ti_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3070_ti_laptop_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3080_10gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3080_12gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3080_laptop_16gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3080_laptop_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3080_ti_12gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3080_ti_laptop_16gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3090_24gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_3090_ti_24gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4050_laptop_6gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4060_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4060_laptop_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4060_ti_16gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4060_ti_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4070_12gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4070_gddr6_12gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4070_laptop_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4070_super_12gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4070_ti_12gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4070_ti_super_16gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4080_16gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4080_laptop_12gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4080_super_16gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4090_24gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_4090_laptop_16gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5050_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5050_laptop_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5060_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5060_laptop_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5060_ti_16gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5060_ti_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5070_12gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5070_laptop_12gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5070_laptop_8gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5070_ti_16gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5070_ti_laptop_12gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5080_16gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5080_laptop_16gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5090_32gb",
+      "vendor": "nvidia"
+    },
+    {
+      "id": "rtx_5090_laptop_24gb",
+      "vendor": "nvidia"
     }
   ]
 }

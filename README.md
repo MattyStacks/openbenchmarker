@@ -325,9 +325,21 @@ This tool feeds a public dataset, so:
   plus more than one touch point; a touch-screen Mac would be misread as an iPad. See [docs/privacy-audit.md](docs/privacy-audit.md).
 - The GPU should be an exact `gpu_id` from the upstream catalog. If your GPU isn't listed yet,
   choose **My GPU isn't listed**: the form then asks for **Your GPU** (its name) and the
-  **Requested gpu_id** (the catalog ID you're asking for, lowercase letters, digits and `_`). Both
-  are saved with the result and carried to later runs, so you can keep running and saving until
-  the GPU is added. The same panel offers **Request your GPU** (a prefilled GitHub issue, no coding
+  **Requested gpu_id** (the catalog ID you're asking for). An ID helper builds both: it shows the
+  GPU lookup command (Windows by default, Linux on a switch), the user pastes what it printed, and
+  `src/benchmark/gpu-id.ts` reads the computer type, each GPU's name, VRAM and board maker (PCI
+  subsystem vendor), matches the chip to an upstream reference id (`references` in the catalog
+  snapshot) and builds the id:
+  laptop `<reference>_reference` (`rtx_5090_laptop_24gb_reference`, no laptop maker or model);
+  desktop `<reference>_fe` / `_reference` / `_le` for the GPU vendor's own card,
+  `<reference>_<brand>_<product_line>` when the line is typed, `<reference>_<brand>_reference`
+  when only the brand is known, or `<reference>_reference`. `reference` stands in for an unknown
+  variant (proposed upstream, see
+  [docs/upstream-submission-changes.md](docs/upstream-submission-changes.md)). The panel also gives
+  the GPU's catalog file (`data/gpus/<form_factor>/<vendor>/<id>.yaml`, with `base:` set to the
+  reference) to download, copy or open in GitHub's new-file form. Name, requested id and desktop
+  or laptop are saved with the result and carried to later runs, so you can keep running and
+  saving until the GPU is added. The paste itself isn't saved, and the page never runs the command. The same panel offers **Request your GPU** (a prefilled GitHub issue, no coding
   needed) and **Add it yourself** (a pull request using upstream's
   [templates](https://github.com/MattyStacks/open-gpu-benchmarks/tree/main/templates)). The YAML
   can still be downloaded, using the requested id as `gpu_id`, with a warning

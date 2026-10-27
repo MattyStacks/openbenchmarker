@@ -28,16 +28,23 @@ const WIN_MEM_TYPES = "@{20='DDR';21='DDR2';24='DDR3';26='DDR4';30='LPDDR4';34='
 const MEM_CHANNELS_NOTE = "No command reads this reliably. Most desktops run 2 (dual channel) with two or four sticks, and 1 with a single stick. CPU-Z's Memory tab (Windows) or your motherboard manual tells you for sure.";
 
 const WIN = {
-  gpu: `Get-ItemProperty '${WIN_GPU_KEY}' -ErrorAction SilentlyContinue | Where-Object { $_.'HardwareInformation.qwMemorySize' } | ForEach-Object { "$($_.DriverDesc) ($([math]::Round($_.'HardwareInformation.qwMemorySize' / 1GB)) GB)" }`,
+  // Desktop or laptop, then each GPU with its VRAM and its board maker (PCI subsystem vendor), in
+  // the lines the results page reads to build a catalog id (src/benchmark/gpu-id.ts).
+  gpu: [
+    `$t = if ((Get-CimInstance Win32_ComputerSystem).PCSystemType -eq 2) { 'laptop' } else { 'desktop' }; "Computer type: $t"`,
+    `$keys = Get-ItemProperty '${WIN_GPU_KEY}' -ErrorAction SilentlyContinue`,
+    `Get-CimInstance Win32_VideoController | ForEach-Object { $n = $_.Name; $k = $keys | Where-Object { $_.DriverDesc -eq $n -and $_.'HardwareInformation.qwMemorySize' } | Select-Object -First 1; $gb = if ($k) { [math]::Round($k.'HardwareInformation.qwMemorySize' / 1GB) } else { '?' }; $b = if ($_.PNPDeviceID -match 'SUBSYS_[0-9A-F]{4}([0-9A-F]{4})') { $Matches[1] } else { '?' }; "GPU: $n ($gb GB) [board $b]" }`,
+  ].join("\n"),
   osDetail: `$os = Get-CimInstance Win32_OperatingSystem; "$($os.Caption -replace '^Microsoft ','') $((Get-ItemProperty '${WIN_CV_KEY}').DisplayVersion)".Trim()`,
   cpu: `(Get-CimInstance Win32_Processor | Select-Object -First 1).Name.Trim()`,
   memoryGb: `[math]::Round((Get-CimInstance Win32_PhysicalMemory | Measure-Object Capacity -Sum).Sum / 1GB)`,
   memoryType: `$m = Get-CimInstance Win32_PhysicalMemory | Select-Object -First 1; "$(${WIN_MEM_TYPES}[[int]$m.SMBIOSMemoryType])-$($m.ConfiguredClockSpeed)"`,
   driver: `nvidia-smi --query-gpu=name,driver_version --format=csv,noheader`,
   // AMD's installer records the AMD Software (Adrenalin) version next to Windows' own number.
-  driverAmd: `Get-ItemProperty '${WIN_GPU_KEY}' -ErrorAction SilentlyContinue | Where-Object { $_.RadeonSoftwareVersion } | ForEach-Object { "$($_.DriverDesc): $($_.RadeonSoftwareVersion)" }`,
+  // Only GPUs present now: the registry also keeps entries for cards that were removed.
+  driverAmd: `$now = (Get-CimInstance Win32_VideoController).Name; Get-ItemProperty '${WIN_GPU_KEY}' -ErrorAction SilentlyContinue | Where-Object { $_.RadeonSoftwareVersion -and $now -contains $_.DriverDesc } | ForEach-Object { "$($_.DriverDesc): $($_.RadeonSoftwareVersion)" }`,
   // Intel publishes its drivers under Windows' own version number.
-  driverIntel: `Get-ItemProperty '${WIN_GPU_KEY}' -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -match 'Intel' -and $_.DriverDesc } | ForEach-Object { "$($_.DriverDesc): $($_.DriverVersion)" }`,
+  driverIntel: `$now = (Get-CimInstance Win32_VideoController).Name; Get-ItemProperty '${WIN_GPU_KEY}' -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -match 'Intel' -and $now -contains $_.DriverDesc } | ForEach-Object { "$($_.DriverDesc): $($_.DriverVersion)" }`,
 };
 
 /**
@@ -48,7 +55,13 @@ const WIN = {
 const LINUX_MESA = `{ glxinfo -B 2>/dev/null | grep -o 'Mesa [0-9][0-9.]*' | cut -d' ' -f2; dpkg-query -W -f='\${Version}\\n' libglx-mesa0 2>/dev/null; rpm -q --qf '%{VERSION}\\n' mesa-dri-drivers Mesa-dri 2>/dev/null; pacman -Q mesa 2>/dev/null | cut -d' ' -f2; } | grep -m1 '^[0-9]' | sed 's/^[0-9]*://; s/[-+~].*//'`;
 
 const LINUX = {
-  gpu: `lspci | grep -Ei 'vga|3d|display'; nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null`,
+  // Same lines as the Windows command. chassis_type 8-14 and 30-32 are portables; the board maker is
+  // the PCI subsystem vendor (nvidia-smi gives it as the last 4 hex digits of pci.sub_device_id).
+  gpu: [
+    `case "$(cat /sys/class/dmi/id/chassis_type 2>/dev/null)" in 8|9|10|11|14|30|31|32) echo "Computer type: laptop";; *) echo "Computer type: desktop";; esac`,
+    `command -v nvidia-smi >/dev/null && nvidia-smi --query-gpu=name,memory.total,pci.sub_device_id --format=csv,noheader,nounits | awk -F', ' '{printf "GPU: %s (%d GB) [board %s]\\n", $1, ($2 + 512) / 1024, substr($3, length($3) - 3)}'`,
+    `for d in /sys/bus/pci/devices/*; do case "$(cat "$d/class")" in 0x03*) ;; *) continue;; esac; [ "$(cat "$d/vendor")" = 0x10de ] && command -v nvidia-smi >/dev/null && continue; n=$(lspci -mm -s "\${d##*/}" 2>/dev/null | cut -d'"' -f6); [ -n "$n" ] || continue; v=$(cat "$d/mem_info_vram_total" 2>/dev/null); g='?'; [ -n "$v" ] && g=$(( (v + 536870912) / 1073741824 )); echo "GPU: $n ($g GB) [board $(cut -c3- "$d/subsystem_vendor")]"; done`,
+  ].join("\n"),
   osDetail: `. /etc/os-release && echo "$PRETTY_NAME"`,
   distro: `. /etc/os-release && echo "$NAME"`,
   kernel: `uname -r`,
@@ -65,7 +78,12 @@ export const SYSINFO_COMMANDS: Record<"windows" | "linux", OsCommands> = {
     shell: "PowerShell",
     howToOpen: "Right-click Start → Terminal (or Windows PowerShell), paste, press Enter.",
     commands: [
-      { field: "gpu", label: "GPU and VRAM (to pick the catalog entry)", command: WIN.gpu },
+      {
+        field: "gpu",
+        label: "GPU, VRAM and board maker (to pick or build the catalog ID)",
+        command: WIN.gpu,
+        note: "Paste what it prints into \"My GPU isn't listed\" to build your GPU's ID.",
+      },
       { field: "osDetail", label: "OS version", command: WIN.osDetail },
       { field: "cpu", label: "CPU", command: WIN.cpu },
       { field: "memoryGb", label: "Memory (GB)", command: WIN.memoryGb, note: "Installed RAM, summed across all modules." },
@@ -81,21 +99,26 @@ export const SYSINFO_COMMANDS: Record<"windows" | "linux", OsCommands> = {
       { field: "driver", label: "GPU driver (Intel)", command: WIN.driverIntel, note: "Prints e.g. 32.0.101.6083. Intel publishes its drivers under this same number, also shown in Intel Graphics Software." },
     ],
     all: [
-      `"GPU:         " + ((${WIN.gpu}) -join '; ')`,
+      WIN.gpu,
       `${WIN.osDetail.replace('"$(', '"OS version:  $(')}`,
       `"CPU:         " + ${WIN.cpu}`,
       `"Memory (GB): " + ${WIN.memoryGb}`,
       `${WIN.memoryType.replace('"$(', '"Memory type: $(')}`,
       `if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) { "GPU driver (NVIDIA): " + (nvidia-smi --query-gpu=driver_version --format=csv,noheader) }`,
-      `(${WIN.driverAmd}) | ForEach-Object { "GPU driver (AMD):    $_" }`,
-      `(${WIN.driverIntel}) | ForEach-Object { "GPU driver (Intel):  $_" }`,
+      `$(${WIN.driverAmd}) | ForEach-Object { "GPU driver (AMD):    $_" }`,
+      `$(${WIN.driverIntel}) | ForEach-Object { "GPU driver (Intel):  $_" }`,
     ].join("\n"),
   },
   linux: {
     shell: "Terminal (bash)",
     howToOpen: "Open a terminal, paste, press Enter. Memory commands use sudo to read DMI tables.",
     commands: [
-      { field: "gpu", label: "GPU (to pick the catalog entry)", command: LINUX.gpu },
+      {
+        field: "gpu",
+        label: "GPU, VRAM and board maker (to pick or build the catalog ID)",
+        command: LINUX.gpu,
+        note: "Paste what it prints into \"My GPU isn't listed\" to build your GPU's ID. Uses lspci (pciutils) for AMD and Intel names.",
+      },
       { field: "osDetail", label: "OS version", command: LINUX.osDetail },
       { field: "distro", label: "Distro", command: LINUX.distro },
       { field: "kernel", label: "Kernel", command: LINUX.kernel },
@@ -119,8 +142,7 @@ export const SYSINFO_COMMANDS: Record<"windows" | "linux", OsCommands> = {
       { field: "proton", label: "Proton", command: "", note: "Not applicable: Proton runs Windows games through Steam, and this benchmark runs in your browser. Leave blank." },
     ],
     all: [
-      `echo "GPU:         $(lspci 2>/dev/null | grep -Ei 'vga|3d|display' | cut -d: -f3- | sed 's/^ //' | paste -sd ';')"`,
-      `echo "GPU (NVIDIA): $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null)"`,
+      LINUX.gpu,
       `echo "OS version:  $(${LINUX.osDetail})"`,
       `echo "Distro:      $(${LINUX.distro})"`,
       `echo "Kernel:      $(${LINUX.kernel})"`,

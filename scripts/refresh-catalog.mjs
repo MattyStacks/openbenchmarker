@@ -2,7 +2,8 @@
 // Re-pull the GPU catalog from MattyStacks/open-gpu-benchmarks into
 // src/benchmark/gpu-catalog.json. Product entries live at
 // data/gpus/<form_factor>/<gpu_vendor>/<gpu_id>.yaml; data/gpus/reference/ holds
-// base models that results must not use, so it is skipped.
+// base models that results must not use, so only their ids and vendors are kept (from the file
+// names, no extra fetches), for building the id of a GPU that isn't listed yet.
 // Refuses to overwrite the snapshot with an empty list.
 //
 //   npm run refresh-catalog            (set GITHUB_TOKEN to avoid API rate limits)
@@ -33,9 +34,12 @@ const commit = await get(`https://api.github.com/repos/${REPO}/commits/${branch}
 const tree = await get(`https://api.github.com/repos/${REPO}/git/trees/${commit.sha}?recursive=1`);
 if (tree.truncated) throw new Error("GitHub tree listing was truncated; refusing to write a partial catalog");
 
-const entries = tree.tree
-  .map((t) => t.path.match(/^data\/gpus\/([^/]+)\/([^/]+)\/([a-z0-9_]+)\.ya?ml$/))
-  .filter((m) => m && m[1] !== "reference");
+const paths = tree.tree.map((t) => t.path.match(/^data\/gpus\/([^/]+)\/([^/]+)\/([a-z0-9_]+)\.ya?ml$/)).filter(Boolean);
+const entries = paths.filter((m) => m[1] !== "reference");
+const references = paths
+  .filter((m) => m[1] === "reference")
+  .map(([, , vendor, id]) => ({ id, vendor }))
+  .sort((a, b) => a.vendor.localeCompare(b.vendor) || a.id.localeCompare(b.id));
 
 const gpus = [];
 for (const [path, formFactor, vendor, id] of entries) {
@@ -58,7 +62,8 @@ const snapshot = {
   snapshotDate: new Date().toISOString().slice(0, 10),
   source: `https://github.com/${REPO}/tree/${commit.sha}/data/gpus`,
   gpus,
+  references,
 };
 writeFileSync(OUT, JSON.stringify(snapshot, null, 2) + "\n");
-console.log(`Wrote ${gpus.length} GPU(s) from ${REPO}@${commit.sha.slice(0, 7)} to ${OUT}`);
+console.log(`Wrote ${gpus.length} GPU(s) and ${references.length} reference id(s) from ${REPO}@${commit.sha.slice(0, 7)} to ${OUT}`);
 for (const g of gpus) console.log(`  ${g.formFactor}/${g.vendor}/${g.id}  ${g.name}`);

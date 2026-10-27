@@ -78,6 +78,56 @@ test("a GPU that isn't listed can be typed in, saved and submitted with a warnin
   await expect(form.locator('[name="gpuIdRequested"]')).toHaveValue("rx_9070_xt_16gb");
 });
 
+test("lookup commands show with no OS chosen: Windows first, Linux on request", async ({ page }) => {
+  await page.addInitScript(() => {
+    const raw = JSON.parse(localStorage.getItem("ogb.results.v1") ?? "[]");
+    if (raw[0] && !sessionStorage.getItem("e2e-no-os")) {
+      raw[0].system.os = "";
+      localStorage.setItem("ogb.results.v1", JSON.stringify(raw));
+      sessionStorage.setItem("e2e-no-os", "1");
+    }
+  });
+  await page.goto(`/#/result/${RESULT.id}`);
+  const cmds = page.locator("#os-cmds");
+  await expect(cmds).toContainText("(PowerShell)");
+  await expect(cmds).toContainText("On Linux? Switch to Linux");
+  await cmds.getByText("Linux", { exact: true }).click();
+  await expect(cmds).toContainText("(Terminal (bash))");
+  await expect(page.locator('#sys-form [name="os"]')).toHaveValue("");
+});
+
+test("the ID helper builds a laptop's ID and catalog file from the pasted command output", async ({ page }) => {
+  await page.goto(`/#/result/${RESULT.id}`);
+  const form = page.locator("#sys-form");
+  await form.locator('[name="gpuId"]').selectOption("__not_listed__");
+  const helper = page.locator("#gpu-helper");
+  await expect(helper.locator("[data-helper-cmd]")).toContainText("Computer type:");
+  // Real output from an RTX 5090 laptop.
+  await helper.locator("[data-helper-paste]").fill(
+    "Computer type: laptop\nGPU: NVIDIA GeForce RTX 5090 Laptop GPU (24 GB) [board 17AA]\nGPU: Intel(R) Graphics (? GB) [board 17AA]",
+  );
+  await expect(helper.locator(".helper-id code")).toHaveText("rtx_5090_laptop_24gb_reference");
+  await expect(form.locator('[name="gpuIdRequested"]')).toHaveValue("rtx_5090_laptop_24gb_reference");
+  await expect(form.locator('[name="gpuName"]')).toHaveValue("NVIDIA GeForce RTX 5090 Laptop GPU");
+  await expect(form.locator('[name="gpuFormFactor"]')).toHaveValue("laptop");
+  const file = page.locator("#gpu-file");
+  await expect(file).toContainText("data/gpus/laptop/nvidia/rtx_5090_laptop_24gb_reference.yaml");
+  await expect(file.locator("[data-gpu-file-yaml]")).toContainText("base: rtx_5090_laptop_24gb");
+  await expect(page.locator("#yaml-preview")).toContainText("gpu_id: rtx_5090_laptop_24gb_reference");
+  await expect(page.locator("#submit-steps")).toContainText("data/gpus/laptop/nvidia/rtx_5090_laptop_24gb_reference.yaml");
+
+  // A desktop card from a known board maker, with and without its product line.
+  await helper.locator("[data-helper-paste]").fill("Computer type: desktop\nGPU: NVIDIA GeForce RTX 5080 (16 GB) [board 1458]");
+  await expect(helper.locator(".helper-id code")).toHaveText("rtx_5080_16gb_gigabyte_reference");
+  await helper.locator("[data-helper-line]").fill("Gaming OC");
+  await expect(form.locator('[name="gpuIdRequested"]')).toHaveValue("rtx_5080_16gb_gigabyte_gaming_oc");
+  await expect(page.locator("#gpu-file [data-gpu-file-yaml]")).toContainText("board_partner: Gigabyte");
+
+  await page.reload();
+  await expect(form.locator('[name="gpuIdRequested"]')).toHaveValue("rtx_5080_16gb_gigabyte_gaming_oc");
+  await expect(page.locator("#gpu-file")).toContainText("data/gpus/desktop/nvidia/rtx_5080_16gb_gigabyte_gaming_oc.yaml");
+});
+
 test("the share link carries the GPU and overclock filled in after the page opened", async ({ page }) => {
   await page.goto(`/#/result/${RESULT.id}`);
   const form = page.locator("#sys-form");

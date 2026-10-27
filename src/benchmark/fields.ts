@@ -1,4 +1,5 @@
 import { NOT_LISTED } from "./catalog";
+import { isCatalogIdShape } from "./gpu-id";
 import type { BenchResult, SystemInfo } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -68,8 +69,6 @@ export const MAX_CORE_OFFSET_MHZ = 3000;
 export const MAX_MEMORY_OFFSET_MHZ = 10000;
 export const MAX_POWER_LIMIT_PCT = 300;
 
-/** Shape of a catalog gpu_id, as the catalog writes them (e.g. rtx_5080_16gb_fe). */
-export const GPU_ID_SHAPE = /^[a-z0-9][a-z0-9_.-]{0,62}$/;
 
 /**
  * CSV column order. The system: fields are in upstream YAML order; the two top-level fields
@@ -97,8 +96,19 @@ export const SYSTEM_FIELDS: readonly SystemField[] = [
     label: "Requested gpu_id",
     kind: "text",
     placeholder: "e.g. rx_9070_xt_16gb",
-    help: "The catalog ID you're asking for (lowercase letters, digits and _), used as gpu_id in the YAML.",
-    validate: (v) => (GPU_ID_SHAPE.test(v) ? null : `Requested gpu_id: '${v}' must be lowercase letters, digits and _ (like rx_9070_xt_16gb)`),
+    help: "The catalog ID you're asking for, used as gpu_id in the YAML. The helper above builds it for you.",
+    validate: (v) =>
+      isCatalogIdShape(v) ? null : `Requested gpu_id: '${v}' must be lowercase letters, digits and single _, with one memory size like 16gb (e.g. rtx_5080_16gb_reference)`,
+    carry: true,
+    gpuSpecific: true,
+  },
+  {
+    key: "gpuFormFactor",
+    yaml: "gpu_form_factor",
+    section: "unlisted",
+    label: "Desktop card or laptop",
+    kind: "choice",
+    validate: (v) => (v === "desktop" || v === "laptop" ? null : `GPU type: '${v}' must be desktop or laptop`),
     carry: true,
     gpuSpecific: true,
   },

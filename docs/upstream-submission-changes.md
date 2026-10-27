@@ -269,7 +269,29 @@ checks.
 - Note in the docs that `detected:` values come from the browser and are never the source of
   `gpu_id` or `system:` fields.
 
-## 5. Site and aggregation (when ready)
+## 5. Catalog IDs for a product whose exact model isn't known
+
+The results page builds the `gpu_id` of a GPU that isn't listed (`src/benchmark/gpu-id.ts`) and
+gives the user its catalog file, with `base:` set to the reference. It uses `reference` for an
+unknown variant instead of `_generic`, and laptop IDs leave out the laptop's maker and model.
+Change "Picking the ID" in `data/gpus/README.md` to match:
+
+| Form factor | Pattern | Example |
+| --- | --- | --- |
+| laptop | `<reference>_reference` | `rtx_5090_laptop_24gb_reference` (base `rtx_5090_laptop_24gb`), `rx_7600m_xt_8gb_reference` |
+| desktop, GPU vendor's own card | `<reference>_fe` · `_reference` · `_le` | `rtx_5080_16gb_fe` (unchanged) |
+| desktop, brand and product line known | `<reference>_<brand>_<product_line>` | `rtx_5080_16gb_gigabyte_gaming_oc` (unchanged) |
+| desktop, brand known, line not | `<reference>_<brand>_reference` | `rtx_5080_16gb_gigabyte_reference` |
+| desktop, brand not known | `<reference>_reference` | `rtx_5080_16gb_reference` |
+
+- Replace the `_generic` rule (laptops only, temporary) with `reference`, which works for desktops
+  too and says what the specs are: the chip's reference specs, until someone adds the exact
+  product. Keep the checks' warning for these IDs if you still want named models to win.
+- `rx_9070_xt_16gb_reference` now means either AMD's own card or an unknown board. Both use the
+  reference specs, so results can share it.
+- Rename the README's `rtx_4070_laptop_8gb_generic` example to `rtx_4070_laptop_8gb_reference`.
+
+## 6. Site and aggregation (when ready)
 
 - Chart score runs separately per `score_test` and per tool `version`, never mixed with custom
   runs.

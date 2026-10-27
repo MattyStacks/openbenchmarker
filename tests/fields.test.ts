@@ -184,7 +184,7 @@ describe("carrying details to the next run", () => {
 
   it("copies what rarely changes, not kernel, Mesa or Proton", () => {
     const c = carriedSystem(saved(filled), result());
-    expect(c).toEqual({ gpuId: GPU, gpuName: "", gpuIdRequested: "", os: "linux", osDetail: "Fedora 41", cpu: "Ryzen 7 7800X3D", memoryGb: "32", memoryType: "DDR5-6000", memoryChannels: "2", driver: "Mesa 24.2.5", distro: "Fedora", overclocked: "yes", ocCoreMhz: "150", ocMemoryMhz: "1000", ocPowerPct: "110" });
+    expect(c).toEqual({ gpuId: GPU, gpuName: "", gpuIdRequested: "", gpuFormFactor: "", os: "linux", osDetail: "Fedora 41", cpu: "Ryzen 7 7800X3D", memoryGb: "32", memoryType: "DDR5-6000", memoryChannels: "2", driver: "Mesa 24.2.5", distro: "Fedora", overclocked: "yes", ocCoreMhz: "150", ocMemoryMhz: "1000", ocPowerPct: "110" });
   });
 
   it("a new run gets them as plain values (not suggestions), and they go into the YAML", () => {
@@ -235,7 +235,9 @@ describe("a GPU that isn't in the catalog yet", () => {
     expect(submissionWarnings(unlisted())[0]).toMatch(/rx_9070_xt_16gb\) isn't in the Open GPU Benchmarks catalog yet, so this submission will fail upstream checks/);
     expect(submissionWarnings(ready())).toEqual([]);
     expect(missingLabels(validateSubmission(unlisted({ gpuName: "", gpuIdRequested: "" })))).toEqual(["Your GPU", "Requested gpu_id"]);
-    for (const id of ["RX 9070 XT", "Rx_9070", "_rx", "rx 9070"]) expect(validateSubmission(unlisted({ gpuIdRequested: id }))[0]).toMatch(/^Requested gpu_id: '.*' must be/);
+    for (const id of ["RX 9070 XT", "Rx_9070_16gb", "_rx_16gb", "rx 9070", "rx_9070_xt", "rx__9070_16gb", "rx-9070-16gb"]) expect(validateSubmission(unlisted({ gpuIdRequested: id }))[0]).toMatch(/^Requested gpu_id: '.*' must be/);
+    expect(validateSubmission(unlisted({ gpuFormFactor: "tower" }))[0]).toMatch(/^GPU type:/);
+    expect(validateSubmission(unlisted({ gpuFormFactor: "laptop" }))).toEqual([]);
     expect(validateSubmission(unlisted({ gpuIdRequested: GPU }))[0]).toMatch(/already in the catalog; choose it from the GPU list/);
   });
 

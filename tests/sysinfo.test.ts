@@ -42,6 +42,24 @@ describe("system-info lookup commands", () => {
     expect(SYSINFO_COMMANDS.linux.all).toContain(mesa);
   });
 
+  it("the GPU command prints the lines the ID helper reads, on both OSes", () => {
+    for (const os of ["windows", "linux"] as const) {
+      const gpu = SYSINFO_COMMANDS[os].commands.find((c) => c.field === "gpu")!.command;
+      expect(gpu).toContain("Computer type: ");
+      expect(gpu).toMatch(/GPU: .*GB\) \[board /);
+      expect(SYSINFO_COMMANDS[os].all.startsWith(gpu)).toBe(true);
+    }
+    expect(SYSINFO_COMMANDS.windows.commands[0].command).toMatch(/PCSystemType -eq 2/);
+    expect(SYSINFO_COMMANDS.windows.commands[0].command).toMatch(/SUBSYS_/);
+    expect(SYSINFO_COMMANDS.linux.commands[0].command).toMatch(/chassis_type/);
+    expect(SYSINFO_COMMANDS.linux.commands[0].command).toMatch(/pci\.sub_device_id/);
+    expect(SYSINFO_COMMANDS.linux.commands[0].command).not.toMatch(/sudo/);
+  });
+
+  it("driver commands only list GPUs present now", () => {
+    for (const c of SYSINFO_COMMANDS.windows.commands.filter((x) => /AMD|Intel/.test(x.label))) expect(c.command).toMatch(/\$now -contains \$_\.DriverDesc/);
+  });
+
   it("only windows/linux have commands", () => {
     expect(commandsFor("")).toBeNull();
     expect(commandsFor("macos")).toBeNull();
