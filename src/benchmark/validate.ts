@@ -2,7 +2,7 @@ import { BENCHMARKS, NOT_LISTED, UPSTREAM_ISSUES, findGpu } from "./catalog";
 import { isSoftwareRenderer } from "./diagnose";
 import { scoreFor } from "./metrics";
 import { RESOLUTIONS, getPreset, getScoreTest, matchesScoreTest, standardResolution } from "./presets";
-import { LINUX_ONLY_FIELDS, SYSTEM_FIELDS } from "./fields";
+import { LINUX_ONLY_FIELDS, SYSTEM_FIELDS, fieldApplies } from "./fields";
 import type { BenchResult } from "./types";
 
 /** Mirrors upstream proof.method for this tool. */
@@ -50,7 +50,9 @@ export function validateSubmission(r: BenchResult | null | undefined): string[] 
   else if (!(RESULT_OSES as readonly string[]).includes(os)) errors.push(`OS: '${os}' must be exactly windows or linux`);
 
   // Optional fields: only a wrong value is reported (registry rules, mirroring upstream checks.py).
+  // Overclock details are kept but ignored unless overclocked is yes.
   for (const f of SYSTEM_FIELDS) {
+    if (!fieldApplies(f, s)) continue;
     const v = String(s[f.key] ?? "").trim();
     const msg = v && f.validate ? f.validate(v) : null;
     if (msg) errors.push(msg);

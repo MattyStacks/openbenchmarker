@@ -50,6 +50,10 @@ export interface SystemInfo {
   proton: string;
   /** "" (not said), "yes" or "no": whether the GPU ran above its stock clocks or power limit. */
   overclocked: string;
+  /** Overclock details, used only when overclocked is "yes": core and memory clock offsets (MHz, may be signed) and power limit (%). */
+  ocCoreMhz: string;
+  ocMemoryMhz: string;
+  ocPowerPct: string;
 }
 
 export { LINUX_ONLY_FIELDS, emptySystem } from "./fields";
@@ -153,4 +157,10 @@ export interface BenchResult {
    * memoryChannels on phones. Editing a field removes it from this list. Absent when none.
    */
   suggested?: (keyof SystemInfo)[];
+  /**
+   * Set when a new run copied the user's details from an earlier result: that result's
+   * "YYYY-MM-DD HH:MM", for the form's "filled in from" note. Removed on the first edit. Local only:
+   * stripped from JSON export, never submitted.
+   */
+  carriedFrom?: string;
 }

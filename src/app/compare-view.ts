@@ -5,7 +5,7 @@ import { allResults } from "./store";
 import { sharePayload } from "./share";
 import { compareRuns, deviceSummary } from "./compare";
 import { esc } from "./dom";
-import { settingsLabel } from "./share";
+import { settingsLabel, sharerGpuRows } from "./share";
 import { lapChartSvg, stabilityPct } from "./stress-view";
 
 // ---------------------------------------------------------------------------
@@ -41,6 +41,7 @@ function column(r: SharedRun, heading: string, faster: boolean): string {
       <dt>Worst frame</dt><dd>${r.worstMs.toFixed(2)} ms</dd>
       <dt>Settings</dt><dd>${esc(settingsLabel(r))}</dd>
       <dt>Device</dt><dd>${esc(deviceSummary(r)) || "unknown"}</dd>
+      ${sharerGpuRows(r)}
       <dt>GPU <em>(browser)</em></dt><dd>${r.device.gpuLabel ? esc(r.device.gpuLabel) : "hidden"}</dd>
       <dt>Version</dt><dd>v${esc(r.benchmarkVersion)}</dd>
       <dt>Date</dt><dd>${esc(r.date)}</dd>

@@ -1,8 +1,8 @@
 # Upstream changes for richer Open GPU Benchmarker submissions
 
 Open GPU Benchmarker now writes more to each submission YAML: score-run scores, the settings the
-scene actually rendered with, a "what limited this run" diagnosis, and a `detected:` block of
-values read from the browser. This document lists what to change in
+scene actually rendered with, a "what limited this run" diagnosis, a `detected:` block of
+values read from the browser, and an `overclock:` block saying what the submitter raised. This document lists what to change in
 [open-gpu-benchmarks](https://github.com/MattyStacks/open-gpu-benchmarks) so those fields become
 first-class: validated, documented and usable for charts and a future leaderboard.
 
@@ -14,8 +14,8 @@ Written against upstream `scripts/checks.py` and `templates/community_submission
 The new YAML **already passes** upstream checks unchanged:
 
 - `check_result_file` only checks the result-entry fields it knows about. Unknown entry keys
-  (`score_test`, `rendered_with`, `diagnostics`, …) and unknown top-level keys (`detected`) are
-  ignored without an error.
+  (`score_test`, `rendered_with`, `diagnostics`, …) and unknown top-level keys (`detected`,
+  `overclock`) are ignored without an error.
 - `score` is already in `RESULT_ENTRY_NUMBERS`, so it is type-checked as a number.
 - `overclocked` is documented in the template as an optional top-level field, but nothing
   validates it.
@@ -33,6 +33,10 @@ date: "2026-10-21"
 version: "2.0.0"
 frame_generation: false
 overclocked: true                 # only when the user answered; true/false
+overclock: # as set in the submitter's tuning tool
+  core_clock_offset_mhz: 150      # only with overclocked: true; each line only when filled in
+  memory_clock_offset_mhz: 1000   # whole MHz, may be negative
+  power_limit_pct: 110            # 100 = stock
 result:
   - resolution: "4K"
     time: "20:15"
@@ -126,6 +130,12 @@ DIAGNOSTICS_FIELDS = {
     "hitches": ("int", 0, None),
     "frame_time_std_ms": ("number", 0, None),
 }
+# What was raised on an overclocked run (MSI Afterburner-style sliders). Only with overclocked: true.
+OVERCLOCK_FIELDS = {
+    "core_clock_offset_mhz": ("int", -3000, 3000),
+    "memory_clock_offset_mhz": ("int", -10000, 10000),
+    "power_limit_pct": ("int", 1, 300),
+}
 DETECTED_FIELDS = {
     "webgl_renderer": ("text",),
     "webgl_vendor": ("text",),
@@ -210,6 +220,10 @@ Add top-level checks (in `check_result_file`, after `check_result_date`):
 ```python
     if "overclocked" in run and not isinstance(run["overclocked"], bool):
         issues.error(path, "result-overclocked", "overclocked must be true or false")
+    if "overclock" in run:
+        if run.get("overclocked") is not True:
+            issues.error(path, "result-overclock", "overclock: details need overclocked: true")
+        check_typed(path, issues, "result-overclock", "overclock", OVERCLOCK_FIELDS, run["overclock"])
     if "detected" in run:
         check_typed(path, issues, "result-detected", "detected", DETECTED_FIELDS, run["detected"])
 ```
@@ -250,7 +264,7 @@ checks.
 - Add `templates/community_openbenchmarker.yaml` with the example above. Note that the file is
   produced by the tool and shouldn't be edited by hand.
 - In `docs/COMMUNITY_SUBMISSIONS.md`, add headings for the new rules: `result-run-details`,
-  `result-diagnostics`, `result-score`, `result-detected`, `result-overclocked` and
+  `result-diagnostics`, `result-score`, `result-detected`, `result-overclocked`, `result-overclock` and
   `result-outlier-skipped`. `checks.py` links each rule to a heading.
 - Note in the docs that `detected:` values come from the browser and are never the source of
   `gpu_id` or `system:` fields.
@@ -261,4 +275,5 @@ checks.
   runs.
 - Show `diagnostics.limit` next to each run. Consider charting only `limit: gpu` runs by default
   for GPU comparisons, with CPU-limited runs behind a toggle.
-- Show `overclocked: true` runs with a badge, and keep them out of stock averages.
+- Show `overclocked: true` runs with a badge, and keep them out of stock averages. Where
+  `overclock:` is present, show the core/memory offsets and power limit next to the run.

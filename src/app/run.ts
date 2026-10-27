@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { BENCHMARK, BENCHMARK_VERSION } from "../benchmark/catalog";
 import { browserName, isSoftwareRenderer, liveVerdict, parseBackend } from "../benchmark/diagnose";
-import { NEW_RUN_SYSTEM } from "../benchmark/fields";
+import { NEW_RUN_SYSTEM, carriedSystem, carrySource, isHandheldRun } from "../benchmark/fields";
 import { computeRunStats, graphPoints, lapStats, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimesInto, scoreFor, type TimedBatch } from "../benchmark/metrics";
 import { STRESS_LAP_SECONDS, WARMUP_SECONDS, getPreset, getResolution, getScoreTest, getStressTest, matchesScoreTest, stressDuration } from "../benchmark/presets";
 import { emptySystem, type BenchResult, type GraphicsApi, type RunDiagnostics } from "../benchmark/types";
@@ -13,7 +13,7 @@ import { route } from "./router";
 import { beginRun, endRun, markFinished, setRunLaps, setRunPhase } from "./run-guard";
 import { detectDeviceContext, detectDeviceContextAsync } from "./share-env";
 import { app, showView } from "./shell";
-import { upsertResult, withSystem, type RunConfig } from "./store";
+import { allResults, upsertResult, withSystem, type RunConfig } from "./store";
 
 // ---------------------------------------------------------------------------
 // Run controller: warm-up -> timed -> finish, uncapped scheduler
@@ -409,8 +409,12 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       device,
       system: emptySystem(),
     };
-    // A brand-new result: registry suggestions (marked) fill what a browser can't read.
-    const result = withSystem(measured, NEW_RUN_SYSTEM);
+    // A brand-new result: the details the user filled in last time (they rarely change between
+    // runs; handheld runs have no form), then registry suggestions (marked) for what's still missing.
+    const src = isHandheldRun(measured) ? undefined : carrySource(allResults());
+    const carried = carriedSystem(src, measured);
+    const copied = src && Object.values(carried).some((v) => v.trim());
+    const result = withSystem(copied ? { ...measured, carriedFrom: `${src.date} ${src.time}` } : measured, { ...NEW_RUN_SYSTEM, ...carried });
     upsertResult(result);
     if (valid) markFinished(resolution, preset.id);
     cleanup();

@@ -345,6 +345,10 @@ body[data-view="run"] { height: 100dvh; overflow: hidden; overscroll-behavior: n
 .card h3 { margin: 6px 0 0; font-size: 14px; letter-spacing: 0.06em; color: var(--text); }
 .sys-form .linux-only { display: none; }
 .sys-form.show-linux .linux-only { display: grid; }
+.sys-form .oc-details { display: none; margin: 0; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 10px; gap: 12px; min-width: 0; }
+.sys-form.show-oc .oc-details { display: grid; }
+.oc-details legend { padding: 0 4px; font-size: 13px; }
+.carried-note { margin: 0; padding: 8px 12px; border-left: 3px solid var(--amber); background: rgba(255, 179, 64, 0.08); font-size: 13px; }
 .blocked { padding: 12px 14px; border: 1px solid var(--line-hi); background: rgba(155, 107, 255, 0.08); border-radius: 10px; font-size: 14px; }
 .hints { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
 .hints dt { color: var(--muted); }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BENCHMARK, GPU_CATALOG } from "../src/benchmark/catalog";
 import { toCsv, toJson, toYaml } from "../src/benchmark/exporter";
-import { SYSTEM_FIELDS, completeSystem, emptySystem, NEW_RUN_SYSTEM } from "../src/benchmark/fields";
+import { SYSTEM_FIELDS, carriedSystem, carrySource, completeSystem, emptySystem, NEW_RUN_SYSTEM } from "../src/benchmark/fields";
 import type { BenchResult, DeviceContext } from "../src/benchmark/types";
 import { validateSubmission } from "../src/benchmark/validate";
 import { withSystem } from "../src/app/store";
@@ -134,5 +134,95 @@ describe("suggestions and migration", () => {
     const r = withSystem(result({ device: PHONE, mobile: true, system: { ...emptySystem(), gpuId: GPU, os: "windows" } }), { gpuId: GPU, os: "windows" });
     expect(validateSubmission(r)[0]).toMatch(/^Device: mobile/);
     expect(validateSubmission({ ...r, mobile: false, device: DESK })).toEqual([]);
+  });
+});
+
+describe("overclock details", () => {
+  const oc = { overclocked: "yes", ocCoreMhz: "+150", ocMemoryMhz: "-500", ocPowerPct: "110" };
+
+  it("validate like the sliders: signed MHz offsets, power limit 1-300%", () => {
+    for (const v of ["150", "+150", "-100", "0", "3000", "-3000", ""]) expect(validateSubmission(ready({ overclocked: "yes", ocCoreMhz: v }))).toEqual([]);
+    for (const v of ["3001", "1.5", "+", "fast"]) expect(validateSubmission(ready({ overclocked: "yes", ocCoreMhz: v }))[0]).toMatch(/^Core clock offset:/);
+    for (const v of ["10000", "-10000"]) expect(validateSubmission(ready({ overclocked: "yes", ocMemoryMhz: v }))).toEqual([]);
+    expect(validateSubmission(ready({ overclocked: "yes", ocMemoryMhz: "10001" }))[0]).toMatch(/^Memory clock offset:/);
+    for (const v of ["1", "100", "300"]) expect(validateSubmission(ready({ overclocked: "yes", ocPowerPct: v }))).toEqual([]);
+    for (const v of ["0", "301", "-110"]) expect(validateSubmission(ready({ overclocked: "yes", ocPowerPct: v }))[0]).toMatch(/^Power limit:/);
+  });
+
+  it("are kept but ignored unless overclocked is yes", () => {
+    for (const overclocked of ["no", ""]) {
+      const r = ready({ ...oc, overclocked, ocCoreMhz: "nonsense" });
+      expect(validateSubmission(r)).toEqual([]);
+      expect(toYaml(r)).not.toMatch(/overclock:|clock_offset|power_limit/);
+      expect(csvRow(r).core_clock_offset_mhz).toBe("");
+      expect(r.system.ocCoreMhz).toBe("nonsense");
+    }
+  });
+
+  it("go in an overclock: block right after overclocked: true, as bare numbers", () => {
+    const y = toYaml(ready(oc));
+    expect(y).toMatch(/^frame_generation: false\noverclocked: true\noverclock: # as set in the submitter's tuning tool\n {2}core_clock_offset_mhz: 150\n {2}memory_clock_offset_mhz: -500\n {2}power_limit_pct: 110\nresult:$/m);
+    expect(toYaml(ready({ overclocked: "yes", ocPowerPct: "120" }))).toMatch(/^overclock: .*\n {2}power_limit_pct: 120\nresult:$/m);
+    expect(toYaml(ready({ overclocked: "yes" }))).toMatch(/^overclocked: true\nresult:$/m);
+  });
+
+  it("are CSV columns when overclocked is yes", () => {
+    const row = csvRow(ready(oc));
+    expect([row.core_clock_offset_mhz, row.memory_clock_offset_mhz, row.power_limit_pct]).toEqual(["+150", "-500", "110"]);
+  });
+
+  it("older results load with them blank", () => {
+    const r = withSystem(result(), { gpuId: GPU, os: "windows", overclocked: "yes" });
+    expect([r.system.ocCoreMhz, r.system.ocMemoryMhz, r.system.ocPowerPct]).toEqual(["", "", ""]);
+    expect(toYaml(r)).toMatch(/^overclocked: true\nresult:$/m);
+  });
+});
+
+describe("carrying details to the next run", () => {
+  const filled = { gpuId: GPU, os: "linux", osDetail: "Fedora 41", cpu: "Ryzen 7 7800X3D", memoryGb: "32", memoryType: "DDR5-6000", memoryChannels: "2", driver: "Mesa 24.2.5", distro: "Fedora", kernel: "6.11.4", mesa: "24.2.5", proton: "x", overclocked: "yes", ocCoreMhz: "150", ocMemoryMhz: "1000", ocPowerPct: "110" };
+  const saved = (sys: Partial<BenchResult["system"]>, over: Partial<BenchResult> = {}) => result({ ...over, system: { ...emptySystem(), ...sys } });
+
+  it("copies what rarely changes, not kernel, Mesa or Proton", () => {
+    const c = carriedSystem(saved(filled), result());
+    expect(c).toEqual({ gpuId: GPU, os: "linux", osDetail: "Fedora 41", cpu: "Ryzen 7 7800X3D", memoryGb: "32", memoryType: "DDR5-6000", memoryChannels: "2", driver: "Mesa 24.2.5", distro: "Fedora", overclocked: "yes", ocCoreMhz: "150", ocMemoryMhz: "1000", ocPowerPct: "110" });
+  });
+
+  it("a new run gets them as plain values (not suggestions), and they go into the YAML", () => {
+    const r = withSystem(result(), { ...NEW_RUN_SYSTEM, ...carriedSystem(saved({ gpuId: GPU, os: "windows", cpu: "Ryzen 7", overclocked: "no" }), result()) });
+    expect(r.system).toMatchObject({ gpuId: GPU, os: "windows", cpu: "Ryzen 7", overclocked: "no", kernel: "" });
+    expect(r.suggested).toBeUndefined();
+    expect(toYaml(r)).toMatch(/^ {2}cpu: "Ryzen 7"$/m);
+  });
+
+  it("a field the user cleared stays blank, and overclocked can be carried as not saying", () => {
+    const c = carriedSystem(saved({ gpuId: GPU, os: "windows", overclocked: "", driver: "" }), result());
+    expect(withSystem(result(), { ...NEW_RUN_SYSTEM, ...c }).system).toMatchObject({ overclocked: "", driver: "" });
+  });
+
+  it("skips the GPU's own details when the browser reports a different GPU", () => {
+    const other = { ...DESK, gpuLabel: "Intel(R) Arc(TM) Graphics" };
+    const c = carriedSystem(saved(filled), result({ device: other }));
+    expect(c).toMatchObject({ os: "linux", cpu: "Ryzen 7 7800X3D" });
+    for (const k of ["gpuId", "driver", "overclocked", "ocCoreMhz", "ocMemoryMhz", "ocPowerPct"]) expect(c).not.toHaveProperty(k);
+    expect(withSystem(result(), { ...NEW_RUN_SYSTEM, ...c }).system.overclocked).toBe("no");
+    // A masked GPU name on either run can't tell, so everything is carried.
+    expect(carriedSystem(saved(filled), result({ device: { ...DESK, gpuLabel: null } }))).toHaveProperty("gpuId", GPU);
+  });
+
+  it("the source is the newest desktop result with something filled in", () => {
+    const blank = saved({ overclocked: "no" }, { id: "blank" });
+    const phone = saved({ gpuId: GPU }, { id: "phone", device: PHONE, mobile: true });
+    const mine = saved({ cpu: "Ryzen 7" }, { id: "mine" });
+    const older = saved(filled, { id: "older" });
+    expect(carrySource([blank, phone, mine, older])?.id).toBe("mine");
+    expect(carrySource([blank, phone])).toBeUndefined();
+    expect(carrySource([])).toBeUndefined();
+    expect(carriedSystem(undefined, result())).toEqual({});
+  });
+
+  it("where they came from stays local: not in the JSON export", () => {
+    const j = JSON.parse(toJson(ready({}, { carriedFrom: "2026-10-27 14:02" })));
+    expect(j).not.toHaveProperty("carriedFrom");
+    expect(toCsv([ready({}, { carriedFrom: "2026-10-27 14:02" })])).not.toContain("2026-10-27 14:02");
   });
 });

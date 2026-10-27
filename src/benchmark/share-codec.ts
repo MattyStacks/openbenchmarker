@@ -1,3 +1,5 @@
+import { findGpu } from "./catalog";
+import { OVERCLOCK_FIELDS } from "./fields";
 import { unknownDevice, type BenchResult, type BrowserId, type DeviceContext, type DeviceType, type GraphicsApi, type OsId } from "./types";
 import type { TimingMethod } from "./metrics";
 import { STRESS_LAP_SECONDS, getStressTest, stressDuration, type PresetId, type ResolutionId, type ScoreTestId, type StressTestId } from "./presets";
@@ -45,9 +47,20 @@ export interface SharedRun {
   /** Local run date YYYY-MM-DD. */
   date: string;
   device: DeviceContext;
+  /** The catalog GPU the sharer picked on the results form (unlike device.gpuLabel, which the browser reports). */
+  gpuId?: string;
+  /** Whether the sharer said the GPU was overclocked, and what they raised (only when it was). */
+  overclock?: SharedOverclock;
 }
 
-/** One extension entry. Tag 0 is reserved; tag 1 is the stress laps (see docs/share-links.md). */
+export interface SharedOverclock {
+  overclocked: boolean;
+  coreMhz?: number;
+  memoryMhz?: number;
+  powerPct?: number;
+}
+
+/** One extension entry. Tag 0 is reserved; tag 1 is the stress laps, tag 2 the sharer's GPU and overclock (see docs/share-links.md). */
 export interface ShareExtension {
   tag: number;
   value: Uint8Array;
@@ -128,6 +141,41 @@ export const STRESS_TAG = 1;
 const STRESS_TESTS_V1: StressTestId[] = ["entry", "extreme"];
 /** Largest lap FPS a stress entry holds (2 bytes of whole FPS). */
 const MAX_LAP_FPS = 2 ** 16 - 1;
+/**
+ * Extension tag of a GPU entry: what the sharer filled in about the GPU. Value: one head byte,
+ * bit 7 = run index, bit 4 = power limit follows, bit 3 = memory offset follows, bit 2 = core offset
+ * follows, bits 1-0 = overclocked (0 not said, 1 no, 2 yes); then the core and memory clock offsets
+ * in MHz as signed 2-byte big-endian, the power limit in % as 2 bytes, each only when its bit is
+ * set (and only with overclocked yes); then the catalog gpu_id, 6 bits per character from
+ * GPU_ID_CHARS, to the end of the entry, the last byte padded with 1 bits.
+ */
+export const GPU_TAG = 2;
+const GPU_ID_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789_.-";
+const GPU_ID_RE = /^[a-z0-9][a-z0-9_.-]{0,62}$/;
+
+function packGpuId(id: string): number[] {
+  const w = new BitWriter();
+  for (const ch of id) w.put(GPU_ID_CHARS.indexOf(ch), 6);
+  const n = (8 - ((id.length * 6) % 8)) % 8;
+  if (n) w.put(2 ** n - 1, n);
+  return w.bytes();
+}
+
+/** The id packed in `v`, or null when it isn't canonically packed. */
+function unpackGpuId(v: Uint8Array): string | null {
+  const rd = new BitReader(v);
+  let id = "";
+  for (let left = v.length * 8; left >= 6; left -= 6) {
+    const c = rd.get(6);
+    // A whole padding group only ever ends the entry.
+    if (c === 63) return left === 6 ? id : null;
+    if (c >= GPU_ID_CHARS.length) return null;
+    id += GPU_ID_CHARS[c];
+  }
+  const rest = (v.length * 8) % 6;
+  return rest && rd.get(rest) !== 2 ** rest - 1 ? null : id;
+}
+const OC_STATE = [undefined, false, true] as const;
 const EARLIEST_DAY = Math.floor(Date.UTC(2024, 0, 1) / 86400000);
 
 // ----- bit I/O -----
@@ -217,7 +265,28 @@ function parseVersion(v: string): [number, number, number] | null {
   return a < 16 && b < 64 && c < 64 ? [a, b, c] : null;
 }
 
-/** The fields of a saved result that go into a link. Nothing from `system`, `diag` or `id`. */
+/** The sharer's catalog GPU and overclock, from the results form: only valid values go in a link. */
+function sharedSystem(r: BenchResult): Pick<SharedRun, "gpuId" | "overclock"> {
+  const s = r.system;
+  if (!s) return {};
+  const gpuId = findGpu(s.gpuId) && GPU_ID_RE.test(s.gpuId) ? s.gpuId : undefined;
+  let overclock: SharedOverclock | undefined;
+  if (s.overclocked === "no") overclock = { overclocked: false };
+  else if (s.overclocked === "yes") {
+    overclock = { overclocked: true };
+    const keys = { ocCoreMhz: "coreMhz", ocMemoryMhz: "memoryMhz", ocPowerPct: "powerPct" } as const;
+    for (const f of OVERCLOCK_FIELDS) {
+      const v = (s[f.key] ?? "").trim();
+      if (v && !f.validate?.(v)) overclock[keys[f.key as keyof typeof keys]] = Number(v);
+    }
+  }
+  return { ...(gpuId ? { gpuId } : {}), ...(overclock ? { overclock } : {}) };
+}
+
+/**
+ * The fields of a saved result that go into a link. From `system`, only the catalog GPU and the
+ * overclock details; nothing from `diag`, nor the `id`.
+ */
 export function sharedRunFrom(r: BenchResult): SharedRun & { valid: boolean } {
   return {
     valid: r.valid,
@@ -240,6 +309,7 @@ export function sharedRunFrom(r: BenchResult): SharedRun & { valid: boolean } {
     graphicsApi: r.graphicsApi,
     date: r.date,
     device: r.device ?? unknownDevice(),
+    ...sharedSystem(r),
   };
 }
 
@@ -317,6 +387,53 @@ function readStressEntry(v: Uint8Array): { runIndex: number; stress: NonNullable
   return { runIndex: v[0] >> 7, stress: { test, laps } };
 }
 
+const int16 = (v: number) => {
+  const x = Math.max(-0x8000, Math.min(0x7fff, Math.round(v))) & 0xffff;
+  return [x >> 8, x & 0xff];
+};
+
+/** A GPU entry for a run, or null when the sharer filled in nothing that goes in a link. */
+function gpuEntry(runIndex: number, r: SharedRun): number[] | null {
+  const oc = r.overclock;
+  const id = r.gpuId && GPU_ID_RE.test(r.gpuId) ? r.gpuId : "";
+  if (!oc && !id) return null;
+  const yes = oc?.overclocked === true;
+  const core = yes && oc.coreMhz !== undefined;
+  const mem = yes && oc.memoryMhz !== undefined;
+  const power = yes && oc.powerPct !== undefined;
+  const out = [(runIndex << 7) | (power ? 0x10 : 0) | (mem ? 0x08 : 0) | (core ? 0x04 : 0) | (oc ? (yes ? 2 : 1) : 0)];
+  if (core) out.push(...int16(oc.coreMhz!));
+  if (mem) out.push(...int16(oc.memoryMhz!));
+  if (power) out.push(...int16(Math.min(oc.powerPct!, 0x7fff)));
+  out.push(...packGpuId(id));
+  return out;
+}
+
+/** A GPU entry's value, or null when it is malformed. */
+function readGpuEntry(v: Uint8Array): { runIndex: number; gpuId?: string; overclock?: SharedOverclock } | null {
+  if (v.length < 1 || v[0] & 0x60) return null;
+  const state = OC_STATE[v[0] & 0x03];
+  if ((v[0] & 0x03) === 3 || (state !== true && v[0] & 0x1c)) return null;
+  let i = 1;
+  const next = (): number | null => {
+    if (i + 2 > v.length) return null;
+    const x = (v[i] << 8) | v[i + 1];
+    i += 2;
+    return x & 0x8000 ? x - 0x10000 : x;
+  };
+  const overclock: SharedOverclock | undefined = state === undefined ? undefined : { overclocked: state };
+  for (const [bit, key] of [[0x04, "coreMhz"], [0x08, "memoryMhz"], [0x10, "powerPct"]] as const) {
+    if (!(v[0] & bit)) continue;
+    const x = next();
+    if (x === null) return null;
+    overclock![key] = x;
+  }
+  const id = unpackGpuId(v.subarray(i));
+  if (id === null || (id && !GPU_ID_RE.test(id))) return null;
+  if (!id && !overclock) return null;
+  return { runIndex: v[0] >> 7, ...(id ? { gpuId: id } : {}), ...(overclock ? { overclock } : {}) };
+}
+
 /** Encode runs into the payload part of the link. Throws if a run can't be shared (check shareBlocker first). */
 export function encodeShare(payload: SharePayload): string {
   const want = payload.type === "comparison" ? 2 : 1;
@@ -334,8 +451,12 @@ export function encodeShare(payload: SharePayload): string {
   payload.runs.forEach((r, i) => {
     if (r.stress) bytes.push(STRESS_TAG, ...withLength(stressEntry(i, r.stress)));
   });
+  payload.runs.forEach((r, i) => {
+    const g = gpuEntry(i, r);
+    if (g) bytes.push(GPU_TAG, ...withLength(g));
+  });
   for (const e of payload.ext ?? []) {
-    if (!(Number.isInteger(e.tag) && e.tag >= 1 && e.tag <= 255) || e.tag === STRESS_TAG || e.value.length > 255) throw new Error("Bad share extension entry");
+    if (!(Number.isInteger(e.tag) && e.tag >= 1 && e.tag <= 255) || e.tag === STRESS_TAG || e.tag === GPU_TAG || e.value.length > 255) throw new Error("Bad share extension entry");
     bytes.push(e.tag, e.value.length, ...e.value);
   }
   bytes.push(crc8(bytes));
@@ -461,6 +582,15 @@ export function decodeShare(s: string, today = new Date()): DecodeResult {
       if (tag === 0 || len === undefined || i + 2 + len > body.length) return { ok: false, reason: "damaged" };
       const value = body.slice(i + 2, i + 2 + len);
       i += 2 + len;
+      if (tag === GPU_TAG) {
+        // The sharer's GPU and overclock; at most one per run.
+        const g = readGpuEntry(value);
+        const r = g ? runs[g.runIndex] : undefined;
+        if (!g || !r || r.gpuId !== undefined || r.overclock) return { ok: false, reason: "damaged" };
+        if (g.gpuId) r.gpuId = g.gpuId;
+        if (g.overclock) r.overclock = g.overclock;
+        continue;
+      }
       if (tag !== STRESS_TAG) {
         ext.push({ tag, value });
         continue;

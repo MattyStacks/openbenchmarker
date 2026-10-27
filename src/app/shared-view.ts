@@ -7,7 +7,7 @@ import { LABELS, comparePanelHtml } from "./compare-view";
 import { allResults } from "./store";
 import { $, esc } from "./dom";
 import { prefillFromShare } from "./home";
-import { deviceLabel, settingsLabel } from "./share";
+import { deviceLabel, settingsLabel, sharerGpuRows } from "./share";
 import { showView } from "./shell";
 import { lapsSectionHtml, stressCardsHtml } from "./stress-view";
 
@@ -42,6 +42,7 @@ function runBlock(r: SharedRun, label = ""): string {
     <dl class="hints shared-facts">
       <dt>Benchmark</dt><dd>${esc(name)} v${esc(r.benchmarkVersion)}</dd>
       <dt>Run date</dt><dd>${esc(r.date)}</dd>
+      ${sharerGpuRows(r)}
       <dt>GPU <em>(reported by the browser)</em></dt><dd>${r.device.gpuLabel ? esc(r.device.gpuLabel) : "hidden by the browser"}</dd>
       <dt>Browser and device</dt><dd>${esc(deviceLabel(r.device))}</dd>
       <dt>Timing</dt><dd>${r.timing === "gpu-timer" ? "GPU timer queries" : r.timing === "batch-avg" ? "batch averages (no GPU timer)" : "n/a"}</dd>

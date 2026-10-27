@@ -20,7 +20,7 @@ import { clearPending, pendingCode, setPending } from "./challenge";
 import { LABELS, bindCompareBoxes, compareBoxHtml, comparePanelHtml } from "./compare-view";
 import { prefillFromShare } from "./home";
 import { commandsFor } from "../benchmark/sysinfo";
-import { LINUX_ONLY_FIELDS, SYSTEM_FIELDS, fieldFor } from "../benchmark/fields";
+import { LINUX_ONLY_FIELDS, OVERCLOCK_FIELDS, SYSTEM_FIELDS, fieldFor, type SystemField } from "../benchmark/fields";
 import type { BenchResult, SystemInfo } from "../benchmark/types";
 import { validateSubmission } from "../benchmark/validate";
 import { $, esc } from "./dom";
@@ -67,8 +67,12 @@ function browserHints(): { renderer: string; threads: string; ua: string } {
   return { renderer: rendererStr, threads: String(navigator.hardwareConcurrency ?? "unknown"), ua: navigator.userAgent };
 }
 
-/** Typed-in fields of the system form, from the field registry. */
-const TEXT_FIELDS = SYSTEM_FIELDS.filter((f) => f.kind === "text" || f.kind === "digits");
+/** Typed-in fields of the system form, from the field registry (overclock details go under Overclocked). */
+const TEXT_FIELDS = SYSTEM_FIELDS.filter((f) => (f.kind === "text" || f.kind === "digits") && f.section !== "overclock");
+
+function inputField(f: SystemField): string {
+  return `<label class="field${f.linux ? " linux-only" : ""}"><span>${esc(f.label)} <em>optional${f.linux ? ", Linux only" : ""}</em> <b class="suggested-tag" data-suggested="${f.key}" hidden>suggested</b></span><input name="${f.key}" placeholder="${esc(f.placeholder ?? "")}" ${f.inputmode ? `inputmode="${f.inputmode}"` : ""}${f.help ? ` aria-describedby="help-${f.key}"` : ""} />${f.help ? `<small class="field-help" id="help-${f.key}">${esc(f.help)}</small>` : ""}</label>`;
+}
 
 const fmtMs = (x: number | null | undefined) => (x === null || x === undefined || !Number.isFinite(x) ? "n/a" : `${x.toFixed(2)} ms`);
 const fmtPct = (x: number | null | undefined) => (x === null || x === undefined || !Number.isFinite(x) ? "n/a" : `${Math.round(x * 100)}%`);
@@ -240,6 +244,7 @@ export function renderResults(r: BenchResult): void {
       <form class="card sys-form" id="sys-form" autocomplete="off">
         <h2><span class="kana" aria-hidden="true">システム</span>System information</h2>
         <p class="muted">Only you can confirm these; grey text is just an example. To make things easier, we sometimes suggest a value, our best guess, for details most people don't know offhand. Suggested values are always marked, and you can change or clear them. Measured values come from the run. <a href="#/about/faq-suggested">Why?</a></p>
+        ${r.carriedFrom ? `<p class="carried-note" id="carried-note">Filled in from your result of ${esc(r.carriedFrom)}. Check they still match before submitting.</p>` : ""}
         <label class="field"><span>GPU <em>required</em></span><select name="gpuId">${gpuOptions}</select></label>
         <p class="muted tiny">The catalog is new and growing: ${GPU_CATALOG.length} GPU${GPU_CATALOG.length === 1 ? "" : "s"} as of ${esc(CATALOG_SNAPSHOT_DATE)} (<a href="${UPSTREAM_REPO}/tree/main/data/gpus" target="_blank" rel="noopener">catalog</a>). Don't see yours? Choose "My GPU isn't listed".</p>
         <div id="gpu-blocked" class="blocked" hidden>
@@ -255,11 +260,9 @@ export function renderResults(r: BenchResult): void {
           <select name="os"><option value="">— Select —</option><option value="windows">windows</option><option value="linux">linux</option></select></label>
         <label class="field"><span>GPU overclocked <em>optional</em></span>
           <select name="overclocked"><option value="">— Not saying —</option><option value="no">No, stock clocks and power limit</option><option value="yes">Yes, overclocked or raised power limit</option></select></label>
+        <fieldset class="oc-details"><legend>What you raised <span class="muted tiny">(MSI Afterburner or your vendor's tuning tool)</span></legend>${OVERCLOCK_FIELDS.map(inputField).join("")}</fieldset>
         <label class="field"><span>Graphics API <em>recorded by the run</em></span><input name="graphicsApi" value="${esc(r.graphicsApi)}" readonly aria-readonly="true" /></label>
-        ${TEXT_FIELDS.map(
-          (f) =>
-            `<label class="field${f.linux ? " linux-only" : ""}"><span>${esc(f.label)} <em>optional${f.linux ? ", Linux only" : ""}</em> <b class="suggested-tag" data-suggested="${f.key}" hidden>suggested</b></span><input name="${f.key}" placeholder="${esc(f.placeholder ?? "")}" ${f.inputmode ? `inputmode="${f.inputmode}"` : ""}${f.help ? ` aria-describedby="help-${f.key}"` : ""} />${f.help ? `<small class="field-help" id="help-${f.key}">${esc(f.help)}</small>` : ""}</label>`,
-        ).join("")}
+        ${TEXT_FIELDS.map(inputField).join("")}
       </form>
 
       <div class="card">
@@ -319,7 +322,7 @@ export function renderResults(r: BenchResult): void {
     bindCompareBoxes(view);
   }
   const shareBox = view.querySelector<HTMLElement>(".share-box");
-  if (shareBox) bindShareBox(shareBox, sharedRunFrom(r));
+  if (shareBox) bindShareBox(shareBox, () => sharedRunFrom(r));
   $("#exp-json").onclick = () => download(suggestedFileName(r, "json"), toJson(r), "application/json");
   $("#exp-csv").onclick = () => download(suggestedFileName(r, "csv"), toCsv([r]), "text/csv");
   const report = view.querySelector<HTMLButtonElement>("#copy-report");
@@ -386,6 +389,7 @@ export function renderResults(r: BenchResult): void {
     const ok = errors.length === 0;
     // Linux-only inputs stay visible once filled, so a windows/linux mix can be seen and fixed.
     form.classList.toggle("show-linux", r.system.os === "linux" || LINUX_ONLY_FIELDS.some((k) => r.system[k].trim()));
+    form.classList.toggle("show-oc", r.system.overclocked === "yes");
     // Not listed: the way to add the GPU replaces the submit controls (no dead-end buttons).
     const notListed = r.system.gpuId === NOT_LISTED;
     $("#gpu-blocked").hidden = !notListed;
@@ -415,6 +419,11 @@ export function renderResults(r: BenchResult): void {
       if (r.suggested?.includes(el.name as keyof SystemInfo)) {
         r.suggested = r.suggested.filter((k) => k !== el.name);
         if (!r.suggested.length) delete r.suggested;
+      }
+      // Reviewed by the user: the "filled in from" note has done its job.
+      if (r.carriedFrom) {
+        delete r.carriedFrom;
+        view.querySelector("#carried-note")?.remove();
       }
       upsertResult(r);
       refresh();

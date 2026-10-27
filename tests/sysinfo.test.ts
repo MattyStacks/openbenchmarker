@@ -25,6 +25,23 @@ describe("system-info lookup commands", () => {
     expect(all).not.toMatch(/\?\?|\?\.|&&|\|\|/);
   });
 
+  it("has a driver version command for NVIDIA, AMD and Intel on each OS", () => {
+    const labels = (os: "windows" | "linux") => SYSINFO_COMMANDS[os].commands.filter((c) => c.field === "driver" && c.command).map((c) => c.label);
+    expect(labels("windows")).toEqual(["GPU driver (NVIDIA)", "GPU driver (AMD)", "GPU driver (Intel)"]);
+    expect(labels("linux")).toEqual(["GPU driver (NVIDIA)", "GPU driver (AMD/Intel)"]);
+    expect(SYSINFO_COMMANDS.windows.all).toMatch(/RadeonSoftwareVersion/);
+    expect(SYSINFO_COMMANDS.windows.all).toMatch(/ProviderName -match 'Intel'/);
+  });
+
+  it("the Linux Mesa lookup works without glxinfo (falls back to the installed package)", () => {
+    const mesa = SYSINFO_COMMANDS.linux.commands.find((c) => c.field === "mesa")!.command;
+    for (const tool of ["glxinfo", "dpkg-query", "rpm -q", "pacman -Q"]) expect(mesa).toContain(tool);
+    expect(mesa).toContain("dpkg-query -W -f='${Version}\\n'");
+    const driver = SYSINFO_COMMANDS.linux.commands.find((c) => c.label === "GPU driver (AMD/Intel)")!.command;
+    expect(driver.startsWith(mesa)).toBe(true);
+    expect(SYSINFO_COMMANDS.linux.all).toContain(mesa);
+  });
+
   it("only windows/linux have commands", () => {
     expect(commandsFor("")).toBeNull();
     expect(commandsFor("macos")).toBeNull();

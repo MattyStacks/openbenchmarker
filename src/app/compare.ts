@@ -1,6 +1,6 @@
 import { sharedRunFrom, type SharedRun } from "../benchmark/share-codec";
 import type { BenchResult } from "../benchmark/types";
-import { browserLabel, osLabel, settingsLabel } from "./share";
+import { browserLabel, osLabel, overclockLabel, settingsLabel } from "./share";
 import { stabilityPct } from "./stress-view";
 
 // ---------------------------------------------------------------------------
@@ -49,6 +49,9 @@ export function compareRuns(a: SharedRun, b: SharedRun, labels = { a: "the share
     if (browserDiffers) notes.push(`Different browsers: ${browserLabel(da)} vs ${browserLabel(db)}.`);
     if (sameBrowser && gpuKnown && !sameGpu) notes.push(`Same browser, different GPU (${da.gpuLabel} vs ${db.gpuLabel}).`);
   }
+  // Only when both sharers said: a run with nothing filled in tells us nothing.
+  const ocA = overclockLabel(a.overclock), ocB = overclockLabel(b.overclock);
+  if (ocA && ocB && ocA !== ocB) notes.push(`Overclock differs. ${labels.b}: ${ocB}. ${labels.a[0].toUpperCase()}${labels.a.slice(1)}: ${ocA}.`);
   if (a.stress && b.stress) notes.push(`Stability: ${stabilityPct(b)} for ${labels.b.toLowerCase()}, ${stabilityPct(a)} for ${labels.a} (slowest lap ÷ fastest).`);
   if (majorsDiffer || !(a.avgFps > 0)) return { pct: null, verdict: "", notes, likeForLike };
   const pct = ((b.avgFps - a.avgFps) / a.avgFps) * 100;

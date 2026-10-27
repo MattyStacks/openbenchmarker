@@ -297,6 +297,19 @@ This tool feeds a public dataset, so:
   "4 (assumed)" in My Results, exported in CSV (`suggested_fields`) and JSON, and commented
   `# assumed, not confirmed` in submission YAML. Editing the field removes the mark. Rules live
   in the field registry, `src/benchmark/fields.ts`.
+- **Carried to the next run:** a new desktop/laptop run starts with the details you filled in on
+  your last result (`carry: true` in the registry: GPU, OS, OS version, CPU, memory, memory type
+  and channels, GPU driver, distro, overclocked and the overclock details; not kernel, Mesa or
+  Proton, which change with updates). They're your own values, so they aren't marked as
+  suggestions; the form says which result they came from until you edit a field. If the browser
+  reports a different GPU than on that result, the GPU's own fields (GPU, driver, overclock) start
+  fresh. The graphics API is never carried: each run records its own.
+- **Overclock details:** with "Overclocked: Yes", the form asks for the core clock offset and
+  memory clock offset (MHz, may be negative) and the power limit (%), as set in MSI Afterburner or
+  the vendor's tool. They go into the submission YAML as an `overclock:` block right after
+  `overclocked: true` (proposed upstream in
+  [docs/upstream-submission-changes.md](docs/upstream-submission-changes.md)), and are kept but
+  ignored (not validated or exported) when overclocked isn't yes.
 - **Detected** by the browser: WebGL renderer/vendor, ANGLE backend, CPU thread count, battery
   state and browser version. They are stored in a separate, labelled `detected:` block, for the
   diagnosis only. They **never** fill in the GPU or any `system:` field. A software-rendered run
@@ -394,13 +407,18 @@ export and the storage migration all read that registry. To add one:
    YAML until it does (and note it in [docs/upstream-todos.md](docs/upstream-todos.md)).
 2. **Add the key** to `SystemInfo` in `src/benchmark/types.ts`.
 3. **Add a registry entry** in `SYSTEM_FIELDS`, at its upstream YAML position: `yaml` name,
-   `kind` (`text` is quoted, `digits` is a bare number, `choice` a bare word), label, placeholder,
+   `kind` (`text` is quoted, `digits` is a bare number, `signed` a bare number that may be
+   negative, `choice` a bare word), `section` (`top`, `system`, or `overclock` for the block
+   that only applies with overclocked yes), label, placeholder,
    optional `help`, `linux: true` for Linux-only fields, and a `validate` rule that mirrors
    `checks.py`. If browsers can't detect it and a best guess helps, add a `suggest` rule; the
    value is then marked in the result's `suggested` list and the YAML comments it as assumed.
+   Set `carry: true` if it rarely changes between runs on the same machine, and `gpuSpecific: true`
+   if it describes the GPU itself.
 4. **Tests:** extend `tests/fields.test.ts` (validation, YAML output and order, CSV column, and
    that older saved results load with it blank or suggested).
-5. **Share links** don't carry system fields. If a new field ever should be in links, add it as an
+5. **Share links** don't carry system fields, except the catalog GPU and overclock details (the
+   GPU entry, tag 2). If a new field ever should be in links, add it as an
    extension entry with a new tag (see [docs/share-links.md](docs/share-links.md)), not as a fixed
    field; the format version changes only for breaking changes.
 
@@ -416,8 +434,9 @@ page. Results live in this browser's localStorage. They leave it only when you
 share a link, export a file, or submit through GitHub. Share links carry the result in the URL
 fragment, which browsers never send to the server, and sharing is on the honor system (nothing is
 signed or verified). Links are encoded, not encrypted: anyone with a link can read it, like a
-screenshot. They never carry the system details you typed in (including `memory_channels`), the
-diagnostics or the result id. The full list of storage keys and checks is in
+screenshot. Of the system details you typed in, they carry only the catalog GPU you picked and the overclock
+details (so others can set up the same test); never CPU, memory (including `memory_channels`), OS
+version or driver. They never carry the diagnostics or the result id. The full list of storage keys and checks is in
 [docs/privacy-audit.md](docs/privacy-audit.md), and the link format in
 [docs/share-links.md](docs/share-links.md).
 

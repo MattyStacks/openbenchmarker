@@ -26,8 +26,9 @@ Hall of Fame. Nothing is planned or built yet.
   - submit the per-batch frame-time summary, so the server can recompute avg FPS and the lows
   - sign the payload in the page (only deters casual edits, since the key ships to the client)
   - require a short screen recording for top-N placements
-- **Overclock details** (leaderboard only, not upstream): core/memory clock offset, power limit,
-  and cooling (air/liquid/LN2).
+- **Overclock details.** Core/memory clock offset and power limit are already in the submission
+  YAML (`overclock:`, proposed upstream in docs/upstream-submission-changes.md) and in share links.
+  Still leaderboard-only ideas: cooling (air/liquid/LN2) and voltage.
 - **Accounts.** Optional GitHub sign-in to claim results. Anonymous submissions stay possible.
 
 ## Diagnostics a browser can't measure yet

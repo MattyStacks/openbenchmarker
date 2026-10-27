@@ -52,9 +52,9 @@ Bits are packed most significant first, then base64url without padding (RFC 4648
 Zero or more entries between the padding and the CRC, each **tag (1 byte), length (1 byte), value (length bytes)**:
 
 - Decoders read every entry and skip tags they don't know (the payload keeps them in `ext`, so a re-encode gives the same link). New **optional** fields can join links this way with no version bump.
-- Tag 0 is reserved (a stray zero byte after the padding still reads as damaged, as before). Tag 1 is the stress entry (below). Tags 2–255 are free; assign one here, with its value format, before using it.
+- Tag 0 is reserved (a stray zero byte after the padding still reads as damaged, as before). Tag 1 is the stress entry, tag 2 the GPU entry (below). Tags 3–255 are free; assign one here, with its value format, before using it.
 - The version byte changes only for breaking changes: a new fixed field, a reordered table, or a different meaning for an existing bit.
-- `memory_channels` and the other user-filled system fields are **not** in links (see below).
+- Of the user-filled system fields, only the catalog GPU and the overclock details are in links (tag 2). `memory_channels`, CPU, memory, OS version, driver and the rest are **not** (see below).
 
 **Tag 1: stress entry.** One for each run whose Duration is 3 (stress test), written right after the padding, before any other entry. Each finished lap's avg FPS for Stress: Entry or Stress: Extreme:
 
@@ -66,7 +66,17 @@ Zero or more entries between the padding and the CRC, each **tag (1 byte), lengt
 The lap count is (length − 1) ÷ 2, and a lap is always 96 s (one pass of the flight), so Duration = laps × 96 s. A different lap length would be a new test number. Per-lap 1% lows stay in the saved result and aren't shared. Six laps make a 15-byte entry (+20 characters): a stress result with an RTX 5080 name is 121 characters, still QR version 7.
 - Compatibility: v1 links made before the section existed have no bytes after the padding, so they decode exactly as before. `tests/share-codec.test.ts` pins four such codes (result, challenge, comparison, no GPU name) and checks that they decode to identical runs and re-encode to the same string. v1 had not reached production when the section was added, so no deployed decoder rejects entries.
 
-Never in a link: the user-filled system fields, the diagnostics, the result id, the run time of day, or anything else from `BenchResult`.
+**Tag 2: GPU entry** (added with the overclock details, still v1). At most one for each run where the sharer filled in a catalog GPU or answered "Overclocked", written after the stress entries. So someone comparing can see the exact card and set up the same test:
+
+| Byte | Contents |
+|---|---|
+| 0 | bit 7: run index · bits 6–5: reserved, 0 · bit 4: power limit follows · bit 3: memory offset follows · bit 2: core offset follows · bits 1–0: overclocked, 0 not said, 1 no, 2 yes (3 is damaged; bits 4–2 only with yes) |
+| … | core clock offset (MHz), memory clock offset (MHz), each signed 2 bytes big-endian; power limit (%), 2 bytes; each only when its bit is set |
+| rest | the catalog `gpu_id`, 6 bits per character from `abcdefghijklmnopqrstuvwxyz0123456789_.-`, the last byte padded with 1 bits (a whole 6-bit padding group is 63, and only ever ends the entry); empty when no GPU was picked |
+
+Only a `gpu_id` that's in the catalog when the link is made goes in (not "My GPU isn't listed"); a reader shows the catalog name, or the id when its own catalog doesn't list it yet. Overclock values that fail the results form's checks are left out. Older readers skip the entry and show the run as before. A result link with an RTX 5080 name grows from 101 to 121 characters with a GPU (QR version 7), 129 with all three overclock values (version 8); a comparison with both runs fully filled in is version 11, which still draws at 4 px a module on the card's 330 px QR panel. `tests/share-gpu.test.ts` covers the round-trips, malformed entries and sizes.
+
+Never in a link: the other user-filled system fields, the diagnostics, the result id, the run time of day, or anything else from `BenchResult`.
 
 ### Decoding
 
@@ -143,7 +153,7 @@ Every decoded string goes through `esc()`. A test link whose GPU name was `<img 
 2. **Copy link** and **Save image** are always next to it. "Preview the share card" shows the PNG.
 3. In My Results, valid rows have a Share button that does step 1.
 
-Share text, e.g.: *"Score: Extreme 14,321: 143.2 FPS avg, 118.4 1% low in the Neon Flythrough browser GPU benchmark (4K · Extreme · 60 s) on NVIDIA GeForce RTX 5080. Measured in my browser, shared on the honor system:"* followed by the link. It's about 190 characters, which fits on X with the link.
+Share text, e.g.: *"Score: Extreme 14,321: 143.2 FPS avg, 118.4 1% low in the Neon Flythrough browser GPU benchmark (4K · Extreme · 60 s) on NVIDIA GeForce RTX 5080. Measured in my browser, shared on the honor system:"* followed by the link. It's about 190 characters, which fits on X with the link. When the sharer picked a catalog GPU, its name replaces the browser's (*"… on GeForce RTX 5080 Founders Edition (overclocked)."*, the suffix only when they said yes), and the card shows it the same way.
 
 ## Test steps
 

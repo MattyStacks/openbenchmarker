@@ -34,8 +34,18 @@ const WIN = {
   memoryGb: `[math]::Round((Get-CimInstance Win32_PhysicalMemory | Measure-Object Capacity -Sum).Sum / 1GB)`,
   memoryType: `$m = Get-CimInstance Win32_PhysicalMemory | Select-Object -First 1; "$(${WIN_MEM_TYPES}[[int]$m.SMBIOSMemoryType])-$($m.ConfiguredClockSpeed)"`,
   driver: `nvidia-smi --query-gpu=name,driver_version --format=csv,noheader`,
-  driverOther: `Get-ItemProperty '${WIN_GPU_KEY}' -ErrorAction SilentlyContinue | Where-Object { $_.DriverDesc } | ForEach-Object { "$($_.DriverDesc): $($_.DriverVersion)" }`,
+  // AMD's installer records the AMD Software (Adrenalin) version next to Windows' own number.
+  driverAmd: `Get-ItemProperty '${WIN_GPU_KEY}' -ErrorAction SilentlyContinue | Where-Object { $_.RadeonSoftwareVersion } | ForEach-Object { "$($_.DriverDesc): $($_.RadeonSoftwareVersion)" }`,
+  // Intel publishes its drivers under Windows' own version number.
+  driverIntel: `Get-ItemProperty '${WIN_GPU_KEY}' -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -match 'Intel' -and $_.DriverDesc } | ForEach-Object { "$($_.DriverDesc): $($_.DriverVersion)" }`,
 };
+
+/**
+ * The Mesa version (AMD and Intel's driver on Linux). glxinfo isn't installed by default, so this
+ * falls back to the installed package: Debian/Ubuntu, Fedora/openSUSE, then Arch. Package epochs
+ * and suffixes are stripped (1:24.2.5-1 and 24.2.5-1ubuntu1 become 24.2.5).
+ */
+const LINUX_MESA = `{ glxinfo -B 2>/dev/null | grep -o 'Mesa [0-9][0-9.]*' | cut -d' ' -f2; dpkg-query -W -f='\${Version}\\n' libglx-mesa0 2>/dev/null; rpm -q --qf '%{VERSION}\\n' mesa-dri-drivers Mesa-dri 2>/dev/null; pacman -Q mesa 2>/dev/null | cut -d' ' -f2; } | grep -m1 '^[0-9]' | sed 's/^[0-9]*://; s/[-+~].*//'`;
 
 const LINUX = {
   gpu: `lspci | grep -Ei 'vga|3d|display'; nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null`,
@@ -45,8 +55,9 @@ const LINUX = {
   cpu: `grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | sed 's/^ //'`,
   memoryGb: `sudo dmidecode -t 17 | awk '/^\\tSize: [0-9]+ GB/ {s+=$2} /^\\tSize: [0-9]+ MB/ {s+=$2/1024} END {print s}'`,
   memoryType: `sudo dmidecode -t 17 | awk -F': ' '/^\\tType: (LP)?DDR/ {t=$2} /^\\tConfigured Memory Speed: [0-9]/ {s=$2+0} END {if (t) print t "-" s}'`,
-  driver: `nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || glxinfo -B | grep -o 'Mesa [0-9.]*' | head -1`,
-  mesa: `glxinfo -B | grep -o 'Mesa [0-9.]*' | head -1 | cut -d' ' -f2`,
+  driver: `nvidia-smi --query-gpu=driver_version --format=csv,noheader`,
+  driverMesa: `${LINUX_MESA} | sed 's/^/Mesa /'`,
+  mesa: LINUX_MESA,
 };
 
 export const SYSINFO_COMMANDS: Record<"windows" | "linux", OsCommands> = {
@@ -64,8 +75,10 @@ export const SYSINFO_COMMANDS: Record<"windows" | "linux", OsCommands> = {
         field: "driver",
         label: "GPU driver (NVIDIA)",
         command: WIN.driver,
-        note: "AMD/Intel: use the version shown in AMD Software or Intel Graphics Software. Windows' own number (e.g. 32.0.16.1714) is not the vendor's driver version.",
+        note: "Prints e.g. 561.09. Windows' own number for NVIDIA drivers (e.g. 32.0.15.6109) is not the version NVIDIA publishes.",
       },
+      { field: "driver", label: "GPU driver (AMD)", command: WIN.driverAmd, note: "Prints the AMD Software (Adrenalin) version, e.g. 24.10.1, also shown in AMD Software under System." },
+      { field: "driver", label: "GPU driver (Intel)", command: WIN.driverIntel, note: "Prints e.g. 32.0.101.6083. Intel publishes its drivers under this same number, also shown in Intel Graphics Software." },
     ],
     all: [
       `"GPU:         " + ((${WIN.gpu}) -join '; ')`,
@@ -73,8 +86,9 @@ export const SYSINFO_COMMANDS: Record<"windows" | "linux", OsCommands> = {
       `"CPU:         " + ${WIN.cpu}`,
       `"Memory (GB): " + ${WIN.memoryGb}`,
       `${WIN.memoryType.replace('"$(', '"Memory type: $(')}`,
-      `"GPU driver:  " + $(if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) { nvidia-smi --query-gpu=driver_version --format=csv,noheader } else { "no nvidia-smi; AMD/Intel: use the version in AMD Software / Intel Graphics Software" })`,
-      `"Windows driver versions (not vendor versions): " + ((${WIN.driverOther}) -join '; ')`,
+      `if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) { "GPU driver (NVIDIA): " + (nvidia-smi --query-gpu=driver_version --format=csv,noheader) }`,
+      `(${WIN.driverAmd}) | ForEach-Object { "GPU driver (AMD):    $_" }`,
+      `(${WIN.driverIntel}) | ForEach-Object { "GPU driver (Intel):  $_" }`,
     ].join("\n"),
   },
   linux: {
@@ -94,8 +108,14 @@ export const SYSINFO_COMMANDS: Record<"windows" | "linux", OsCommands> = {
       },
       { field: "memoryType", label: "Memory type", command: LINUX.memoryType, note: "Prints e.g. DDR5-6000." },
       { field: "memoryChannels", label: "Memory channels", command: "", note: MEM_CHANNELS_NOTE },
-      { field: "driver", label: "GPU driver", command: LINUX.driver, note: "NVIDIA proprietary prints its version; otherwise the Mesa version (glxinfo is in mesa-utils / mesa-demos)." },
-      { field: "mesa", label: "Mesa", command: LINUX.mesa, note: "Leave blank on the NVIDIA proprietary driver." },
+      { field: "driver", label: "GPU driver (NVIDIA)", command: LINUX.driver, note: "The NVIDIA proprietary driver, e.g. 560.35.03." },
+      {
+        field: "driver",
+        label: "GPU driver (AMD/Intel)",
+        command: LINUX.driverMesa,
+        note: "AMD and Intel GPUs (Arc included) use Mesa on Linux, so the driver version is the Mesa version, e.g. Mesa 24.2.5. Works without glxinfo: it falls back to the installed Mesa package.",
+      },
+      { field: "mesa", label: "Mesa", command: LINUX.mesa, note: "Same Mesa version, without the word Mesa. Leave blank on the NVIDIA proprietary driver." },
       { field: "proton", label: "Proton", command: "", note: "Not applicable: Proton runs Windows games through Steam, and this benchmark runs in your browser. Leave blank." },
     ],
     all: [
@@ -107,8 +127,8 @@ export const SYSINFO_COMMANDS: Record<"windows" | "linux", OsCommands> = {
       `echo "CPU:         $(${LINUX.cpu})"`,
       `echo "Memory (GB): $(${LINUX.memoryGb})"`,
       `echo "Memory type: $(${LINUX.memoryType})"`,
-      `echo "GPU driver:  $(${LINUX.driver})"`,
-      `echo "Mesa:        $(${LINUX.mesa} 2>/dev/null)"`,
+      `command -v nvidia-smi >/dev/null && echo "GPU driver (NVIDIA): $(${LINUX.driver})"`,
+      `echo "Mesa (AMD/Intel driver): $(${LINUX.mesa})"`,
     ].join("\n"),
   },
 };

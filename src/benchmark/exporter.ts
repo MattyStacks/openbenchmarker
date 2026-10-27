@@ -2,7 +2,7 @@ import { BENCHMARK, UPSTREAM_REPO } from "./catalog";
 import { diagnose, isMaskedRenderer } from "./diagnose";
 import { round1, stability } from "./metrics";
 import { WARMUP_SECONDS } from "./presets";
-import { SYSTEM_FIELDS, type SystemField } from "./fields";
+import { OVERCLOCK_FIELDS, SYSTEM_FIELDS, fieldApplies, type SystemField } from "./fields";
 import type { BenchResult } from "./types";
 import { PROOF_METHOD, validateSubmission } from "./validate";
 
@@ -67,9 +67,17 @@ function detectedLines(r: BenchResult): string[] {
 }
 
 function yamlScalar(f: SystemField, v: string): string {
-  if (f.kind === "digits") return String(Number(v));
+  if (f.kind === "digits" || f.kind === "signed") return String(Number(v));
   if (f.kind === "yesno") return String(v === "yes");
   return f.kind === "choice" ? v : q(v);
+}
+
+/** The overclock: block: what was raised, only when overclocked is yes and something is filled in. */
+function overclockLines(r: BenchResult): string[] {
+  const s = r.system;
+  if (s.overclocked !== "yes") return [];
+  const lines = OVERCLOCK_FIELDS.filter((f) => (s[f.key] ?? "").trim()).map((f) => `  ${f.yaml}: ${yamlScalar(f, s[f.key].trim())}`);
+  return lines.length ? [`overclock: # as set in the submitter's tuning tool`, ...lines] : [];
 }
 
 /** Stress test, stability and every lap. Only in run reports: stress runs are never submitted. */
@@ -130,6 +138,7 @@ export function toYaml(r: BenchResult): string {
     `version: ${q(r.benchmarkVersion)}`,
     `frame_generation: false`,
     ...(s.overclocked === "yes" || s.overclocked === "no" ? [`overclocked: ${s.overclocked === "yes"}`] : []),
+    ...overclockLines(r),
     `result:`,
     `  - resolution: ${q(r.resolution)}`,
     `    time: ${q(r.time)}`,
@@ -219,7 +228,7 @@ const CSV_FIELDS: [string, (r: BenchResult) => string | number][] = [
   ["detected_cpu_threads", (r) => r.diag?.cpuThreads ?? ""],
   ["detected_on_battery", (r) => (r.diag?.onBattery != null ? String(r.diag.onBattery) : "")],
   ["detected_browser", (r) => r.diag?.browser ?? ""],
-  ...SYSTEM_FIELDS.map((f): [string, (r: BenchResult) => string] => [f.yaml, (r) => r.system?.[f.key] ?? ""]),
+  ...SYSTEM_FIELDS.map((f): [string, (r: BenchResult) => string] => [f.yaml, (r) => (r.system && fieldApplies(f, r.system) ? (r.system[f.key] ?? "") : "")]),
   ["suggested_fields", (r) => (r.suggested ?? []).map((k) => SYSTEM_FIELDS.find((f) => f.key === k)?.yaml ?? k).join(" ")],
 ];
 
@@ -239,8 +248,10 @@ export function toJson(r: BenchResult): string {
   const errors = validateSubmission(r);
   const diagnosis = r.diag ? diagnose(r) : undefined;
   // The compared-with run belongs to someone else (or another session): not part of this export.
-  const { challenge: _compared, ...own } = r;
+  // Where the system details were copied from is only for the form's note.
+  const { challenge: _compared, carriedFrom: _carried, ...own } = r;
   void _compared;
+  void _carried;
   const stab = r.stressTest ? stability(r.laps ?? []) : null;
   return JSON.stringify({ ...own, ...(stab !== null ? { stabilityPct: pct1(stab) } : {}), diagnosis, submittable: errors.length === 0, blockingIssues: errors }, null, 2) + "\n";
 }

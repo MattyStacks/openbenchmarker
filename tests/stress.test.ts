@@ -103,8 +103,12 @@ describe("sharing a stress run", () => {
     const { sharedRunFrom } = await import("../src/benchmark/share-codec");
     const r = sharedRunFrom(stressResult({ device: { browser: "edge", browserMajor: 141, os: "windows", deviceType: "desktop", webkitEngine: false, gpuLabel: "NVIDIA GeForce RTX 5080" } }));
     expect(settingsLabel(r)).toBe("4K · Extreme · 6 laps");
+    // The catalog GPU picked on the results form names the GPU; without one, the browser's name does.
     expect(shareText(r)).toBe(
-      "Stress: Extreme: 96.4% stability over 6 laps (152.1 → 146.7 FPS) in the Neon Flythrough browser GPU benchmark (4K · Extreme) on NVIDIA GeForce RTX 5080. Measured in my browser, shared on the honor system:",
+      "Stress: Extreme: 96.4% stability over 6 laps (152.1 → 146.7 FPS) in the Neon Flythrough browser GPU benchmark (4K · Extreme) on GeForce RTX 5080 Founders Edition. Measured in my browser, shared on the honor system:",
     );
+    const { gpuId: _picked, ...unpicked } = r;
+    void _picked;
+    expect(shareText(unpicked)).toMatch(/ on NVIDIA GeForce RTX 5080\. Measured/);
   });
 });

@@ -3,7 +3,7 @@ import { ASSUMED_HANDHELD_CHANNELS } from "../benchmark/fields";
 import { getScoreTest } from "../benchmark/presets";
 import { decodeShare, type SharedRun } from "../benchmark/share-codec";
 import { $, esc } from "./dom";
-import { browserLabel, osLabel } from "./share";
+import { browserLabel, osLabel, overclockLabel } from "./share";
 import { showView } from "./shell";
 
 // ---------------------------------------------------------------------------
@@ -55,6 +55,8 @@ function linkRows(r: SharedRun): [string, string, string][] {
     ["Device type", d.deviceType, "Phone, tablet or desktop."],
     ["iOS engine", d.webkitEngine ? "yes" : "no", "On iPhone and iPad every browser uses Safari's engine."],
     ["GPU name", d.gpuLabel ?? "not reported", "As the browser reported it (often generic), up to 63 bytes."],
+    ["Your GPU", r.gpuId ?? "not filled in", "The exact GPU you picked from the catalog on the results page, if you did."],
+    ["Overclocked", overclockLabel(r.overclock) || "not filled in", "Whether you said the GPU was overclocked and, if so, the core clock, memory clock and power limit you raised, so others can set up the same test."],
     ["Check value", "1 byte", "Catches links that got cut off or mangled when copied."],
   ];
 }
@@ -128,6 +130,7 @@ export function aboutHtml(): string {
       <ol>
         <li><b>Your result is read</b> from this browser: the measured numbers, the settings and the run date.</li>
         <li><b>Some device details are added</b>, as your browser reports them: browser and version, operating system, whether it's a phone, tablet or desktop, and the GPU name. They come from the browser's own description of itself (its "user agent") and from WebGL, and were recorded with the result when you ran it.</li>
+        <li><b>Your GPU and overclock are added, if you filled them in</b> on the results page: the GPU you picked from the catalog, whether it was overclocked, and the core clock offset, memory clock offset and power limit. Nothing else you typed in is added.</li>
         <li><b>Everything is packed into a short code</b> of letters, numbers, <code>-</code> and <code>_</code>. Each value is stored as a few bits, like a very compact form, and the bytes are written out in a link-safe alphabet (called base64url).</li>
         <li><b>A check value is added</b>, so a link that gets cut off or mangled is caught instead of showing wrong numbers.</li>
         <li><b>The code goes after the <code>#</code></b> in the address: <code>opengpubenchmarker.com/#/r/&lt;code&gt;</code>.</li>
@@ -159,7 +162,7 @@ export function aboutHtml(): string {
       ${tech(`<p>The format is bit-packed binary. Byte 0 is the format version, then the link type, then one record per run (two for a comparison). After that comes an optional extension section (tag, length, value entries that older versions skip), then a CRC-8 check byte, and the whole thing is base64url without padding. The full layout is in <a href="${REPO}/blob/main/docs/share-links.md" target="_blank" rel="noopener">docs/share-links.md</a> and <code>src/benchmark/share-codec.ts</code>.</p>`)}
 
       <h3>What's not in a link</h3>
-      <p>No name, email address, IP address, account, device ID or result ID. It also doesn't carry the system details you typed in (GPU model, CPU, memory and so on), the detailed diagnostics, or the time of day.</p>
+      <p>No name, email address, IP address, account, device ID or result ID. Of the system details you typed in, it carries only your GPU and overclock: never your CPU, memory, OS version or driver. It also doesn't carry the detailed diagnostics or the time of day.</p>
 
       <h3>Link types</h3>
       <ul>

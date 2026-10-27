@@ -1,5 +1,6 @@
 import { encode as qrEncode } from "uqr";
-import { encodeShare, type SharedRun, type SharePayload } from "../benchmark/share-codec";
+import { findGpu } from "../benchmark/catalog";
+import { encodeShare, type SharedOverclock, type SharedRun, type SharePayload } from "../benchmark/share-codec";
 import type { DeviceContext } from "../benchmark/types";
 import { getScoreTest, getStressTest } from "../benchmark/presets";
 import { SAME_PCT, apartLabel, compareRuns, comparisonText, inviteText } from "./compare";
@@ -38,6 +39,31 @@ export function deviceLabel(d: DeviceContext): string {
   return [browserLabel(d), osLabel(d), DEVICE_NAME[d.deviceType]].filter(Boolean).join(" · ");
 }
 
+/** The catalog GPU the sharer picked (its name, or the id if this catalog doesn't list it yet), or "". */
+export function chosenGpuName(r: SharedRun): string {
+  return r.gpuId ? (findGpu(r.gpuId)?.name ?? r.gpuId) : "";
+}
+
+const signed = (x: number) => (x > 0 ? `+${x}` : String(x));
+/** "No, stock clocks", "Yes: core +150 MHz, memory +1000 MHz, power limit 110%", or "" when not said. */
+export function overclockLabel(o: SharedOverclock | undefined): string {
+  if (!o) return "";
+  if (!o.overclocked) return "No, stock clocks";
+  const parts = [
+    o.coreMhz !== undefined ? `core ${signed(o.coreMhz)} MHz` : "",
+    o.memoryMhz !== undefined ? `memory ${signed(o.memoryMhz)} MHz` : "",
+    o.powerPct !== undefined ? `power limit ${o.powerPct}%` : "",
+  ].filter(Boolean);
+  return parts.length ? `Yes: ${parts.join(", ")}` : "Yes";
+}
+
+/** The sharer's GPU and overclock as definition-list rows (shared view, compare columns); "" when neither was filled in. */
+export function sharerGpuRows(r: SharedRun): string {
+  const gpu = chosenGpuName(r);
+  const oc = overclockLabel(r.overclock);
+  return `${gpu ? `<dt>GPU <em>(chosen by the sharer)</em></dt><dd>${esc(gpu)}</dd>` : ""}${oc ? `<dt>Overclocked</dt><dd>${esc(oc)}</dd>` : ""}`;
+}
+
 const fps = (x: number) => x.toFixed(1);
 export const settingsLabel = (r: SharedRun) => `${r.resolution} · ${r.preset} · ${r.stress ? `${r.stress.laps.length} laps` : `${r.durationS} s`}`;
 const stressName = (r: SharedRun) => getStressTest(r.stress?.test)?.name ?? "Stress test";
@@ -46,7 +72,8 @@ const scoreLabel = (r: SharedRun) =>
 
 /** One line that reads well in iMessage, Discord, Reddit and X (well under 280 with the link). */
 export function shareText(r: SharedRun): string {
-  const gpu = r.device.gpuLabel ? ` on ${r.device.gpuLabel}` : "";
+  const name = chosenGpuName(r) || r.device.gpuLabel;
+  const gpu = name ? ` on ${name}${r.overclock?.overclocked ? " (overclocked)" : ""}` : "";
   if (r.stress) {
     const laps = r.stress.laps;
     return `${stressName(r)}: ${stabilityPct(r)} stability over ${laps.length} laps (${fps(laps[0])} → ${fps(laps[laps.length - 1])} FPS) in the Neon Flythrough browser GPU benchmark (${r.resolution} · ${r.preset})${gpu}. Measured in my browser, shared on the honor system:`;
@@ -133,8 +160,8 @@ function footer(ctx: CanvasRenderingContext2D): void {
 }
 
 /**
- * QR code on a white panel, top right. ECC M (15%) keeps the code small enough (version 5–7 for one
- * run, up to 10 for two) to scan off a phone screen or screenshot; the 4-module quiet zone is part
+ * QR code on a white panel, top right. ECC M (15%) keeps the code small enough (version 5–8 for one
+ * run, up to 11 for two with the sharers' GPU and overclock) to scan off a phone screen or screenshot; the 4-module quiet zone is part
  * of the panel. `label` (invite cards) sits above the panel.
  */
 function qrPanel(ctx: CanvasRenderingContext2D, url: string, caption: string, label = ""): void {
@@ -226,13 +253,14 @@ export function renderCard(r: SharedRun, url: string, variant: CardVariant = "re
     ctx.fillStyle = "#ff3edb";
     ctx.fillText(fitText(ctx, scoreLabel(r), TEXT_W, "700", 30, 22), X, y);
   }
-  // GPU, then a small "reported by browser" tag on the same line.
+  // GPU (the sharer's catalog pick, else the browser's), then a small tag on the same line.
   y += 46;
-  const tag = r.device.gpuLabel ? "reported by browser" : "";
+  const chosen = chosenGpuName(r);
+  const tag = chosen ? (r.overclock?.overclocked ? "overclocked" : "") : r.device.gpuLabel ? "reported by browser" : "";
   ctx.font = `500 18px ${SANS}`;
   const tagW = tag ? ctx.measureText(tag).width + 14 : 0;
   ctx.fillStyle = "#f0ecff";
-  const gpuText = fitText(ctx, r.device.gpuLabel ?? "GPU hidden by the browser", TEXT_W - tagW, "600", 30, 20);
+  const gpuText = fitText(ctx, chosen || (r.device.gpuLabel ?? "GPU hidden by the browser"), TEXT_W - tagW, "600", 30, 20);
   ctx.fillText(gpuText, X, y);
   if (tag) {
     const gw = ctx.measureText(gpuText).width;
@@ -290,7 +318,7 @@ export function renderComparisonCard(a: SharedRun, b: SharedRun, url: string): H
     ctx.fillStyle = "#f0ecff";
     ctx.font = `700 26px ${SANS}`;
     ctx.fillText(r.stress ? `Stability ${stabilityPct(r)}` : `1% low ${fps(r.p1Low)}`, x, 314);
-    ctx.fillText(fitText(ctx, r.device.gpuLabel ?? "GPU hidden by the browser", COL_W, "600", 24, 16), x, 360);
+    ctx.fillText(fitText(ctx, `${chosenGpuName(r) || (r.device.gpuLabel ?? "GPU hidden by the browser")}${r.overclock?.overclocked ? " (OC)" : ""}`, COL_W, "600", 24, 16), x, 360);
     ctx.fillStyle = "#b6aedc";
     ctx.fillText(fitText(ctx, `${browserLabel(r.device)} · ${osLabel(r.device)}`, COL_W, "500", 20, 15), x, 392);
     if (!same) ctx.fillText(fitText(ctx, settingsLabel(r), COL_W, "500", 20, 15), x, 422);
@@ -426,37 +454,40 @@ const OUTCOME_TEXT: Record<ShareOutcome, string> = {
 };
 
 /** Wire a share box for one run. */
-export function bindShareBox(root: HTMLElement, r: SharedRun): void {
+/** `run` is read on every click, so GPU and overclock details filled in after the page opened go in the link. */
+export function bindShareBox(root: HTMLElement, run: () => SharedRun): void {
   const status = root.querySelector<HTMLElement>("[data-share-status]");
   const say = (text: string, bad = false) => {
     if (!status) return;
     status.textContent = text;
     status.classList.toggle("bad", bad);
   };
-  const result: SharePayload = { type: "result", runs: [r] };
+  const result = (): SharePayload => ({ type: "result", runs: [run()] });
   root.querySelector("[data-share]")?.addEventListener("click", () => {
-    void sharePayload(result).done.then((o) => say(OUTCOME_TEXT[o], o === "failed"));
+    void sharePayload(result()).done.then((o) => say(OUTCOME_TEXT[o], o === "failed"));
   });
   root.querySelector("[data-copy-link]")?.addEventListener("click", async () => {
-    const url = payloadUrl(result);
+    const url = payloadUrl(result());
     if (await copyText(url)) say("Link copied ✓");
     else say(`Copy this link: ${url}`, true);
   });
   root.querySelector("[data-copy-code]")?.addEventListener("click", async () => {
-    const code = shareCode(result);
+    const code = shareCode(result());
     if (await copyText(code)) say("Code copied ✓ Anyone can paste it into “Have a code?” on My Results.");
     else say(`Copy this code: ${code}`, true);
   });
-  root.querySelector("[data-save-card]")?.addEventListener("click", () => saveImage(payloadCard(result)));
+  root.querySelector("[data-save-card]")?.addEventListener("click", () => saveImage(payloadCard(result())));
   const details = root.querySelector<HTMLDetailsElement>("[data-card-preview]");
   details?.addEventListener("toggle", () => {
-    if (!details.open || details.querySelector("img")) return;
+    if (!details.open) return;
+    details.querySelector("img")?.remove();
+    const r = run();
     const img = document.createElement("img");
     img.className = "card-preview";
     img.alt = `Share card: ${r.avgFps.toFixed(1)} FPS average at ${settingsLabel(r)}`;
     img.width = CARD_W;
     img.height = CARD_H;
-    img.src = renderCard(r, payloadUrl(result)).toDataURL("image/png");
+    img.src = renderCard(r, payloadUrl({ type: "result", runs: [r] })).toDataURL("image/png");
     details.append(img);
   });
 }
