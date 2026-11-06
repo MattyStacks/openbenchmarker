@@ -23,6 +23,8 @@ interface Measure {
   gpuMs: number;
   /** Mean JS time per frame (scene update + draw submission), ms. */
   cpuMs: number;
+  updateMs: number;
+  drawCalls: number;
   /** Mean GPU ms per sampled scene time, showing how load varies along the flight. */
   bySample: number[];
   /** Slowest single frame's GPU time, ms (spikes the averages hide). */
@@ -37,6 +39,9 @@ interface Row {
   build_ms: number;
   gpu_ms: number;
   cpu_ms: number;
+  update_ms: number;
+  submission_ms: number;
+  draw_calls: number;
   est_fps: number;
   by_sample: number[];
   max_gpu_ms: number;
@@ -90,19 +95,29 @@ export function runLab(): void {
     gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
     for (let attempt = 0; attempt < 3; attempt++) {
       const queries: { q: WebGLQuery; s: number }[] = [];
-      let cpu = 0;
-      for (let s = 0; s < SAMPLES.length; s++) {
-        for (let i = 0; i < FRAMES_PER_SAMPLE; i++) {
-          const qq = gl.createQuery()!;
-          gl.beginQuery(ext!.TIME_ELAPSED_EXT, qq);
-          const c0 = performance.now();
-          fly.render(SAMPLES[s] + i / 60);
-          renderer.setRenderTarget(null);
-          cpu += performance.now() - c0;
-          gl.endQuery(ext!.TIME_ELAPSED_EXT);
-          queries.push({ q: qq, s });
+      let cpu = 0, update = 0, calls = 0;
+      const autoReset = renderer.info.autoReset;
+      renderer.info.autoReset = false;
+      try {
+        for (let s = 0; s < SAMPLES.length; s++) {
+          for (let i = 0; i < FRAMES_PER_SAMPLE; i++) {
+            const qq = gl.createQuery()!;
+            gl.beginQuery(ext!.TIME_ELAPSED_EXT, qq);
+            renderer.info.reset();
+            fly.timing.updateMs = 0;
+            const c0 = performance.now();
+            fly.render(SAMPLES[s] + i / 60);
+            renderer.setRenderTarget(null);
+            cpu += performance.now() - c0;
+            update += fly.timing.updateMs;
+            calls += renderer.info.render.calls;
+            gl.endQuery(ext!.TIME_ELAPSED_EXT);
+            queries.push({ q: qq, s });
+          }
+          await sleep(0); // let the browser breathe between samples
         }
-        await sleep(0); // let the browser breathe between samples
+      } finally {
+        renderer.info.autoReset = autoReset;
       }
       gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
       const end = performance.now() + 3000;
@@ -126,6 +141,8 @@ export function runLab(): void {
       return {
         gpuMs: sums.reduce((a, b) => a + b, 0) / n,
         cpuMs: cpu / queries.length,
+        updateMs: update / queries.length,
+        drawCalls: calls / queries.length,
         bySample,
         maxMs,
       };
@@ -144,6 +161,9 @@ export function runLab(): void {
       build_ms: Math.round(buildMs),
       gpu_ms: r2(m.gpuMs),
       cpu_ms: r2(m.cpuMs),
+      update_ms: r2(m.updateMs),
+      submission_ms: r2(Math.max(0, m.cpuMs - m.updateMs)),
+      draw_calls: r2(m.drawCalls),
       est_fps: Math.round(1000 / Math.max(m.gpuMs, m.cpuMs)),
       by_sample: m.bySample.map(r2),
       max_gpu_ms: r2(m.maxMs),
@@ -258,6 +278,8 @@ export function runLab(): void {
         addRow("system", `${s} (cost)`, ext4k.id, res4k, 0, {
           gpuMs: full.gpuMs - m.gpuMs,
           cpuMs: full.cpuMs - m.cpuMs,
+          updateMs: full.updateMs - m.updateMs,
+          drawCalls: full.drawCalls - m.drawCalls,
           bySample: m.bySample.map((x, i) => full.bySample[i] - x),
           maxMs: m.maxMs,
         });
