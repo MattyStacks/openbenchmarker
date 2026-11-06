@@ -233,6 +233,14 @@ describe("score, diagnostics and detected data", () => {
     expect(y.split("\n").filter((l) => !l.trimStart().startsWith("#")).join("\n")).not.toMatch(/: [[{]/);
   });
 
+  it("exports preview handoffs separately from rendered FPS and GPU hitches", () => {
+    const y = toYaml(scored({ diag: { ...DIAG, gpuHitches: 5, presentation: { frames: 3600, fps: 119.98, p95Ms: 8.4, maxMs: 16.7, lateP95Ms: 0.2, dropped: 1 } } }));
+    expect(y).toContain("gpu_hitches: 5");
+    expect(y).toContain("preview_fps: 119.98");
+    expect(y).toContain("preview_interval_p95_ms: 8.4");
+    expect(y).toContain("preview_interval_max_ms: 16.7");
+  });
+
   it("custom runs and old results leave the new fields out", () => {
     const y = toYaml(withSys({ gpuId: GPU, os: "windows" }));
     for (const k of ["score", "score_test", "overclocked", "diagnostics", "detected", "rendered_with"]) expect(y).not.toMatch(new RegExp(`^\\s*${k}:`, "m"));

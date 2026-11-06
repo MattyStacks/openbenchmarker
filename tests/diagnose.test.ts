@@ -138,6 +138,7 @@ describe("renderer and browser parsing", () => {
 
   it("parses the ANGLE backend", () => {
     expect(parseBackend(NV)).toBe("D3D11");
+    expect(parseBackend("ANGLE (Mesa, zink Vulkan 1.4(NVIDIA GeForce RTX 2080 Ti (NVK TU102) (MESA_NVK)), OpenGL ES 3.2)")).toBe("OpenGL ES");
     expect(parseBackend("ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 5080/PCIe/SSE2, OpenGL 4.5.0)")).toBe("OpenGL");
     expect(parseBackend("ANGLE (AMD, Vulkan 1.3.260 (AMD Radeon RX 7900 XTX (0x0000744C)), AMD proprietary driver)")).toBe("Vulkan");
     expect(parseBackend("ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Max, Unspecified Version)")).toBe("Metal");

@@ -49,6 +49,16 @@ function runDetailLines(r: BenchResult): string[] {
     `      hitches: ${d.hitches}`,
     `      frame_time_std_ms: ${r2(d.frameStdMs)}`,
   );
+  if (d.gpuHitches !== undefined) lines.push(`      gpu_hitches: ${d.gpuHitches}`);
+  if (d.presentation) {
+    const p = d.presentation;
+    if (p.refreshHz !== undefined) lines.push(`      preview_refresh_hz: ${r2(p.refreshHz)}`);
+    if (p.divisor !== undefined) lines.push(`      preview_refresh_divisor: ${p.divisor}`);
+    lines.push(`      # Canvas handoffs, not physical monitor scanout or render throughput.`,
+      `      preview_frames: ${p.frames}`, `      preview_fps: ${r2(p.fps)}`,
+      `      preview_interval_p95_ms: ${r2(p.p95Ms)}`, `      preview_interval_max_ms: ${r2(p.maxMs)}`,
+      `      preview_lateness_p95_ms: ${r2(p.lateP95Ms)}`, `      preview_dropped: ${p.dropped}`);
+  }
   return lines;
 }
 
@@ -218,6 +228,10 @@ const CSV_FIELDS: [string, (r: BenchResult) => string | number][] = [
   ["main_thread_stalls", (r) => r.diag?.stalls ?? ""],
   ["stall_ms", (r) => (r.diag ? Math.round(r.diag.stallMs) : "")],
   ["hitches", (r) => r.diag?.hitches ?? ""],
+  ["gpu_hitches", (r) => r.diag?.gpuHitches ?? ""],
+  ["preview_fps", (r) => r.diag?.presentation ? r2(r.diag.presentation.fps) : ""],
+  ["preview_interval_p95_ms", (r) => r.diag?.presentation ? r2(r.diag.presentation.p95Ms) : ""],
+  ["preview_interval_max_ms", (r) => r.diag?.presentation ? r2(r.diag.presentation.maxMs) : ""],
   ["frame_time_std_ms", (r) => (r.diag ? r2(r.diag.frameStdMs) : "")],
   ["heap_growth_mb", (r) => (r.diag?.heapGrowthMb != null ? Math.round(r.diag.heapGrowthMb) : "")],
   ["bloom", (r) => (r.diag ? String(r.diag.features.bloom) : "")],

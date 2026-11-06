@@ -70,7 +70,9 @@ export function parseBackend(renderer: string): string {
   const m = /^ANGLE \((.*)\)$/.exec(renderer.trim());
   if (!m) return "";
   const last = m[1].split(",").pop()!.trim();
-  if (/^(D3D11|D3D9|Vulkan|OpenGL(?: ES)?|Metal)$/i.test(last)) return last;
+  // Prefer the outer ANGLE API over a nested driver name (e.g. Zink Vulkan).
+  const trailing = /^(D3D11|D3D9|Vulkan|OpenGL(?: ES)?|Metal)(?:\s+\d.*)?$/i.exec(last);
+  if (trailing) return trailing[1];
   // ANGLE on Vulkan, OpenGL or Metal names the API mid-string and ends with the driver.
   const api = /\b(Vulkan|OpenGL ES|OpenGL|Metal|Direct3D11|Direct3D9)\b/.exec(m[1]);
   return api ? ({ Direct3D11: "D3D11", Direct3D9: "D3D9" } as Record<string, string>)[api[1]] ?? api[1] : "";

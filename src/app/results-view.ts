@@ -112,6 +112,7 @@ function diagPanel(r: BenchResult): string {
       d
         ? `<details><summary>All measured and detected signals</summary><dl class="hints">
         ${d.renderThread ? `<dt>Rendering</dt><dd>${d.renderThread === "worker" ? "Dedicated worker" : "Main thread (compatibility path)"}</dd>` : ""}
+        ${d.presentation ? `<dt>Preview delivery</dt><dd>${d.presentation.fps.toFixed(1)} images/s; interval p95 ${fmtMs(d.presentation.p95Ms)}, max ${fmtMs(d.presentation.maxMs)}. Canvas handoffs, not monitor scanout.</dd>` : ""}
         <dt>GPU time / frame</dt><dd>${fmtMs(d.gpuMs)}</dd>
         <dt>Wall time / frame</dt><dd>${fmtMs(d.frameMs)}</dd>
         <dt>JS time / frame</dt><dd>${fmtMs(d.cpuMs)} (scene update ${fmtMs(d.updateMs)}, draw submission ${fmtMs(Math.max(0, d.cpuMs - d.updateMs))})</dd>

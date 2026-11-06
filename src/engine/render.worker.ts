@@ -7,10 +7,10 @@ import type { WorkerInput, WorkerOutput, WorkerSettings } from './render-worker-
 const scope = self as unknown as { postMessage(message: WorkerOutput, transfer?: Transferable[]): void };
 const send = (message: WorkerOutput, transfer?: Transferable[]) => scope.postMessage(message, transfer);
 let start: (() => void) | undefined, abort: ((reason: string) => void) | undefined;
-let present = true;
+const presentations: { sampledAt: number; targetAt: number; targetTick: number; generation: number }[] = [];
 self.onmessage = (e: MessageEvent<WorkerInput>) => {
   const m = e.data;
-  if (m.type === 'present') present = true;
+  if (m.type === 'present') { if (presentations[0]?.generation !== m.generation) presentations.length = 0; presentations.push(m); if (presentations.length > 4) presentations.shift(); }
   else if (m.type === 'start') start?.();
   else if (m.type === 'abort') abort?.(m.reason);
   else try { initialize(m.canvas, m.settings); } catch (e) { send({ type: 'error', reason: String(e) }); }
@@ -24,7 +24,7 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
   const ext = settings.timers ? gl.getExtension('EXT_disjoint_timer_query_webgl2') as { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number } | null : null;
   const sizer = new BatchSizer(settings.gpuBatchMs);
   const channel = new MessageChannel();
-  interface Flight { fence: WebGLSync; image?: ImageBitmap; frames: number; cpuMs: number; updateMs: number; waitMs: number; yieldMs: number; phase: 'warmup' | 'timed' }
+  interface Flight { fence: WebGLSync; images: { image: ImageBitmap; targetAt: number; targetTick: number; generation: number }[]; frames: number; cpuMs: number; updateMs: number; waitMs: number; yieldMs: number; phase: 'warmup' | 'timed' }
   const flights: Flight[] = [], pending: { q: WebGLQuery; frame: number }[] = [], pool: WebGLQuery[] = [];
   const warm: TimedBatch[] = [], timed: TimedBatch[] = [], gpu: { frame: number; ms: number }[] = [], recent: number[] = [], lapStarts: number[] = [];
   let phase: 'warmup' | 'timed' = 'warmup', stopped = false;
@@ -53,10 +53,13 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
   function complete(list: Flight[], now: number, drainMs = 0): void {
     if (!list.length) return;
     let n = 0, cpuMs = 0, updateMs = 0, syncMs = drainMs, yieldMs = 0;
-    let image: ImageBitmap | undefined;
-    for (const f of list) { if (f.image) { image?.close(); image = f.image; } n += f.frames; cpuMs += f.cpuMs; updateMs += f.updateMs; syncMs += f.waitMs; yieldMs = Math.max(yieldMs, f.yieldMs); gl.deleteSync(f.fence); }
-    // Publish only after the fence signals: the compositor never waits on queued renders.
-    if (image) send({ type: "frame", image }, [image]);
+    for (const f of list) {
+      // Keep all requested previews: discarding an earlier completed image here
+      // defeats timestamped playout even when throughput exceeds display refresh.
+      for (const { image, targetAt, targetTick, generation } of f.images) send({ type: "frame", image, targetAt, targetTick, generation }, [image]);
+      n += f.frames; cpuMs += f.cpuMs; updateMs += f.updateMs; syncMs += f.waitMs;
+      yieldMs = Math.max(yieldMs, f.yieldMs); gl.deleteSync(f.fence);
+    }
     const ms = now - lastComplete; lastComplete = now;
     const batch = { frames: n, ms, cpuMs, updateMs, syncMs, yieldMs, busyMs: Math.min(ms, cpuMs + syncMs) };
     batchFrames = sizer.observe(n, ms, recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : null);
@@ -75,7 +78,7 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
       if (!reason && pending.length && !gl.isContextLost() && performance.now() < deadline) { setTimeout(collect, 0); return; }
       progress(true); send({ type: 'finished', reason });
       channel.port1.close(); channel.port2.close();
-      for (const f of flights) { f.image?.close(); gl.deleteSync(f.fence); }
+      for (const f of flights) { for (const { image } of f.images) image.close(); gl.deleteSync(f.fence); }
       for (const { q } of pending) gl.deleteQuery(q);
       for (const q of pool) gl.deleteQuery(q);
       fly.dispose(); renderer.dispose();
@@ -105,14 +108,15 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
         progress(true);
       } else if (flights.length < settings.inFlight) {
         let n = 0, cpuMs = 0; fly.timing.updateMs = 0;
-        let image: ImageBitmap | undefined;
+        const images: { image: ImageBitmap; targetAt: number; targetTick: number; generation: number }[] = [];
         do {
           const q = ext ? pool.pop() ?? gl.createQuery() : null;
           if (q) gl.beginQuery(ext!.TIME_ELAPSED_EXT, q);
-          const c0 = performance.now(), sceneT = (c0 - runStart) / 1000;
-          fly.render(settings.lapCount ? sceneT % STRESS_LAP_SECONDS : sceneT, undefined, present);
-          if (present) image = canvas.transferToImageBitmap();
-          present = false;
+          const c0 = performance.now(), presentation = presentations.shift();
+          // Sample preview motion on the display clock, not on variable queue-submission times.
+          const sceneT = Math.max(0, ((presentation ? presentation.sampledAt - performance.timeOrigin : c0) - runStart) / 1000);
+          fly.render(settings.lapCount ? sceneT % STRESS_LAP_SECONDS : sceneT, undefined, !!presentation);
+          if (presentation) images.push({ image: canvas.transferToImageBitmap(), targetAt: presentation.targetAt, targetTick: presentation.targetTick, generation: presentation.generation });
           renderer.setRenderTarget(null); cpuMs += performance.now() - c0;
           if (q) { gl.endQuery(ext!.TIME_ELAPSED_EXT); pending.push({ q, frame: phase === 'timed' ? submitted : -1 }); }
           if (phase === 'timed') submitted++;
@@ -120,7 +124,7 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
         } while (n < batchFrames && performance.now() - tick0 < settings.cpuBatchMs && performance.now() < end);
         const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
         if (!fence) throw new Error('Could not create GPU fence');
-        gl.flush(); flights.push({ fence, image, phase, frames: n, cpuMs, updateMs: fly.timing.updateMs, waitMs: waitSince ? tick0 - waitSince : 0, yieldMs }); waitSince = 0;
+        gl.flush(); flights.push({ fence, images, phase, frames: n, cpuMs, updateMs: fly.timing.updateMs, waitMs: waitSince ? tick0 - waitSince : 0, yieldMs }); waitSince = 0;
       } else if (!waitSince) waitSince = tick0;
       if (tick0 - lastError > 1000) { lastError = tick0; const e = gl.getError(); if (e !== gl.NO_ERROR) throw new Error(`WebGL error 0x${e.toString(16)}`); }
       progress();

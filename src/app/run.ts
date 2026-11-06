@@ -1,3 +1,5 @@
+import { PreviewCadence } from "./preview-cadence";
+import { PresentationQueue } from "./presentation-queue";
 import { BatchSizer } from "../benchmark/batch-sizer";
 import { prepareRenderWorker } from "./render-worker-client";
 import type { WorkerOutput } from "../engine/render-worker-protocol";
@@ -31,14 +33,14 @@ const RECENT_GPU = 120;
  * Dev overrides allow controlled comparisons without changing the fixed workload.
  */
 const DEV_PARAMS = new URLSearchParams(import.meta.env.DEV ? location.search : "");
-const MAX_IN_FLIGHT = Number(DEV_PARAMS.get("inflight")) || 3;
+const MAX_IN_FLIGHT = Number(DEV_PARAMS.get("inflight")) || 2;
 /** Dev server only: ?batch=MS overrides the batch length, ?present=all draws every frame to the canvas. */
 const BATCH = Number(DEV_PARAMS.get("batch")) || BATCH_MS;
 /** GPU work per batch is independent of the main-thread task budget. */
-const GPU_BATCH_MS = Number(DEV_PARAMS.get("gpuBatch")) || 8;
+const GPU_BATCH_MS = Number(DEV_PARAMS.get("gpuBatch")) || 4;
 const PRESENT_ALL = DEV_PARAMS.get("present") === "all";
-/** Dev server only: ?presentHz=N caps how often a frame goes to the canvas (default: 60 Hz). */
-const PRESENT_HZ = Number(DEV_PARAMS.get("presentHz")) || 60;
+/** Dev server only: ?presentHz=N caps how often a frame goes to the canvas (default: display refresh). */
+const PRESENT_HZ = Number(DEV_PARAMS.get("presentHz")) || 0;
 /** Dev server only: ?laps=N runs stress tests with N laps (the result then doesn't match the locked test). */
 const DEV_LAPS = Math.max(0, Math.floor(Number(DEV_PARAMS.get("laps")) || 0));
 /** HUD refresh interval, ms. The loop ticks far more often than this while waiting on the GPU. */
@@ -236,7 +238,8 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   const batchSizer = new BatchSizer(GPU_BATCH_MS);
   let phase: "warmup" | "timed" = "warmup";
   let done = false;
-  let pendingImage: ImageBitmap | null = null;
+  const presentation = new PresentationQueue<ImageBitmap>();
+  const cadence = new PreviewCadence();
   let uiStalls = 0, uiStallMs = 0;
   let rafId = 0;
   let lastComplete = 0;
@@ -334,7 +337,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     ro.disconnect();
     $("#abort").removeEventListener("click", onAbort);
     cancelAnimationFrame(rafId);
-    pendingImage?.close(); pendingImage = null;
+    presentation.dispose();
     void wakeLock?.release().catch(() => {});
     wakeLock = null;
     channel.port1.onmessage = null;
@@ -376,6 +379,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     const heapEnd = heapMb();
     const diag: RunDiagnostics = {
       renderThread: remote ? "worker" : "main",
+      ...(remote ? { presentation: { ...presentation.stats(), refreshHz: 1000 / cadence.intervalMs, divisor: cadence.divisor } } : {}),
       gpuBusy: st.gpuBusy,
       gpuMs: st.gpuMsPerFrame,
       cpuMs: st.cpuMsPerFrame,
@@ -511,11 +515,17 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   if (remote) {
     const worker = remote.worker;
     let lastPresent = 0;
-    let workerWallMs = 0;
+    let workerWallMs = 0, warmWallMs = 0, warmFrames = 0;
+    let generation = 0;
     const present = (now: number) => {
-      if (pendingImage) { remote!.present(pendingImage); pendingImage = null; }
-      if (!PRESENT_HZ || now - lastPresent >= 1000 / PRESENT_HZ - 2) {
-        worker.postMessage({ type: "present" }); lastPresent = now;
+      const absoluteNow = performance.timeOrigin + now;
+      const throughput = phase === "timed" && workerWallMs > 0 ? timedFrames * 1000 / workerWallMs : warmWallMs > 0 ? warmFrames * 1000 / warmWallMs : 0;
+      const step = cadence.advance(now, throughput, phase === "warmup");
+      if (step.reset) { generation++; presentation.dispose(); }
+      const image = presentation.take(cadence.tick, performance.timeOrigin + performance.now(), phase === "timed");
+      if (image) remote!.present(image);
+      if (step.request && (!PRESENT_HZ || now - lastPresent >= 1000 / PRESENT_HZ - 2)) {
+        worker.postMessage({ type: "present", sampledAt: absoluteNow, targetAt: absoluteNow + cadence.delayTicks * cadence.intervalMs, targetTick: cadence.tick + cadence.delayTicks, generation }); lastPresent = now;
       }
       if (!done) rafId = requestAnimationFrame(present);
     };
@@ -524,7 +534,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     worker.onmessage = (event: MessageEvent<WorkerOutput>) => {
       if (done) { if (event.data.type === "frame") event.data.image.close(); return; }
       const m = event.data;
-      if (m.type === "frame") { pendingImage?.close(); pendingImage = m.image; }
+      if (m.type === "frame") { if (m.generation === generation) presentation.push(m.image, m.targetAt, m.targetTick); else m.image.close(); }
       else if (m.type === "progress") {
         const deliveryMs = Math.max(0, performance.timeOrigin + performance.now() - m.sentAt);
         if (deliveryMs > 20) { uiStalls++; uiStallMs += deliveryMs; }
@@ -532,6 +542,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
         phase = m.phase;
         timedStart = m.timedStart ? runStart + m.timedStart : 0;
         warm.push(...m.warm); timed.push(...m.timed);
+        for (const b of m.warm) { warmWallMs += b.ms; warmFrames += b.frames; }
         for (const q of m.gpu) gpuMs[q.frame] = q.ms;
         recentGpu.splice(0, recentGpu.length, ...m.recent);
         timedFrames = m.frames;

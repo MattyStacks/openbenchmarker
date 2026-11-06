@@ -72,6 +72,8 @@ export { LINUX_ONLY_FIELDS, emptySystem } from "./fields";
 export interface RunDiagnostics {
   /** Rendering execution context; absent on results before 3.0. */
   renderThread?: "worker" | "main";
+  /** Timed canvas image handoffs, not physical display scanout. */
+  presentation?: { refreshHz?: number; divisor?: number; frames: number; fps: number; p95Ms: number; maxMs: number; lateP95Ms: number; dropped: number };
   /** Worker scheduler delays, separate from UI-thread progress-message delays. */
   renderStalls?: number;
   renderStallMs?: number;

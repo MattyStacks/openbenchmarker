@@ -13,5 +13,5 @@ export interface WorkerProgress {
   warm: TimedBatch[]; timed: TimedBatch[]; gpu: { frame: number; ms: number }[];
   recent: number[]; frames: number; lapStarts: number[];
 }
-export type WorkerOutput = WorkerReady | WorkerProgress | { type: "frame"; image: ImageBitmap } | { type: 'finished'; reason: string } | { type: 'error'; reason: string };
-export type WorkerInput = { type: 'init'; canvas: OffscreenCanvas; settings: WorkerSettings } | { type: 'start' } | { type: 'present' } | { type: 'abort'; reason: string };
+export type WorkerOutput = WorkerReady | WorkerProgress | { type: "frame"; image: ImageBitmap; targetAt: number; targetTick: number; generation: number } | { type: 'finished'; reason: string } | { type: 'error'; reason: string };
+export type WorkerInput = { type: 'init'; canvas: OffscreenCanvas; settings: WorkerSettings } | { type: 'start' } | { type: 'present'; sampledAt: number; targetAt: number; targetTick: number; generation: number } | { type: 'abort'; reason: string };

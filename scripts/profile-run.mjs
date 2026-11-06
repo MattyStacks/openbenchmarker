@@ -30,6 +30,16 @@ try {
     }
     await page.evaluate(() => {
       window.benchPacing = [];
+      window.benchPresentations = [];
+      const transfer = ImageBitmapRenderingContext.prototype.transferFromImageBitmap;
+      let lastImage = 0;
+      ImageBitmapRenderingContext.prototype.transferFromImageBitmap = function(image) {
+        const now = performance.now();
+        const timed = document.querySelector('#hud-phase')?.textContent.startsWith('TIMED');
+        if (timed && lastImage) window.benchPresentations.push(now - lastImage);
+        lastImage = timed ? now : 0;
+        return transfer.call(this, image);
+      };
       let last = 0;
       const frame = t => {
         const timed = document.querySelector('#hud-phase')?.textContent.startsWith('TIMED');
@@ -56,10 +66,11 @@ try {
     }
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('ogb.results.v1') || '[]').length > 0, null, { timeout: 180000 });
     if (monitor) clearInterval(monitor);
-    const data = await page.evaluate(() => ({ result: JSON.parse(localStorage.getItem('ogb.results.v1'))[0], pacing: window.benchPacing }));
+    const data = await page.evaluate(() => ({ result: JSON.parse(localStorage.getItem('ogb.results.v1'))[0], pacing: window.benchPacing, presentations: window.benchPresentations }));
     if (!data.result.valid) throw new Error(`Invalid run: ${data.result.invalidReason}`);
     const times = data.pacing.sort((a, b) => a - b);
-    console.log(JSON.stringify({ trial, renderer, layout, osGpuBusy: gpuBusy.length ? { samples: gpuBusy.length, min: Math.min(...gpuBusy), mean: gpuBusy.reduce((a, b) => a + b, 0) / gpuBusy.length, max: Math.max(...gpuBusy) } : null, result: data.result, animationCallbackMs: { samples: times.length, median: times[Math.floor(times.length / 2)], p95: times[Math.floor(times.length * 0.95)], max: times.at(-1) } }));
+    const images = data.presentations.sort((a, b) => a - b);
+    console.log(JSON.stringify({ trial, renderer, layout, presentationCallbackMs: { samples: images.length, median: images[Math.floor(images.length / 2)], p95: images[Math.floor(images.length * 0.95)], max: images.at(-1) }, osGpuBusy: gpuBusy.length ? { samples: gpuBusy.length, min: Math.min(...gpuBusy), mean: gpuBusy.reduce((a, b) => a + b, 0) / gpuBusy.length, max: Math.max(...gpuBusy) } : null, result: data.result, animationCallbackMs: { samples: times.length, median: times[Math.floor(times.length / 2)], p95: times[Math.floor(times.length * 0.95)], max: times.at(-1) } }));
     await page.close();
   }
 } finally {

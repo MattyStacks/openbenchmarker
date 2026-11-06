@@ -155,3 +155,67 @@ tests passed, including worker abort/resize/visibility invalidation and visible
 output/HUD bounds for Medium through Extreme. Thirty desktop/mobile sharing
 checks passed. The completed Low runs above cover valid completion. These checks
 do not establish Windows/NVIDIA performance or cross-GPU score ordering.
+
+## 3.0.1 preview pacing follow-up
+
+Matt's 9800X3D / 2080 Ti result used Chrome 156 on Nobara Linux, with
+`ANGLE (Mesa, zink Vulkan 1.4(... NVK TU102 ...), OpenGL ES 3.2)`.
+It reported 214.4 render FPS, 97.9% GPU timer coverage, 0.03 ms scene updates,
+18 hitches, 89.2 FPS 1% low and a 14.5 ms worst frame. This is not the earlier
+Windows Edge environment. Both displays Matt was using were 120 Hz; the solution
+must also account automatically for other refresh rates, including 90/144/240/400.
+
+The previous profiler only timed animation callbacks. Instrumenting actual
+`transferFromImageBitmap` calls exposed irregular image delivery even when those
+callbacks were regular: the 3.0.0 local Brave baseline had image interval median
+16.7 ms, p95 25 ms, max 33.3 ms; callbacks had p95 8.4 ms. Render throughput was
+155.3 FPS. Thus high throughput and zero UI stalls did not establish smoothness.
+
+The candidate requests previews on display callbacks and picks an integer divisor
+of the measured refresh rate during warm-up, allowing 10% throughput headroom.
+For example, 400 Hz with 215 render FPS selects every third callback; 120 Hz with
+155 render FPS selects every callback. It never caps benchmark submission or
+changes the preset's geometry/shader work based on refresh rate.
+
+Preview images sample animation at their request timestamp. A bounded buffer holds
+completed images until their target display callback, at least 50 ms later,
+rounded to complete preview intervals. Deadline selection uses integer callback
+indices, avoiding floating-point time boundaries and millisecond jitter. Pending
+requests and completed previews are retained rather than unconditionally replaced
+by the newest image. Monitor refresh changes recalibrate the cadence and invalidate
+old presentation requests; timed benchmark statistics remain independent.
+
+Preview intervals, rate, dropped images and GPU-only hitch counts are now exported.
+These are canvas handoffs, not physical monitor scanout. An ANGLE parser bug was
+also corrected: a nested `Zink Vulkan` driver name no longer overrides the outer
+`OpenGL ES 3.2` backend. Mesa identifies NVK as its NVIDIA Vulkan driver and Zink
+as OpenGL over Vulkan; this does not prove that either caused Matt's stutter.
+References: https://docs.mesa3d.org/drivers/nvk.html and
+https://docs.mesa3d.org/drivers/zink.html .
+
+The final defaults reduce queued batches from three to two and their GPU target
+from 8 ms to 4 ms (CPU task budget remains 8 ms). Display-paced previews with the
+old queue still had delayed animation callbacks; shortening the GPU queue improved
+the measured handoffs without a material throughput or utilization loss locally.
+
+Two final native-window Brave 157 runs, 120 Hz display, Low/720p/30 s:
+
+| Trial | Render FPS | Preview handoffs/s | Handoff interval p95 / max | OS GPU mean / min / max |
+|---|---:|---:|---:|---:|
+| 1 | 152.15 | 120.00 | 8.5 / 10.2 ms | 99.45 / 77 / 100% |
+| 2 | 151.75 | 120.00 | 8.5 / 9.8 ms | 99.88 / 99 / 100% |
+
+Neither trial dropped a preview from the presentation queue. The first trial still
+had an isolated 77% OS sample; this is not a guarantee against every sampled dip.
+The profiler samples across timed-phase notification and completion boundaries;
+these aggregate samples cannot locate that dip precisely within GPU execution.
+Physical scanout and the remote NVK system remain unverified. No claim of universal
+stutter elimination is made. The fixed 64-step GPU workload is unchanged in 3.0.1.
+Preview cadence is inferred from callbacks, not a monitor identification API.
+
+Automated checks cover 60/90/120/144/165/240/400 Hz with rendering above and below
+refresh, refresh changes, jittered image completion, missed deadlines, bounded
+resource cleanup, 400 Hz buffering, export fields and the Zink backend parser.
+The production build and 317 unit tests passed.
+All 14 accelerated browser regression tests and 30 desktop/mobile sharing checks
+also passed before redeploying the branch preview.
