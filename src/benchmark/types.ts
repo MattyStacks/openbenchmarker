@@ -70,6 +70,11 @@ export { LINUX_ONLY_FIELDS, emptySystem } from "./fields";
  * Stored as numbers so the verdict can be recomputed (src/benchmark/diagnose.ts).
  */
 export interface RunDiagnostics {
+  /** Rendering execution context; absent on results before 3.0. */
+  renderThread?: "worker" | "main";
+  /** Worker scheduler delays, separate from UI-thread progress-message delays. */
+  renderStalls?: number;
+  renderStallMs?: number;
   /** Share of timed wall-clock the GPU was busy with our frames (0-1); null without GPU timers. */
   gpuBusy: number | null;
   /** Mean GPU time per frame, ms; null without GPU timers. */

@@ -31,7 +31,7 @@ maintain body/light/shadow/reflection agreement and deterministic stress laps.
 Retain changes only when gains exceed run-to-run variation without an Extreme
 regression. A worker alone does not parallelize WebGL command submission.
 
-## Current outcome
+## Initial profiling-only outcome (superseded below)
 
 No production optimization or performance improvement is claimed. Real-device
 profiles and repeated measurements remain outstanding. Existing saved results,
@@ -71,3 +71,87 @@ Cloudflare deployment deferred at Matt's request.
 Three Extreme/4K trials (15 frames per scene point): GPU 52.94/52.88/52.96 ms,
 CPU render 39.22/39.18/39.19 ms, update 0.60/0.66/0.58 ms,
 and 108.07 draw calls/frame. GPU time dominates this heavy preset.
+
+## Workload and scheduling investigation (continued)
+
+Matt authorized lower FPS and a new fixed workload to prioritize GPU scaling.
+Initial headless 30-second Low/720p runs (Chromium 153, accelerated AMD OpenGL) measured:
+
+- Original workload/default queue: 1742 and 1737 FPS, GPU timer coverage 82.7%.
+- Original workload/six queued 8 ms batches: 1865 and 1861 FPS, coverage 87.1%.
+- Original workload/six queued 16 ms batches: 1913 FPS, coverage 90.3%.
+- Disabling timer queries: 1697 FPS; no evidence that queries caused the gap.
+- A separate early queue experiment was invalidated by tab visibility and excluded.
+
+The scene-update cost was around 0.025 ms/frame. The observed gap responds to
+submission batching, so attributing it entirely to a slow CPU or animation is
+incorrect. The 9800X3D/2080Ti case remains remotely reported, not locally measured.
+
+A 24-step volumetric floor alone did not meet the goal: 334 FPS and 88.8% timer
+coverage with six 8 ms batches. A 64-step floor plus six 16 ms batches reached
+146 FPS / 92.1% coverage. The last 25 seconds of OS samples for that run were
+91–100%, averaging 94.26%; including setup in the average understates utilization.
+Timer coverage and OS utilization are distinct measurements.
+
+## Implemented candidate and visible-browser controls
+
+Version 3.0.0 uses fixed 64-step volumetrics on every preset. It never selects work
+based on detected hardware, and scores are not comparable with 2.x. Rendering,
+scene updates and GPU queries run in a dedicated worker. The UI receives completed
+bitmaps, presents the newest one on animation callbacks and requests previews at
+up to 60 Hz. Render throughput remains uncapped. A compatibility path remains for
+browsers without worker/bitmap support.
+
+Batch sizing uses recent GPU times, or a smoothed window without timers, rather
+than noisy individual fence intervals. Three batches target 8 ms GPU work each;
+CPU tasks have a separate 8 ms budget. Phase transitions wait for outstanding
+fences without blocking the main thread. Deep queues increased presentation
+latency in experiments and were not retained. More workload alone (128 steps)
+did not solve the presentation issue; 64 steps were retained.
+
+The first visible profiling harness forced a viewport larger than the actual
+window, hiding HUD controls. The harness now uses the native viewport in visible
+runs. Matt reviewed the updated run and confirmed smoother motion and correct
+layout. Animation callback timing alone is not proof of displayed-frame pacing.
+
+Controlled native-window Chromium 153, same accelerated AMD backend, Low/720p,
+30 seconds, OS GPU counter sampled every 500 ms during the timed phase:
+
+| Build | Render FPS | GPU timer coverage | OS utilization mean / min / max | Animation callback p95 / max |
+|---|---:|---:|---:|---:|
+| Original 2.2.0 | 2014.2 | 96.13% | 99.67 / 80 / 100% | 8.4 / 16.8 ms |
+| Candidate 3.0.0 | 152.0 | 97.48% | 99.90 / 94 / 100% | 8.4 / 16.6 ms |
+
+These controls do **not** reproduce the original reported sustained utilization
+loss: the original also averages nearly 100% in visible Chromium. The earlier
+headless differences must not be presented as a definitive diagnosis of the
+user's visible-browser issue. The changes reduce scheduling interference and
+increase fixed GPU work, but the original cause remains incompletely isolated.
+Matt reports the other affected system used Windows Edge on a 9800X3D / 2080 Ti;
+the behavior is therefore not exclusive to Brave. That system and a 5080 have
+not been measured locally. No all-hardware utilization guarantee is established.
+Cloudflare deployment remains deferred at Matt's request.
+
+A second controlled pair used installed Brave 157 with a fresh isolated profile,
+its default GPU settings (no forced ANGLE flags), native viewport, and the same
+Low/720p/30 s settings. Original 2.2.0: 2026.8 FPS, 96.63% timer coverage,
+OS mean 99.35% / min 61% / max 100%. Candidate 3.0.0: 154.1 FPS, 97.53% timer
+coverage, OS mean 99.90% / min 94% / max 100%. Each had 60 OS samples and animation
+callback p95 8.4 ms / max 16.7 ms. The original's single low sample did not amount
+to sustained low utilization. The original report is still not reproduced under
+these clean-profile conditions; neither browser identity nor CPU speed alone is
+established as the cause. Candidate reported no UI stalls, render stalls or hitches.
+
+The portable profiler supports `PW_CDP_URL` for an externally started test browser,
+`BENCH_HEADED=1` for native-window profiling, and optional `GPU_BUSY_FILE` for an OS
+counter. Use an isolated browser profile when attaching through CDP. CPU total-use
+percentages need not match across systems with different core counts; compare
+render throughput, GPU time and completion variability under identical workloads.
+
+## Candidate verification
+
+Production build and 281 unit tests passed. All 14 accelerated Chromium browser
+tests passed, including worker abort/resize/visibility invalidation and visible
+output/HUD bounds for Medium through Extreme. Thirty desktop/mobile sharing
+checks passed. The completed Low runs above cover valid completion. These checks
+do not establish Windows/NVIDIA performance or cross-GPU score ordering.

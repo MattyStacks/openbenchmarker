@@ -93,8 +93,8 @@ function diagPanel(r: BenchResult): string {
     ${
       d
         ? `<div class="share-bars" aria-label="Share of each frame's time">
-        ${bar("gpu", "GPU busy", dx.shares.gpu, "Share of the run the GPU spent on our frames (GPU timer queries)")}
-        ${bar("js", "Page JavaScript", dx.shares.js, "Scene update and three.js draw submission on the main thread")}
+        ${bar("gpu", "GPU time coverage", dx.shares.gpu, "Share of the run the GPU spent on our frames (GPU timer queries)")}
+        ${bar("js", "Render JavaScript", dx.shares.js, "Scene update and three.js draw submission on the rendering thread")}
         ${bar("wait", "Waiting for GPU", dx.shares.wait, "Waiting with the GPU queue full: the GPU (or its driver) was behind, which is what a GPU-limited run looks like")}
         ${bar("over", "Browser overhead", dx.shares.overhead, "Event loop, HUD updates and other tasks between batches")}
       </div>
@@ -111,6 +111,7 @@ function diagPanel(r: BenchResult): string {
     ${
       d
         ? `<details><summary>All measured and detected signals</summary><dl class="hints">
+        ${d.renderThread ? `<dt>Rendering</dt><dd>${d.renderThread === "worker" ? "Dedicated worker" : "Main thread (compatibility path)"}</dd>` : ""}
         <dt>GPU time / frame</dt><dd>${fmtMs(d.gpuMs)}</dd>
         <dt>Wall time / frame</dt><dd>${fmtMs(d.frameMs)}</dd>
         <dt>JS time / frame</dt><dd>${fmtMs(d.cpuMs)} (scene update ${fmtMs(d.updateMs)}, draw submission ${fmtMs(Math.max(0, d.cpuMs - d.updateMs))})</dd>

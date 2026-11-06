@@ -73,7 +73,9 @@ export const BENCHMARK = BENCHMARKS[0];
  * workload is different, so 2.x scores aren't comparable with 1.x. Measurement is unchanged.
  * 1.1.0: no per-frame readback, Avg FPS is throughput. Not comparable with 1.0.0 scores.
  */
-export const BENCHMARK_VERSION = "2.2.0";
+// 3.0.0: fixed 64-step volumetric lighting on every preset; separate GPU batch and CPU task budgets.
+// A different workload: do not compare scores with 2.x.
+export const BENCHMARK_VERSION = "3.0.0";
 
 export function findGpu(id: string): CatalogGpu | undefined {
   return GPU_CATALOG.find((g) => g.id === id);

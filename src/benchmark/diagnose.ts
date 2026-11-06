@@ -140,7 +140,7 @@ export function diagnose(r: BenchResult): Diagnosis {
   };
   const { verdict, estimated } = verdictFor(d, r.loopBusy);
   const sceneSplit = `scene update ${ms(d.updateMs)}, draw submission ${ms(Math.max(0, d.cpuMs - d.updateMs))}`;
-  const gpuText = d.gpuBusy === null ? "" : ` (GPU busy ${pct(d.gpuBusy)})`;
+  const gpuText = d.gpuBusy === null ? "" : ` (GPU timer coverage ${pct(d.gpuBusy)})`;
   let headline = "";
   let detail = "";
   switch (verdict) {
@@ -157,12 +157,12 @@ export function diagnose(r: BenchResult): Diagnosis {
         ` ${oneThreadNote(d.cpuThreads)}`;
       break;
     case "driver":
-      headline = `The graphics driver or browser GPU process was the limit${gpuText}`;
-      detail = `The GPU was busy only ${pct(d.gpuBusy ?? 0)} and the page's JavaScript only ${pct(shares.js)} of the time, but each frame still waited ${ms(d.syncMs)} on the GPU queue. That time went to the browser's GPU process and the driver turning draw calls into GPU work, which runs on one CPU thread. ${oneThreadNote(d.cpuThreads)}`;
+      headline = `Driver or browser scheduling may be limiting throughput${gpuText}`;
+      detail = `The GPU was busy only ${pct(d.gpuBusy ?? 0)} and the page's JavaScript only ${pct(shares.js)} of the time, but each frame still waited ${ms(d.syncMs)} on the GPU queue. Queue waits can include GPU execution, driver work and browser scheduling. These measurements cannot identify a particular saturated CPU thread.`;
       break;
     case "mixed":
-      headline = `GPU and CPU were both close to the limit${gpuText}`;
-      detail = `A faster GPU still helps, but only partly: the page's JavaScript took ${ms(d.cpuMs)} of each ${ms(d.frameMs)} frame (${sceneSplit}).`;
+      headline = `GPU timing shows gaps between frames${gpuText}`;
+      detail = `The GPU timer covers only part of the elapsed frame interval. Submission, scheduling and presentation can contribute to the gap; this does not by itself establish a CPU bottleneck. The page's JavaScript took ${ms(d.cpuMs)} of each ${ms(d.frameMs)} frame (${sceneSplit}).`;
       break;
     case "software":
       headline = "Hardware acceleration is off: the CPU drew every frame";

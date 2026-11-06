@@ -1,8 +1,11 @@
+import { BatchSizer } from "../benchmark/batch-sizer";
+import { prepareRenderWorker } from "./render-worker-client";
+import type { WorkerOutput } from "../engine/render-worker-protocol";
 import * as THREE from "three";
 import { BENCHMARK, BENCHMARK_VERSION } from "../benchmark/catalog";
 import { browserName, isSoftwareRenderer, liveVerdict, parseBackend } from "../benchmark/diagnose";
 import { NEW_RUN_SYSTEM, carriedSystem, carrySource, isHandheldRun } from "../benchmark/fields";
-import { computeRunStats, graphPoints, lapStats, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimesInto, scoreFor, type TimedBatch } from "../benchmark/metrics";
+import { computeRunStats, graphPoints, lapStats, liveBatchFps, liveBreakdown, lowFpsSelect, runFrameTimesInto, scoreFor, type TimedBatch } from "../benchmark/metrics";
 import { STRESS_LAP_SECONDS, WARMUP_SECONDS, getPreset, getResolution, getScoreTest, getStressTest, matchesScoreTest, stressDuration } from "../benchmark/presets";
 import { emptySystem, type BenchResult, type GraphicsApi, type RunDiagnostics } from "../benchmark/types";
 import { makeFlythrough, type Flythrough } from "../engine/scenes";
@@ -23,17 +26,19 @@ const DRAIN_MS = 500;
 /** Resolved GPU timer results kept for the live HUD readout. */
 const RECENT_GPU = 120;
 /**
- * Batches queued on the GPU at once (WebGL2). Batches are short (BATCH_MS), so three keep at
- * least ~24 ms of work queued against main-thread hiccups (GC, other tabs). The dev
- * server accepts ?inflight=N to compare (1 drains the GPU between batches, like the old loop).
+ * Bound queued batches to limit presentation latency. GPU batching and the CPU task
+ * budget are separate: a heavier GPU batch must not require a long JavaScript task.
+ * Dev overrides allow controlled comparisons without changing the fixed workload.
  */
 const DEV_PARAMS = new URLSearchParams(import.meta.env.DEV ? location.search : "");
 const MAX_IN_FLIGHT = Number(DEV_PARAMS.get("inflight")) || 3;
 /** Dev server only: ?batch=MS overrides the batch length, ?present=all draws every frame to the canvas. */
 const BATCH = Number(DEV_PARAMS.get("batch")) || BATCH_MS;
+/** GPU work per batch is independent of the main-thread task budget. */
+const GPU_BATCH_MS = Number(DEV_PARAMS.get("gpuBatch")) || 8;
 const PRESENT_ALL = DEV_PARAMS.get("present") === "all";
-/** Dev server only: ?presentHz=N caps how often a frame goes to the canvas (default: every refresh). */
-const PRESENT_HZ = Number(DEV_PARAMS.get("presentHz")) || 0;
+/** Dev server only: ?presentHz=N caps how often a frame goes to the canvas (default: 60 Hz). */
+const PRESENT_HZ = Number(DEV_PARAMS.get("presentHz")) || 60;
 /** Dev server only: ?laps=N runs stress tests with N laps (the result then doesn't match the locked test). */
 const DEV_LAPS = Math.max(0, Math.floor(Number(DEV_PARAMS.get("laps")) || 0));
 /** HUD refresh interval, ms. The loop ticks far more often than this while waiting on the GPU. */
@@ -165,15 +170,27 @@ export async function startRun(cfg: RunConfig): Promise<void> {
 
   // Cleared when the run ends in any way; still there on the next load = the OS killed the page.
   beginRun({ resolution, preset: preset.id, duration, ...(scoreTest ? { scoreTest: scoreTest.id } : {}), ...(stressTest ? { stressTest: stressTest.id } : {}) });
-  const canvas = document.createElement("canvas");
+  let canvas = document.createElement("canvas");
   canvas.className = "bench-canvas";
   $("#canvas-host").replaceChildren(canvas);
-  let renderer: THREE.WebGLRenderer;
+  let remote: Awaited<ReturnType<typeof prepareRenderWorker>> = null;
+  let renderer!: THREE.WebGLRenderer;
   let made: THREE.WebGLRenderer | null = null;
-  let fly: Flythrough;
-  let gl: WebGLRenderingContext | WebGL2RenderingContext;
+  let fly!: Flythrough;
+  let features: Flythrough["features"];
+  let gl!: WebGLRenderingContext | WebGL2RenderingContext;
   let api: GraphicsApi;
   try {
+    fitCanvas(canvas, width, height);
+    if (!DEV_PARAMS.has("mainThread")) remote = await prepareRenderWorker(canvas, { preset, width, height, duration, lapCount, cpuBatchMs: BATCH, gpuBatchMs: GPU_BATCH_MS, inFlight: MAX_IN_FLIGHT, timers: !DEV_PARAMS.has("noGpuTimers") }).catch(error => {
+      if (String(error).includes("Aborted by user")) throw error;
+      console.warn("Worker renderer unavailable; using main-thread rendering", error);
+      canvas.remove(); canvas = document.createElement("canvas"); canvas.className = "bench-canvas";
+      $("#canvas-host").replaceChildren(canvas); fitCanvas(canvas, width, height);
+      return null;
+    });
+    if (remote) { api = "WebGL2"; features = remote.meta.features; }
+    else {
     // No canvas MSAA: every preset renders through the composer, which has its own MSAA, so a
     // multisampled canvas only added a full-screen resolve on every screen update.
     renderer = made = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
@@ -183,6 +200,8 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     gl = renderer.getContext();
     api = typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext ? "WebGL2" : "WebGL1";
     fly = makeFlythrough(renderer, preset, width, height);
+    features = fly.features;
+    }
   } catch (e) {
     app.running = false;
     endRun();
@@ -197,11 +216,11 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     );
     return;
   }
-  if (fly.features.fallbackReason) console.warn(fly.features.fallbackReason);
+  if (features.fallbackReason) console.warn(features.fallbackReason);
   setRunPhase("warmup");
   $("#hud-settings").textContent = `${test ? `${test.name} · ` : ""}${width}×${height} · ${preset.id} · ${length} · ${api}`;
-  const info = rendererInfo(gl);
-  const maxTextureSize = Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 0;
+  const info = remote ? remote.meta : rendererInfo(gl);
+  const maxTextureSize = remote ? remote.meta.maxTextureSize : Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 0;
   const software = isSoftwareRenderer(info.renderer);
   // Display/sharing only. The async read (navigator.brave.isBrave(), high-entropy platform) resolves before warm-up ends.
   let device = detectDeviceContext(info.renderer, info.vendor);
@@ -214,8 +233,13 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   const gpuMs: number[] = [];
   let timedFrames = 0;
   let batchFrames = 1;
+  const batchSizer = new BatchSizer(GPU_BATCH_MS);
   let phase: "warmup" | "timed" = "warmup";
   let done = false;
+  let pendingImage: ImageBitmap | null = null;
+  let uiStalls = 0, uiStallMs = 0;
+  let rafId = 0;
+  let lastComplete = 0;
   /**
    * Stress runs: index in `timed` of each lap's first batch. A lap ends with the first batch that
    * completes at or after its 96 s mark, so the laps partition the timed batches.
@@ -244,7 +268,8 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   // Per-frame GPU time via EXT_disjoint_timer_query_webgl2 (WebGL2 only). Results arrive only
   // after control returns to the event loop, so they're polled at the start of each batch.
   const gl2 = api === "WebGL2" ? (gl as WebGL2RenderingContext) : null;
-  const timerExt = gl2?.getExtension("EXT_disjoint_timer_query_webgl2") as
+  // Development comparison only: isolate per-frame GPU-query overhead.
+  const timerExt = (DEV_PARAMS.has("noGpuTimers") ? null : gl2?.getExtension("EXT_disjoint_timer_query_webgl2")) as
     | { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number }
     | null
     | undefined;
@@ -273,7 +298,10 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     pending.splice(0, ready);
   }
   const invalidate = (reason: string) => {
-    if (!done) finish(reason);
+    if (!done) {
+      if (remote) remote.worker.postMessage({ type: "abort", reason });
+      else finish(reason);
+    }
   };
   const onVisibility = () => document.visibilityState === "hidden" && invalidate("Tab hidden during run");
   // The render size is fixed and CSS only scales the display, so a resize just refits the canvas.
@@ -306,11 +334,13 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     ro.disconnect();
     $("#abort").removeEventListener("click", onAbort);
     cancelAnimationFrame(rafId);
+    pendingImage?.close(); pendingImage = null;
     void wakeLock?.release().catch(() => {});
     wakeLock = null;
     channel.port1.onmessage = null;
     channel.port1.close();
     channel.port2.close();
+    if (remote) { remote.worker.terminate(); canvas.remove(); return; }
     if (gl2) for (const q of [...queryPool, ...pending.map((p) => p.q)]) gl2.deleteQuery(q);
     if (gl2) for (const f of inFlight) if (f.fence) gl2.deleteSync(f.fence);
     try {
@@ -345,14 +375,16 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     const st = computeRunStats(timed, gpuMs);
     const heapEnd = heapMb();
     const diag: RunDiagnostics = {
+      renderThread: remote ? "worker" : "main",
       gpuBusy: st.gpuBusy,
       gpuMs: st.gpuMsPerFrame,
       cpuMs: st.cpuMsPerFrame,
       updateMs: st.updateMsPerFrame,
       syncMs: st.syncMsPerFrame,
       frameMs: st.avgFps > 0 ? 1000 / st.avgFps : 0,
-      stalls: st.stalls,
-      stallMs: st.stallMs,
+      stalls: remote ? uiStalls : st.stalls,
+      stallMs: remote ? uiStallMs : st.stallMs,
+      ...(remote ? { renderStalls: st.stalls, renderStallMs: st.stallMs } : {}),
       hitches: st.hitches,
       gpuHitches: st.gpuHitches,
       frameStdMs: st.frameStdMs,
@@ -365,12 +397,12 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       onBattery: battery,
       browser: BRAVE ? browserName(navigator.userAgent).replace(/^Chrome/, "Brave") : browserName(navigator.userAgent),
       features: {
-        bloom: fly.features.bloom,
-        msaa: fly.features.msaa,
-        shadowMap: fly.features.shadows ? fly.features.shadowMap : 0,
-        reflections: fly.features.reflections ? preset.reflections : 0,
-        volumetrics: fly.features.volumetrics,
-        fallbackReason: fly.features.fallbackReason,
+        bloom: features.bloom,
+        msaa: features.msaa,
+        shadowMap: features.shadows ? features.shadowMap : 0,
+        reflections: features.reflections ? preset.reflections : 0,
+        volumetrics: features.volumetrics,
+        fallbackReason: features.fallbackReason,
       },
     };
     const valid = reason === "" && st.frames > 0;
@@ -432,7 +464,8 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   let lastLimitAt = 0;
   let liveTimes: Float64Array = new Float64Array(0);
   const graph = $<HTMLCanvasElement>("#hud-graph");
-  const g2d = graph.getContext("2d")!;
+  // Keep this small HUD canvas off the benchmark GPU where the browser supports the hint.
+  const g2d = graph.getContext("2d", { willReadFrequently: true })!;
 
   function updateHud(t: number): void {
     const arr = phase === "timed" ? timed : warm;
@@ -446,7 +479,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
         $("#hud-gpu").textContent = gpuMean === null ? "n/a" : `${gpuMean.toFixed(1)} ms`;
         $("#hud-cpu").textContent = `${live.cpuMs.toFixed(1)} ms`;
         if (software) setLimit("software", "");
-        else setLimit(liveVerdict(live.gpuBusy), live.gpuBusy === null ? "no GPU timer" : `${Math.round(live.gpuBusy * 100)}% busy`);
+        else setLimit(liveVerdict(live.gpuBusy), live.gpuBusy === null ? "no GPU timer" : `${Math.round(live.gpuBusy * 100)}% GPU time`);
       }
     }
     if (phase === "warmup") {
@@ -460,7 +493,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
         : `TIMED ${Math.min(el, duration).toFixed(1)} / ${duration} s`;
       $("#hud-bar").style.width = `${Math.min(100, (el / duration) * 100).toFixed(1)}%`;
       $("#hud-frames").textContent = timedFrames.toString();
-      // Keep this cheap: the GPU queue holds only ~2 batches, so a long main-thread task here
+      // Keep this cheap: the GPU queue is bounded, so a long main-thread task here
       // starves it (a full sort of every frame time grew to ~100 ms on 300k-frame runs).
       if (timedFrames > 0 && lastComplete > timedStart) $("#hud-avg").textContent = ((timedFrames * 1000) / (lastComplete - timedStart)).toFixed(1);
       if (t - lastStatsAt > LIVE_LOWS_MS) {
@@ -473,6 +506,54 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       }
     }
     drawGraph(graph, g2d, graphPoints(arr));
+  }
+
+  if (remote) {
+    const worker = remote.worker;
+    let lastPresent = 0;
+    let workerWallMs = 0;
+    const present = (now: number) => {
+      if (pendingImage) { remote!.present(pendingImage); pendingImage = null; }
+      if (!PRESENT_HZ || now - lastPresent >= 1000 / PRESENT_HZ - 2) {
+        worker.postMessage({ type: "present" }); lastPresent = now;
+      }
+      if (!done) rafId = requestAnimationFrame(present);
+    };
+    rafId = requestAnimationFrame(present);
+    worker.onerror = e => { if (!done) { done = true; finalize(`Render worker error: ${e.message}`, true); } };
+    worker.onmessage = (event: MessageEvent<WorkerOutput>) => {
+      if (done) { if (event.data.type === "frame") event.data.image.close(); return; }
+      const m = event.data;
+      if (m.type === "frame") { pendingImage?.close(); pendingImage = m.image; }
+      else if (m.type === "progress") {
+        const deliveryMs = Math.max(0, performance.timeOrigin + performance.now() - m.sentAt);
+        if (deliveryMs > 20) { uiStalls++; uiStallMs += deliveryMs; }
+        if (phase !== m.phase) { timedViewportW = window.innerWidth; sampleBattery(); setRunPhase("timed"); }
+        phase = m.phase;
+        timedStart = m.timedStart ? runStart + m.timedStart : 0;
+        warm.push(...m.warm); timed.push(...m.timed);
+        for (const q of m.gpu) gpuMs[q.frame] = q.ms;
+        recentGpu.splice(0, recentGpu.length, ...m.recent);
+        timedFrames = m.frames;
+        workerWallMs += m.timed.reduce((sum, b) => sum + b.ms, 0);
+        lastComplete = timedStart + workerWallMs;
+        lapStarts.splice(0, lapStarts.length, ...m.lapStarts);
+        lapFrameStart = timed.slice(0, lapStarts.at(-1) ?? 0).reduce((sum, b) => sum + b.frames, 0);
+        while (lapFps.length + 1 < lapStarts.length) {
+          const start = lapStarts[lapFps.length], end = lapStarts[lapFps.length + 1];
+          const batches = timed.slice(start, end);
+          lapFps.push(batches.reduce((n, b) => n + b.frames, 0) * 1000 / batches.reduce((n, b) => n + b.ms, 0));
+          setRunLaps(lapFps.length);
+          $("#hud-laps").textContent = `LAPS ${lapFps.map(f => f.toFixed(1)).join(" · ")}`;
+        }
+        updateHud(runStart + m.elapsed);
+      } else if (m.type === "finished" || m.type === "error") {
+        done = true; finalize(m.reason, m.type === "error");
+      }
+    };
+    worker.postMessage({ type: "start" });
+    if (document.visibilityState === "hidden") invalidate("Tab hidden during run");
+    return;
   }
 
   // Frames are submitted back-to-back with no per-frame sync, in batches of about BATCH_MS.
@@ -501,7 +582,6 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   // made the browser's own screen updates contend with the benchmark on the GPU when frames took
   // about one refresh interval (stutter, GPU-time spikes, lost FPS).
   let presentDue = true;
-  let rafId = 0;
   let lastPresentAt = 0;
   const onRaf = (now: number) => {
     // Allow 2 ms of refresh jitter so e.g. 60 Hz on a 120 Hz display is every other refresh.
@@ -512,7 +592,6 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     rafId = requestAnimationFrame(onRaf);
   };
   rafId = requestAnimationFrame(onRaf);
-  let lastComplete = 0;
   let waitSince = 0;
   let timedSubmitted = 0;
   let lastErrorCheck = 0;
@@ -536,7 +615,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     lastComplete = t;
     lastFrameMs = ms / frames;
     const b: TimedBatch = { frames, ms, busyMs: Math.min(ms, cpuMs + waitMs), cpuMs, updateMs, syncMs: waitMs, yieldMs };
-    batchFrames = nextBatchFrames(Math.max(1, Math.round(frames / list.length)), ms / list.length, BATCH);
+    batchFrames = batchSizer.observe(frames, ms, recentGpu.length ? recentGpu.reduce((a, b) => a + b, 0) / recentGpu.length : null);
     if (list[0].phase === "warmup") warm.push(b);
     else {
       timed.push(b);
