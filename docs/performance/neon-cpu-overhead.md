@@ -45,3 +45,29 @@ exports, scoring and benchmark version are unchanged.
 - Production bundle filenames/sizes remained identical after the development-only change.
 - Preview deployment attempted but blocked by missing Cloudflare credentials.
 - Real GPU profiling and cross-device performance acceptance remain outstanding.
+
+## Local accelerated testing (2026-11-06)
+
+All seven Playwright end-to-end tests passed. Default headless Chromium uses
+SwiftShader; this validates behavior only. Full Chromium with local launch flags
+`--ignore-gpu-blocklist --enable-gpu --use-gl=angle --use-angle=gl` used
+`ANGLE (AMD, AMD Steam Machine (radeonsi navi33 ACO), OpenGL ES 3.2)` with
+GPU timer queries. Flags were supplied in a temporary script, not repo config.
+
+Three Low/720p lab trials (60 frames at each of eight scene points) reported:
+
+| Trial | GPU ms | CPU render ms | Update ms | Submission ms | Draw calls |
+|---|---:|---:|---:|---:|---:|
+| 1 | 0.53 | 0.35 | 0.03 | 0.32 | 39.83 |
+| 2 | 0.53 | 0.35 | 0.03 | 0.32 | 39.83 |
+| 3 | 0.53 | 0.36 | 0.03 | 0.33 | 39.83 |
+
+These are lab samples, not complete timed benchmark runs or measured FPS.
+The browser is Chromium 153, not the supplied report's Brave 157.
+Submission timing includes possible driver backpressure; it is not pure CPU
+computation. No optimization or multi-core speedup is established by these tests.
+Cloudflare deployment deferred at Matt's request.
+
+Three Extreme/4K trials (15 frames per scene point): GPU 52.94/52.88/52.96 ms,
+CPU render 39.22/39.18/39.19 ms, update 0.60/0.66/0.58 ms,
+and 108.07 draw calls/frame. GPU time dominates this heavy preset.
