@@ -11,6 +11,16 @@ The issue also occurred on other machines; keep code portable and validate there
 when access exists. Do not require driver changes, fixed refresh rates, a blanket
 60 FPS rendering cap, or hardware-selected benchmark workloads.
 
+## First reconcile the two checkpoints
+
+Fetch `origin/perf/neon-cpu-overhead` and compare its 3.0.2 checkpoint `2607a6f`
+with this branch. Read its `docs/plans/neon-pacing/STATUS.md` and `PLAN.md` via git
+before selecting a new candidate. This session accidentally started from cached
+3.0.1 `751c52b`; it did not test 3.0.2. Preserve both histories and existing work.
+Use this branch as the user-selected, locally tested partial improvement; test
+any integration against it. Do not spend another session rediscovering the same
+timer/elapsed-clock ideas already documented on the other branch.
+
 ## Establish a trustworthy baseline
 
 1. Read `docs/performance/neon-cpu-overhead.md` and the JSONL results archive.

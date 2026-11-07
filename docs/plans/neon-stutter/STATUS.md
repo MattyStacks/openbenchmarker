@@ -1,6 +1,21 @@
 # Neon stutter: status and handoff
 
-Updated: 2026-11-07. Branch: `perf/neon-cpu-overhead`.
+Updated: 2026-11-07. Checkpoint branch: `perf/neon-stutter-checkpoint`.
+
+## Critical remote divergence discovered at close
+
+The initial checkout used locally cached `origin/perf/neon-cpu-overhead` at
+`751c52b` (3.0.1). A fetch was not performed before testing. At push time, the
+remote was found at `2607a6f`, a separate 3.0.2 checkpoint with its own
+`docs/plans/neon-pacing/STATUS.md` and `PLAN.md`. **Today's measurements do not
+validate or reject that 3.0.2 checkpoint.** Several ideas overlap with it.
+
+To preserve the exact version tested here and avoid overwriting remote work, this
+session is saved on `perf/neon-stutter-checkpoint`. The original performance branch
+is untouched remotely. Next agent: fetch and read BOTH handoffs before any new
+experiment. Compare code and reconcile deliberately; do not blindly merge queue
+constants or infer acceptance from either checkpoint. The user asked to close the
+session, so no combined-code testing or deployment was attempted.
 
 ## Selected version
 

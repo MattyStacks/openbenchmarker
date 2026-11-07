@@ -2,7 +2,7 @@
 
 ## Neon performance handoff
 
-For stuttering / GPU utilization work on `perf/neon-cpu-overhead`, start with
+For the locally tested stuttering checkpoint on `perf/neon-stutter-checkpoint`, start with
 `docs/plans/neon-stutter/STATUS.md` and `PLAN.md` in that folder. This is separate
 from Ashen Horizon. The selected version is a partial improvement, not a completed fix.
 

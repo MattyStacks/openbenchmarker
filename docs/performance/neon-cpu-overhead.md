@@ -2,6 +2,9 @@
 
 Branch: `perf/neon-cpu-overhead`.
 
+**Checkpoint branch:** `perf/neon-stutter-checkpoint`. The original remote branch
+contains a separate 3.0.2 checkpoint discovered at close; read STATUS before resuming.
+
 **Latest handoff:** [Neon status](../plans/neon-stutter/STATUS.md) and
 [follow-up plan](../plans/neon-stutter/PLAN.md). Those files supersede the
 intermediate experiment status below.
