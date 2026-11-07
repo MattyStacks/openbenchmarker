@@ -2,6 +2,10 @@
 
 Branch: `perf/neon-cpu-overhead`.
 
+**Latest handoff:** [Neon status](../plans/neon-stutter/STATUS.md) and
+[follow-up plan](../plans/neon-stutter/PLAN.md). Those files supersede the
+intermediate experiment status below.
+
 ## Evidence
 
 The supplied 2.2.0 SteamOS / Brave 157 Low 720p run reports 1844.4 FPS,
@@ -219,3 +223,79 @@ resource cleanup, 400 Hz buffering, export fields and the Zink backend parser.
 The production build and 317 unit tests passed.
 All 14 accelerated browser regression tests and 30 desktop/mobile sharing checks
 also passed before redeploying the branch preview.
+
+## Nobara RTX 2080 Ti reproduction (2026-11-07, ongoing)
+
+This is the affected local machine: Nobara, nouveau kernel driver, RTX 2080 Ti,
+Chrome 153 using ANGLE OpenGL ES over Mesa Zink/NVK. Node dependencies and
+Playwright Chromium were installed. Matt confirmed visible stutter in the baseline.
+The NVIDIA device does not expose the AMD-style `gpu_busy_percent` sysfs counter;
+the percentages below are GPU timer coverage, not OS utilization.
+
+| Experiment | Render FPS | Handoffs/s | Handoff p95 / max ms | Timer coverage |
+|---|---:|---:|---:|---:|
+| baseline, trial 1 | 196.74 | 73.87 | 19.6 / 75.6 | 90.61% |
+| baseline, trial 2 | 195.62 | 69.80 | 21.0 / 86.7 | 91.74% |
+| baseline, trial 3 | 194.54 | 71.98 | 19.7 / 86.4 | 91.79% |
+| wayland, trial 1 | 197.82 | 73.99 | 19.2 / 76.5 | 91.79% |
+| cadence, trial 1 | 195.51 | 73.84 | 24.8 / 50.3 | 89.84% |
+| 60, trial 1 | 198.44 | 59.70 | 19.1 / 29.0 | 91.53% |
+| adaptive, trial 1 | 199.47 | 17.12 | 58.4 / 82.4 | 90.41% |
+| adaptive2, trial 1 | 189.98 | 51.93 | 33.4 / 75.8 | 90.50% |
+| adaptive2, trial 2 | 188.80 | 57.90 | 24.6 / 37.9 | 91.41% |
+| oneflight, trial 1 | 118.97 | 60.00 | 16.8 / 17.2 | 51.66% |
+| poll, trial 1 | 128.08 | 59.73 | 16.8 / 37.6 | 56.15% |
+| poll2, trial 1 | 203.11 | 60.72 | 19.9 / 21.8 | 95.91% |
+| direct, trial 1 | 194.50 | 0.00 | 0.0 / 0.0 | 88.93% |
+| heavy, trial 1 | 15.57 | 4.55 | 325.2 / 472.6 | 97.98% |
+| heavy-clock, trial 1 | 15.21 | 10.45 | 237.1 / 407.9 | 93.35% |
+| low-clock, trial 1 | 195.11 | 62.82 | 26.3 / 39.8 | 94.66% |
+
+Experiments are **not accepted fixes**. `cadence` and both `adaptive` candidates
+were reverted after inconsistent or visibly poor results. `oneflight` was smooth
+but lost substantial GPU utilization. `direct` bypassed bitmap delivery and has
+no handoff instrumentation; its zero handoff metrics are not a performance result.
+The direct path was also reverted. Vulkan launch flags failed to create a real
+WebGL context and supplied no performance evidence.
+
+Intermediate candidate (superseded by the session-close section below): message-task scheduling for fence polling,
+elapsed display ticks rather than callback counts, crossing-slot preview requests,
+and one outstanding batch when individual GPU frames exceed the queue time budget.
+These reduce some measured delays but **have not solved the stuttering**, especially
+Low/720p, which remains the primary acceptance case. Heavy/4K runs are regression
+checks: 15 render FPS previously produced only 4.5 handoffs/s, and the candidate
+raised that to 10.5/s but still has unacceptable long gaps. Do not deploy or claim
+completion from these results.
+
+The profiler now supports `PW_EXECUTABLE_PATH` and records synchronous bitmap
+transfer duration. Handoff calls were <=0.1 ms in these measurements, so a slow
+synchronous handoff call is not established as the cause. Baseline build and 317
+unit tests passed; expanded low-throughput cadence tests bring the count to 346.
+Browser regression and final cross-preset acceptance remain outstanding.
+
+## Session close: selected partial improvement
+
+At Matt's request, restored the `runtime` candidate: original fence polling and
+bitmap delivery, elapsed display ticks, crossing-slot requests, lower-quintile
+refresh estimation, sustained presentation-overload backoff during warm-up and
+timed phases, and a one-batch limit for individually long GPU frames. All later
+direct-canvas, retained-buffer, readback, and HUD-blur experiments were removed.
+
+The two completed Low/720p runtime trials measured 197.13/195.15 render FPS,
+57.53/57.80 handoffs/s, handoff p95 25.2/17.7 ms, maxima 58.6/68.4 ms, and
+91.37/91.21% GPU timer coverage. Matt reported that the adaptive runs settled and
+were better, but smaller stutters remained. This is a chosen partial improvement,
+not proof that stutter or utilization issues are solved.
+
+All completed experiment records are preserved in
+[the result archive](neon-2026-11-07-results.jsonl). `runtime` is the restored
+candidate; other labels are experiments, not shipped variants. No physical
+scanout or NVIDIA OS-utilization series was captured. User observations of low
+utilization are independent evidence and must not be overridden by timer coverage.
+
+A browser trace showed SharedImageStub::OnCreateSharedImage wall durations up to
+7.5 ms with very little thread CPU time. This suggests waiting in image creation,
+but does not establish the original root cause. Snapshotting and PBO readback did
+not solve it. A desynchronized direct-canvas test reported the hint as **false**
+and was rejected for low utilization. The issue was also reported on other
+machines; it must not be characterized as specific to NVK, Nobara, or this GPU.

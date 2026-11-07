@@ -90,6 +90,9 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
     const tick0 = performance.now(), yieldMs = postedAt ? tick0 - postedAt : 0;
     try {
       poll(); let k = 0;
+      // Avoid queuing several long frames ahead of the next presentation.
+      const gpuFrameMs = recent.length ? recent.reduce((sum, ms) => sum + ms, 0) / recent.length : 0;
+      const flightLimit = gpuFrameMs > settings.gpuBatchMs * settings.inFlight ? 1 : settings.inFlight;
       while (k < flights.length) {
         const status = gl.clientWaitSync(flights[k].fence, 0, 0);
         if (status === gl.WAIT_FAILED) throw new Error('GPU fence wait failed');
@@ -106,7 +109,7 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
         timedStart = performance.now(); lastComplete = timedStart; phase = 'timed';
         if (settings.lapCount) lapStarts.push(0);
         progress(true);
-      } else if (flights.length < settings.inFlight) {
+      } else if (flights.length < flightLimit) {
         let n = 0, cpuMs = 0; fly.timing.updateMs = 0;
         const images: { image: ImageBitmap; targetAt: number; targetTick: number; generation: number }[] = [];
         do {
@@ -128,7 +131,7 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
       } else if (!waitSince) waitSince = tick0;
       if (tick0 - lastError > 1000) { lastError = tick0; const e = gl.getError(); if (e !== gl.NO_ERROR) throw new Error(`WebGL error 0x${e.toString(16)}`); }
       progress();
-      if (flights.length >= settings.inFlight) { postedAt = performance.now() + 1; setTimeout(tick, 1); }
+      if (flights.length >= flightLimit) { postedAt = performance.now() + 1; setTimeout(tick, 1); }
       else { postedAt = performance.now(); channel.port2.postMessage(0); }
     } catch (e) { finish(`Render error: ${String(e)}`); }
   }
