@@ -24,6 +24,9 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
   const ext = settings.timers ? gl.getExtension('EXT_disjoint_timer_query_webgl2') as { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number } | null : null;
   const sizer = new BatchSizer(settings.gpuBatchMs);
   const channel = new MessageChannel();
+  // Re-enter through a message task: chaining timer callbacks clamps a requested
+  // 1 ms poll to >=4 ms after five nestings, long enough to empty a short GPU queue.
+  const wake = () => { if (!stopped) channel.port2.postMessage(0); };
   interface Flight { fence: WebGLSync; images: { image: ImageBitmap; targetAt: number; targetTick: number; generation: number }[]; frames: number; cpuMs: number; updateMs: number; waitMs: number; yieldMs: number; phase: 'warmup' | 'timed' }
   const flights: Flight[] = [], pending: { q: WebGLQuery; frame: number }[] = [], pool: WebGLQuery[] = [];
   const warm: TimedBatch[] = [], timed: TimedBatch[] = [], gpu: { frame: number; ms: number }[] = [], recent: number[] = [], lapStarts: number[] = [];
@@ -101,7 +104,7 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
       if (tick0 >= end) {
         // Stop submission and wait for every fence before changing phases. Reading
         // a cleared canvas after bitmap transfer is not a reliable queue drain.
-        if (flights.length) { progress(); postedAt = performance.now() + 1; setTimeout(tick, 1); return; }
+        if (flights.length) { progress(); postedAt = performance.now() + 1; setTimeout(wake, 1); return; }
         if (phase === 'timed') { finish(''); return; }
         timedStart = performance.now(); lastComplete = timedStart; phase = 'timed';
         if (settings.lapCount) lapStarts.push(0);
@@ -128,7 +131,7 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
       } else if (!waitSince) waitSince = tick0;
       if (tick0 - lastError > 1000) { lastError = tick0; const e = gl.getError(); if (e !== gl.NO_ERROR) throw new Error(`WebGL error 0x${e.toString(16)}`); }
       progress();
-      if (flights.length >= settings.inFlight) { postedAt = performance.now() + 1; setTimeout(tick, 1); }
+      if (flights.length >= settings.inFlight) { postedAt = performance.now() + 1; setTimeout(wake, 1); }
       else { postedAt = performance.now(); channel.port2.postMessage(0); }
     } catch (e) { finish(`Render error: ${String(e)}`); }
   }

@@ -33,11 +33,11 @@ const RECENT_GPU = 120;
  * Dev overrides allow controlled comparisons without changing the fixed workload.
  */
 const DEV_PARAMS = new URLSearchParams(import.meta.env.DEV ? location.search : "");
-const MAX_IN_FLIGHT = Number(DEV_PARAMS.get("inflight")) || 2;
+const MAX_IN_FLIGHT = Number(DEV_PARAMS.get("inflight")) || 3;
 /** Dev server only: ?batch=MS overrides the batch length, ?present=all draws every frame to the canvas. */
 const BATCH = Number(DEV_PARAMS.get("batch")) || BATCH_MS;
 /** GPU work per batch is independent of the main-thread task budget. */
-const GPU_BATCH_MS = Number(DEV_PARAMS.get("gpuBatch")) || 4;
+const GPU_BATCH_MS = Number(DEV_PARAMS.get("gpuBatch")) || 8;
 const PRESENT_ALL = DEV_PARAMS.get("present") === "all";
 /** Dev server only: ?presentHz=N caps how often a frame goes to the canvas (default: display refresh). */
 const PRESENT_HZ = Number(DEV_PARAMS.get("presentHz")) || 0;
@@ -379,7 +379,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     const heapEnd = heapMb();
     const diag: RunDiagnostics = {
       renderThread: remote ? "worker" : "main",
-      ...(remote ? { presentation: { ...presentation.stats(), refreshHz: 1000 / cadence.intervalMs, divisor: cadence.divisor } } : {}),
+      ...(remote ? { presentation: { ...presentation.stats(), ...cadence.callbackStats(), refreshHz: 1000 / cadence.intervalMs, divisor: cadence.divisor } } : {}),
       gpuBusy: st.gpuBusy,
       gpuMs: st.gpuMsPerFrame,
       cpuMs: st.cpuMsPerFrame,

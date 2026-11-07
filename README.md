@@ -143,7 +143,7 @@ and lists fixes. All of it comes from signals the browser exposes (`src/benchmar
 |---|---|
 | GPU busy % / GPU ms per frame | `EXT_disjoint_timer_query_webgl2` time per frame ÷ wall-clock |
 | JS ms per frame (scene update vs draw submission) | `performance.now()` around each frame, and around the scene update |
-| GPU wait per frame | Time spent waiting with the GPU queue full (two batches queued) |
+| GPU wait per frame | Time spent waiting with the GPU queue full (three batches queued) |
 | Browser overhead | Share of wall-clock outside render batches (`1 − loop busy`) |
 | Main-thread stalls | Yields delayed > 20 ms by other work (tabs, extensions, GC) |
 | Hitches, frame-time spread | Frames > 2.5× the median and at least 4 ms over it; standard deviation |
@@ -185,7 +185,7 @@ The diagnosis also flags:
 4. The **timed phase** follows. A dedicated worker owns scene updates, WebGL submission
    and GPU queries, leaving the main thread available for the HUD and controls. Browsers
    without the required worker/bitmap APIs use the main-thread compatibility path.
-   - **Pipelined (WebGL2):** two batches can be queued, each targeting 4 ms of GPU
+   - **Pipelined (WebGL2):** three batches can be queued, each targeting 8 ms of GPU
      work with a separate 8 ms CPU task budget. Batch size uses recent GPU timings,
      or a smoothed completion window without timers. Fence notification jitter does
      not directly feed back into the next batch size. A full queue uses bounded polling.
@@ -193,8 +193,11 @@ The diagnosis also flags:
      their fences signal. Preview requests follow display callbacks, at an integer divisor
      of refresh selected during warm-up with 10% render-throughput headroom. A short buffer
      (at least 50 ms, longer for slow GPUs, rounded to complete preview intervals) delivers images on their target
-     display callback rather than immediately on arrival. This trades preview latency for
-     steadier motion. Changing displays recalibrates the cadence. Render FPS is not the
+     elapsed display slot rather than immediately on arrival. Missed callbacks advance
+     the timeline so obsolete images can be discarded instead of replayed late. This trades preview latency for
+     steadier motion. Sustained missing display callbacks trigger one conservative
+     preview-rate reduction; render throughput alone does not measure compositor capacity.
+     Changing displays recalibrates the cadence. Render FPS is not the
      number of visible screen updates; preview handoff statistics are exported separately.
      Browser/compositor delays and GPU throughput below the selected cadence can still
      cause missed updates; canvas handoffs do not measure physical monitor scanout.
@@ -629,7 +632,7 @@ renderer, WebGPU adapter and timer queries the browser under test has.
 
 Every preset now uses fixed 64-step volumetric lighting, including Low and Medium.
 This adds useful per-pixel GPU work without proportionally increasing scene-update
-CPU work. The submission queue holds two batches targeting 4 ms of GPU work each,
+CPU work. The submission queue holds three batches targeting 8 ms of GPU work each,
 while retaining the separate 8 ms CPU task budget.
 Scores are not comparable with 2.x; historical results remain readable. GPU timer
 coverage is an estimate, not an OS-wide hardware utilization counter. No preset

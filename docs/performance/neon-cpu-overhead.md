@@ -219,3 +219,37 @@ resource cleanup, 400 Hz buffering, export fields and the Zink backend parser.
 The production build and 317 unit tests passed.
 All 14 accelerated browser regression tests and 30 desktop/mobile sharing checks
 also passed before redeploying the branch preview.
+
+## 3.0.1 remote regression and 3.0.2 correction
+
+Matt reported visibly worse stutter and lower utilization on the same Nobara/NVK
+2080 Ti system. 3.0.1: 193.6 render FPS (previously 214.4), GPU coverage 89.2%
+(previously 97.9%), GPU frame time 4.61 ms (previously 4.57 ms), CPU 0.26 ms,
+scene updates 0.03 ms. There were 58 hitches but zero GPU-only hitches. Preview
+handoffs were only 77.1/s despite a 119.05 Hz inferred refresh and divisor 1;
+p95/max intervals were 18.9/77.1 ms and p95 lateness 45.9 ms, with no queue drops.
+The AMD improvement did not generalize. 3.0.1 is a failed remote acceptance result.
+
+Two concrete defects were found:
+
+1. `setTimeout(tick, 1)` recursively schedules timer tasks. The HTML timer algorithm
+   clamps this to at least 4 ms after five nestings. In the isolated Brave worker
+   comparison (120 iterations, first 10 excluded), direct timer recursion measured
+   median/p95 4.1/4.3 ms. Returning through a MessageChannel task measured 1.1/1.2 ms.
+   The worker now uses that task boundary for full-queue and phase-drain polling.
+   This avoids a CPU spin loop. GPU queues return to the 3.0.0 depth/target of
+   three batches / 8 ms; two / 4 ms was not robust on the remote system.
+2. Preview target indices counted received callbacks, not elapsed refresh slots.
+   Missed callbacks stretched the buffer rather than expiring obsolete images.
+   The timeline now advances by elapsed refresh slots and requests one current
+   preview after a skipped slot, without replaying old requests in a burst.
+
+The preview controller also considers sustained missed-callback rate. Two bad
+windows trigger one conservative increase in its refresh divisor, kept stable for
+the remainder of the run unless refresh changes. Render throughput and shader work
+remain uncapped and fixed. Callback FPS/p95/max are exported separately from image
+handoffs, so subsequent reports can distinguish callback starvation from a shortage
+of completed images. GPU-only hitch count cannot by itself identify the responsible
+browser/driver component. The exact remote improvement requires another NVK run.
+
+Timer behavior reference: https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html

@@ -52,6 +52,9 @@ function runDetailLines(r: BenchResult): string[] {
   if (d.gpuHitches !== undefined) lines.push(`      gpu_hitches: ${d.gpuHitches}`);
   if (d.presentation) {
     const p = d.presentation;
+    if (p.callbackFps !== undefined) lines.push(`      display_callback_fps: ${r2(p.callbackFps)}`);
+    if (p.callbackP95Ms !== undefined) lines.push(`      display_callback_p95_ms: ${r2(p.callbackP95Ms)}`);
+    if (p.callbackMaxMs !== undefined) lines.push(`      display_callback_max_ms: ${r2(p.callbackMaxMs)}`);
     if (p.refreshHz !== undefined) lines.push(`      preview_refresh_hz: ${r2(p.refreshHz)}`);
     if (p.divisor !== undefined) lines.push(`      preview_refresh_divisor: ${p.divisor}`);
     lines.push(`      # Canvas handoffs, not physical monitor scanout or render throughput.`,

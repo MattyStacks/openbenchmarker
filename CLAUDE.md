@@ -1,5 +1,13 @@
 # Notes for Claude
 
+## Active Neon Flythrough pacing investigation
+
+For the current GPU utilization / stutter work, start with
+`docs/plans/neon-pacing/STATUS.md` and `PLAN.md`. Continue the existing
+`perf/neon-cpu-overhead` investigation on the affected machine. The 3.0.1 preview
+regressed remotely; the 3.0.2 checkpoint is not an accepted fix. Keep status and
+findings in that folder so Codex and Claude on other machines share the same state.
+
 ## Ashen Horizon
 
 The Ashen Horizon benchmark's plans, progress, decisions and working notes all live in

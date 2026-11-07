@@ -53,3 +53,14 @@ it('retains a full 50 ms buffer at 400 Hz without dropping images', () => {
   expect(q.stats()).toMatchObject({ frames: 80, fps: 400, dropped: 0 });
   q.dispose();
 });
+
+it('skips stale buffered frames after elapsed display slots were missed', () => {
+  const q = new PresentationQueue(); const stale = frame(), current = frame(), future = frame();
+  q.push(stale, 50, 6); q.push(current, 75, 9); q.push(future, 100, 12);
+  // One callback arrives after three display slots elapsed, not three callbacks later.
+  expect(q.take(9, 75, true)).toBe(current);
+  expect(stale.close).toHaveBeenCalledOnce();
+  expect(q.stats()).toMatchObject({ dropped: 1, lateP95Ms: 0 });
+  expect(q.take(12, 100, true)).toBe(future);
+  expect(q.stats().lateP95Ms).toBe(0);
+});
