@@ -1,5 +1,9 @@
 # Neon stutter: status and handoff
 
+**Released 2026-11-08 as benchmark 3.1.0** (main + production) after Matt tested the
+`neon-stutter-2` preview. `perf/neon-cpu-overhead` (`2607a6f`, 3.0.2) was not merged and remains
+untested; don't merge it blindly. Remaining work: frames of 14–20 ms GPU, other machines and refresh rates.
+
 ## Heavy-frame utilization, 2026-11-08 (Claude), branch `perf/neon-stutter-2`
 
 Matt confirmed Low/720p looks smooth natively. He reported 1080p GPU utilization as too low:

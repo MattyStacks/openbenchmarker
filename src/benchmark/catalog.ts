@@ -76,7 +76,9 @@ export const BENCHMARK = BENCHMARKS[0];
 // 3.0.0: fixed 64-step volumetric lighting on every preset; separate GPU batch and CPU task budgets.
 // A different workload: do not compare scores with 2.x.
 // 3.0.1: timestamped display-paced preview; fixed rendered workload unchanged.
-export const BENCHMARK_VERSION = "3.0.1";
+// 3.1.0: heavy frames (over 8 ms GPU) keep the GPU fed between frames; same workload, but
+// GPU-limited FPS at 1080p and up can be several percent higher than 3.0.x.
+export const BENCHMARK_VERSION = "3.1.0";
 
 export function findGpu(id: string): CatalogGpu | undefined {
   return GPU_CATALOG.find((g) => g.id === id);
