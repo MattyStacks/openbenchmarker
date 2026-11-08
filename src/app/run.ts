@@ -39,6 +39,10 @@ const BATCH = Number(DEV_PARAMS.get("batch")) || BATCH_MS;
 /** GPU work per batch is independent of the main-thread task budget. */
 const GPU_BATCH_MS = Number(DEV_PARAMS.get("gpuBatch")) || 4;
 const PRESENT_ALL = DEV_PARAMS.get("present") === "all";
+/** Dev server only: ?trace records per-preview timestamps in window.benchTrace; ?preview=off disables worker previews (diagnostic). */
+const TRACE = DEV_PARAMS.has("trace");
+const PREVIEW_OFF = DEV_PARAMS.get("preview") === "off";
+const PREVIEW_DELAY_MS = Number(DEV_PARAMS.get("delayMs")) || 50;
 /** Dev server only: ?presentHz=N caps how often a frame goes to the canvas (default: display refresh). */
 const PRESENT_HZ = Number(DEV_PARAMS.get("presentHz")) || 0;
 /** Dev server only: ?laps=N runs stress tests with N laps (the result then doesn't match the locked test). */
@@ -184,7 +188,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   let api: GraphicsApi;
   try {
     fitCanvas(canvas, width, height);
-    if (!DEV_PARAMS.has("mainThread")) remote = await prepareRenderWorker(canvas, { preset, width, height, duration, lapCount, cpuBatchMs: BATCH, gpuBatchMs: GPU_BATCH_MS, inFlight: MAX_IN_FLIGHT, timers: !DEV_PARAMS.has("noGpuTimers") }).catch(error => {
+    if (!DEV_PARAMS.has("mainThread")) remote = await prepareRenderWorker(canvas, { preset, width, height, duration, lapCount, cpuBatchMs: BATCH, gpuBatchMs: GPU_BATCH_MS, inFlight: MAX_IN_FLIGHT, queueMs: Number(DEV_PARAMS.get("queueMs")) || 0, timers: !DEV_PARAMS.has("noGpuTimers") }).catch(error => {
       if (String(error).includes("Aborted by user")) throw error;
       console.warn("Worker renderer unavailable; using main-thread rendering", error);
       canvas.remove(); canvas = document.createElement("canvas"); canvas.className = "bench-canvas";
@@ -239,7 +243,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   let phase: "warmup" | "timed" = "warmup";
   let done = false;
   const presentation = new PresentationQueue<ImageBitmap>();
-  const cadence = new PreviewCadence();
+  const cadence = new PreviewCadence(PREVIEW_DELAY_MS);
   let uiStalls = 0, uiStallMs = 0;
   let rafId = 0;
   let lastComplete = 0;
@@ -517,14 +521,20 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     let lastPresent = 0;
     let workerWallMs = 0, warmWallMs = 0, warmFrames = 0;
     let generation = 0;
+    const trace: Record<string, number | boolean>[] = [];
+    const traceMeta = new WeakMap<ImageBitmap, Record<string, number>>();
+    if (TRACE) (window as unknown as { benchTrace: unknown }).benchTrace = trace;
     const present = (now: number) => {
       const absoluteNow = performance.timeOrigin + now;
       const throughput = phase === "timed" && workerWallMs > 0 ? timedFrames * 1000 / workerWallMs : warmWallMs > 0 ? warmFrames * 1000 / warmWallMs : 0;
       const step = cadence.advance(now, throughput, phase === "warmup");
-      if (step.reset) { generation++; presentation.dispose(); }
+      if (step.reset) { generation++; presentation.dispose(); if (TRACE) trace.push({ reset: absoluteNow, divisor: cadence.divisor, delayTicks: cadence.delayTicks, intervalMs: cadence.intervalMs }); }
       const image = presentation.take(cadence.tick, performance.timeOrigin + performance.now(), phase === "timed");
-      if (image) remote!.present(image);
-      if (step.request && (!PRESENT_HZ || now - lastPresent >= 1000 / PRESENT_HZ - 2)) {
+      if (image) {
+        if (TRACE) { const meta = traceMeta.get(image); if (meta) trace.push({ ...meta, tick: cadence.tick, handoffAt: performance.timeOrigin + performance.now(), timed: phase === "timed" }); }
+        remote!.present(image);
+      }
+      if (step.request && !PREVIEW_OFF && (!PRESENT_HZ || now - lastPresent >= 1000 / PRESENT_HZ - 2)) {
         worker.postMessage({ type: "present", sampledAt: absoluteNow, targetAt: absoluteNow + cadence.delayTicks * cadence.intervalMs, targetTick: cadence.tick + cadence.delayTicks, generation }); lastPresent = now;
       }
       if (!done) rafId = requestAnimationFrame(present);
@@ -534,7 +544,11 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     worker.onmessage = (event: MessageEvent<WorkerOutput>) => {
       if (done) { if (event.data.type === "frame") event.data.image.close(); return; }
       const m = event.data;
-      if (m.type === "frame") { if (m.generation === generation) presentation.push(m.image, m.targetAt, m.targetTick); else m.image.close(); }
+      if (m.type === "frame") {
+        if (m.generation !== generation) { m.image.close(); return; }
+        if (TRACE) traceMeta.set(m.image, { sampledAt: m.sampledAt, receivedAt: m.receivedAt, renderedAt: m.renderedAt, postedAt: m.postedAt, arrivedAt: performance.timeOrigin + performance.now(), targetAt: m.targetAt, targetTick: m.targetTick });
+        presentation.push(m.image, m.targetAt, m.targetTick);
+      }
       else if (m.type === "progress") {
         const deliveryMs = Math.max(0, performance.timeOrigin + performance.now() - m.sentAt);
         if (deliveryMs > 20) { uiStalls++; uiStallMs += deliveryMs; }

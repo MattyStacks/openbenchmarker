@@ -7,10 +7,10 @@ import type { WorkerInput, WorkerOutput, WorkerSettings } from './render-worker-
 const scope = self as unknown as { postMessage(message: WorkerOutput, transfer?: Transferable[]): void };
 const send = (message: WorkerOutput, transfer?: Transferable[]) => scope.postMessage(message, transfer);
 let start: (() => void) | undefined, abort: ((reason: string) => void) | undefined;
-const presentations: { sampledAt: number; targetAt: number; targetTick: number; generation: number }[] = [];
+const presentations: { sampledAt: number; targetAt: number; targetTick: number; generation: number; receivedAt: number }[] = [];
 self.onmessage = (e: MessageEvent<WorkerInput>) => {
   const m = e.data;
-  if (m.type === 'present') { if (presentations[0]?.generation !== m.generation) presentations.length = 0; presentations.push(m); if (presentations.length > 4) presentations.shift(); }
+  if (m.type === 'present') { if (presentations[0]?.generation !== m.generation) presentations.length = 0; presentations.push({ ...m, receivedAt: performance.timeOrigin + performance.now() }); if (presentations.length > 4) presentations.shift(); }
   else if (m.type === 'start') start?.();
   else if (m.type === 'abort') abort?.(m.reason);
   else try { initialize(m.canvas, m.settings); } catch (e) { send({ type: 'error', reason: String(e) }); }
@@ -24,7 +24,8 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
   const ext = settings.timers ? gl.getExtension('EXT_disjoint_timer_query_webgl2') as { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number } | null : null;
   const sizer = new BatchSizer(settings.gpuBatchMs);
   const channel = new MessageChannel();
-  interface Flight { fence: WebGLSync; images: { image: ImageBitmap; targetAt: number; targetTick: number; generation: number }[]; frames: number; cpuMs: number; updateMs: number; waitMs: number; yieldMs: number; phase: 'warmup' | 'timed' }
+  interface Preview { image: ImageBitmap; targetAt: number; targetTick: number; generation: number; sampledAt: number; receivedAt: number; renderedAt: number }
+  interface Flight { fence: WebGLSync; images: Preview[]; frames: number; cpuMs: number; updateMs: number; waitMs: number; yieldMs: number; phase: 'warmup' | 'timed' }
   const flights: Flight[] = [], pending: { q: WebGLQuery; frame: number }[] = [], pool: WebGLQuery[] = [];
   const warm: TimedBatch[] = [], timed: TimedBatch[] = [], gpu: { frame: number; ms: number }[] = [], recent: number[] = [], lapStarts: number[] = [];
   let phase: 'warmup' | 'timed' = 'warmup', stopped = false;
@@ -56,7 +57,8 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
     for (const f of list) {
       // Keep all requested previews: discarding an earlier completed image here
       // defeats timestamped playout even when throughput exceeds display refresh.
-      for (const { image, targetAt, targetTick, generation } of f.images) send({ type: "frame", image, targetAt, targetTick, generation }, [image]);
+      const postedAt = performance.timeOrigin + now;
+      for (const p of f.images) send({ type: "frame", ...p, postedAt }, [p.image]);
       n += f.frames; cpuMs += f.cpuMs; updateMs += f.updateMs; syncMs += f.waitMs;
       yieldMs = Math.max(yieldMs, f.yieldMs); gl.deleteSync(f.fence);
     }
@@ -93,6 +95,10 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
       // Avoid queuing several long frames ahead of the next presentation.
       const gpuFrameMs = recent.length ? recent.reduce((sum, ms) => sum + ms, 0) / recent.length : 0;
       const flightLimit = gpuFrameMs > settings.gpuBatchMs * settings.inFlight ? 1 : settings.inFlight;
+      // Time-based queue: submit while less than queueMs of GPU work is outstanding, so the
+      // GPU never runs dry yet the browser compositor's own GPU work never waits long behind it.
+      const queued = () => flights.reduce((n, f) => n + f.frames, 0) * gpuFrameMs;
+      const full = () => flights.length >= flightLimit || (!!settings.queueMs && gpuFrameMs > 0 && queued() >= settings.queueMs);
       while (k < flights.length) {
         const status = gl.clientWaitSync(flights[k].fence, 0, 0);
         if (status === gl.WAIT_FAILED) throw new Error('GPU fence wait failed');
@@ -109,9 +115,9 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
         timedStart = performance.now(); lastComplete = timedStart; phase = 'timed';
         if (settings.lapCount) lapStarts.push(0);
         progress(true);
-      } else if (flights.length < flightLimit) {
+      } else if (!full()) {
         let n = 0, cpuMs = 0; fly.timing.updateMs = 0;
-        const images: { image: ImageBitmap; targetAt: number; targetTick: number; generation: number }[] = [];
+        const images: Preview[] = [];
         do {
           const q = ext ? pool.pop() ?? gl.createQuery() : null;
           if (q) gl.beginQuery(ext!.TIME_ELAPSED_EXT, q);
@@ -119,7 +125,7 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
           // Sample preview motion on the display clock, not on variable queue-submission times.
           const sceneT = Math.max(0, ((presentation ? presentation.sampledAt - performance.timeOrigin : c0) - runStart) / 1000);
           fly.render(settings.lapCount ? sceneT % STRESS_LAP_SECONDS : sceneT, undefined, !!presentation);
-          if (presentation) images.push({ image: canvas.transferToImageBitmap(), targetAt: presentation.targetAt, targetTick: presentation.targetTick, generation: presentation.generation });
+          if (presentation) images.push({ image: canvas.transferToImageBitmap(), targetAt: presentation.targetAt, targetTick: presentation.targetTick, generation: presentation.generation, sampledAt: presentation.sampledAt, receivedAt: presentation.receivedAt, renderedAt: performance.timeOrigin + performance.now() });
           renderer.setRenderTarget(null); cpuMs += performance.now() - c0;
           if (q) { gl.endQuery(ext!.TIME_ELAPSED_EXT); pending.push({ q, frame: phase === 'timed' ? submitted : -1 }); }
           if (phase === 'timed') submitted++;
@@ -131,10 +137,12 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
       } else if (!waitSince) waitSince = tick0;
       if (tick0 - lastError > 1000) { lastError = tick0; const e = gl.getError(); if (e !== gl.NO_ERROR) throw new Error(`WebGL error 0x${e.toString(16)}`); }
       progress();
-      if (flights.length >= flightLimit) { postedAt = performance.now() + 1; setTimeout(tick, 1); }
+      // A timer scheduled from a message task is not nested, so it is not clamped to 4 ms.
+      if (full()) { postedAt = performance.now() + 1; setTimeout(wake, 1); }
       else { postedAt = performance.now(); channel.port2.postMessage(0); }
     } catch (e) { finish(`Render error: ${String(e)}`); }
   }
+  const wake = () => channel.port2.postMessage(0);
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); finish('WebGL context lost during run'); });
   abort = finish;
   start = () => { runStart = lastComplete = performance.now(); channel.port1.onmessage = tick; channel.port2.postMessage(0); };

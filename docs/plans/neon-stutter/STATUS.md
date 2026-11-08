@@ -1,5 +1,56 @@
 # Neon stutter: status and handoff
 
+## Session 2026-11-08 (Claude), branch `perf/neon-stutter-2`
+
+Continues from the checkpoint below. **Not finished; a reboot is pending.**
+
+**Environment change.** All Codex numbers (2026-11-06/07) were on the 2080 Ti via nouveau/NVK.
+The proprietary NVIDIA 595.112.07 kernel module took over on the 02:09 reboot on 2026-11-07, but
+its GL/EGL/Vulkan userspace was missing, so every browser fell back to the Ryzen iGPU (~8 FPS).
+Matt installed `nvidia-driver nvidia-driver-libs`. Without a reboot, KDE still started before those
+libs existed; the browser reaches the 2080 Ti only via XWayland + PRIME offload env
+(`__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia`, `--use-angle=gl --ozone-platform=x11`,
+set in a local script only). Display 100 Hz. `nvidia-smi` now provides an OS utilization counter
+(`GPU_BUSY_CMD` in the profiler). Re-baseline after the reboot before trusting the numbers below.
+
+Results: [neon-2026-11-08-results.jsonl](../../performance/neon-2026-11-08-results.jsonl)
+(Low/720p/30 s, one visible window; "OS" = nvidia-smi steady-state mean).
+
+| Config | Render FPS | Timer | OS GPU | Handoff max | rAF max |
+|---|---:|---:|---:|---:|---:|
+| checkpoint default (2 × 4 ms) | 160–164 | 70.5% | 85.6% | 11 ms | 10 ms |
+| previews off | 195–197 | 88.8% | 92.3% | – | 10 ms |
+| 3 × 8 ms | 174–176 | 79.6% | 93.4% | 26–40 ms | 10–20 ms |
+| previews off, 6 × 16 ms | 204 | 94.3% | 97.3% | – | **70 ms** |
+| previews off, 6 × 16 ms, 1440p | 54 | 95.2% | 98.0% | – | 90 ms |
+| unclamped wake only (default queue) | 169 | 76.3% | 91.7% | 11 ms | 10 ms |
+| previews off, time queue 6–14 ms + unclamped wake | 202–206 | 91.5–92.3% | 95–96% | – | 10 ms |
+
+Findings:
+1. On this driver, the default's previews are perfectly regular; the problem is utilization.
+2. Utilization is lost in two places: (a) the queue drains between fence polls because recursive
+   `setTimeout(1)` is clamped to ~4 ms; (b) each preview `transferToImageBitmap` costs ~5–6% OS.
+3. Deep queues raise utilization but delay the **browser compositor's own GPU work**: the page's
+   animation callbacks miss frames (rAF max 70–100 ms) even with previews off. So the queue must
+   stay small in GPU *time* and be refilled promptly, not just be deep.
+4. Late previews in deeper queues are fixable with a longer playout delay (`?delayMs=`); after that,
+   remaining gaps come from missed compositor frames (finding 3).
+5. A ~4% gap remains even with previews off and any queue depth (204 FPS plateau). Not yet explained.
+
+Dev-only additions: `?trace` (per-preview timestamps into `window.benchTrace`), `?preview=off`,
+`?delayMs=`, `?queueMs=` (time-based queue cap; use with a higher `?inflight=`). The worker's
+full-queue wake now goes through a timer scheduled from a message task (not clamped).
+Profiler: `GPU_BUSY_CMD`, `BENCH_QUERY`, `BENCH_OUT`, `BENCH_LABEL`, steady-state stats, gap-by-second.
+
+Next: reboot; confirm KDE and the browser are on the NVIDIA GPU natively; re-run control and
+`?inflight=8&queueMs=10` with previews on; then attack the preview cost (persistent swap chain via
+`transferControlToOffscreen`, drawing to the default framebuffer only on preview frames) and the
+residual ~4%.
+
+---
+
+## Earlier checkpoint (Codex, 2026-11-07)
+
 Updated: 2026-11-07. Checkpoint branch: `perf/neon-stutter-checkpoint`.
 
 ## Critical remote divergence discovered at close

@@ -8,6 +8,8 @@ export class PreviewCadence {
   private tunedAt = 0;
   private presentationDivisor = 1;
   private intervals: number[] = [];
+  /** Minimum playout delay; must exceed the worst request-to-arrival time of the GPU queue. */
+  constructor(private readonly minDelayMs = 50) {}
   advance(now: number, renderFps: number, warming: boolean): { request: boolean; reset: boolean } {
     // Missing a callback must not stretch every queued presentation deadline.
     const previousTick = this.tick;
@@ -37,7 +39,7 @@ export class PreviewCadence {
         const divisor = Math.max(renderDivisor, this.presentationDivisor);
         // Leave time for two queued GPU batches and the requested frame even on
         // GPUs slower than one refresh. This changes only preview latency/cadence.
-        const delayMs = Math.max(50, renderFps > 0 ? 3000 / renderFps : 50);
+        const delayMs = Math.max(this.minDelayMs, renderFps > 0 ? 3000 / renderFps : this.minDelayMs);
         const delayTicks = Math.max(divisor, Math.ceil(delayMs / interval / divisor - 1e-6) * divisor);
         reset = divisor !== this.divisor || delayTicks !== this.delayTicks;
         this.divisor = divisor; this.delayTicks = delayTicks; this.intervalMs = interval;
