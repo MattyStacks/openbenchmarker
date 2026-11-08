@@ -39,6 +39,16 @@ const BATCH = Number(DEV_PARAMS.get("batch")) || BATCH_MS;
 /** GPU work per batch is independent of the main-thread task budget. */
 const GPU_BATCH_MS = Number(DEV_PARAMS.get("gpuBatch")) || 4;
 const PRESENT_ALL = DEV_PARAMS.get("present") === "all";
+/**
+ * Heavy frames (over GPU_BATCH_MS × MAX_IN_FLIGHT): up to LEAD_MAX_FRAME_MS of GPU time, the next
+ * frame is queued LEAD_MS before the current one should finish. Longer frames would hold the
+ * compositor's work too long, so they run one at a time, polled closely for SPIN_NEAR_MS before
+ * their estimated finish. Dev overrides: ?leadMs=, ?leadMaxMs=, ?spinMs= (0 disables).
+ */
+const devNum = (name: string, fallback: number) => DEV_PARAMS.has(name) ? Number(DEV_PARAMS.get(name)) || 0 : fallback;
+const LEAD_MS = devNum("leadMs", 4);
+const LEAD_MAX_FRAME_MS = devNum("leadMaxMs", 14);
+const SPIN_NEAR_MS = devNum("spinMs", 3);
 /** Dev server only: ?trace records per-preview timestamps in window.benchTrace; ?preview=off disables worker previews (diagnostic). */
 const TRACE = DEV_PARAMS.has("trace");
 const PREVIEW_OFF = DEV_PARAMS.get("preview") === "off";
@@ -188,7 +198,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   let api: GraphicsApi;
   try {
     fitCanvas(canvas, width, height);
-    if (!DEV_PARAMS.has("mainThread")) remote = await prepareRenderWorker(canvas, { preset, width, height, duration, lapCount, cpuBatchMs: BATCH, gpuBatchMs: GPU_BATCH_MS, inFlight: MAX_IN_FLIGHT, queueMs: Number(DEV_PARAMS.get("queueMs")) || 0, timers: !DEV_PARAMS.has("noGpuTimers") }).catch(error => {
+    if (!DEV_PARAMS.has("mainThread")) remote = await prepareRenderWorker(canvas, { preset, width, height, duration, lapCount, cpuBatchMs: BATCH, gpuBatchMs: GPU_BATCH_MS, inFlight: MAX_IN_FLIGHT, queueMs: Number(DEV_PARAMS.get("queueMs")) || 0, leadMs: LEAD_MS, leadMaxFrameMs: LEAD_MAX_FRAME_MS, spinMs: SPIN_NEAR_MS, timers: !DEV_PARAMS.has("noGpuTimers") }).catch(error => {
       if (String(error).includes("Aborted by user")) throw error;
       console.warn("Worker renderer unavailable; using main-thread rendering", error);
       canvas.remove(); canvas = document.createElement("canvas"); canvas.className = "bench-canvas";

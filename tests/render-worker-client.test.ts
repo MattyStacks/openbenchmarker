@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { prepareRenderWorker } from '../src/app/render-worker-client';
 import { getPreset } from '../src/benchmark/presets';
 import type { WorkerSettings } from '../src/engine/render-worker-protocol';
-const settings: WorkerSettings = { preset: getPreset('Low')!, width: 1280, height: 720, duration: 30, lapCount: 0, cpuBatchMs: 8, gpuBatchMs: 16, inFlight: 3, timers: true };
+const settings: WorkerSettings = { preset: getPreset('Low')!, width: 1280, height: 720, duration: 30, lapCount: 0, cpuBatchMs: 8, gpuBatchMs: 16, inFlight: 3, leadMs: 4, leadMaxFrameMs: 14, spinMs: 3, timers: true };
 class FakeWorker {
   static latest: FakeWorker;
   onmessage: ((event: { data: unknown }) => void) | null = null;

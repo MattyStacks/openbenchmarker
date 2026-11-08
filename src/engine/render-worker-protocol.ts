@@ -6,6 +6,13 @@ export interface WorkerSettings {
   cpuBatchMs: number; gpuBatchMs: number; inFlight: number; timers: boolean;
   /** GPU work (ms) to keep queued; 0 keeps the batch-count limit only. */
   queueMs?: number;
+  /**
+   * Heavy frames (longer than gpuBatchMs × inFlight) up to leadMaxFrameMs: queue the next frame
+   * once less than leadMs of GPU work is estimated outstanding. Longer frames run one at a time.
+   */
+  leadMs: number; leadMaxFrameMs: number;
+  /** One heavy frame at a time: poll every task once its estimated finish is this close (ms). */
+  spinMs: number;
 }
 export interface WorkerReady {
   type: 'ready'; renderer: string; vendor: string; maxTextureSize: number; features: Flythrough['features'];

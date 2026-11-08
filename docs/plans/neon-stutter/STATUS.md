@@ -1,5 +1,43 @@
 # Neon stutter: status and handoff
 
+## Heavy-frame utilization, 2026-11-08 (Claude), branch `perf/neon-stutter-2`
+
+Matt confirmed Low/720p looks smooth natively. He reported 1080p GPU utilization as too low:
+the checkpoint ran any frame longer than `gpuBatchMs × inFlight` (8 ms) one at a time, which
+leaves ~1.7 ms idle between frames. Results (dev server, one visible window, 100 Hz):
+[neon-2026-11-08-heavy-results.jsonl](../../performance/neon-2026-11-08-heavy-results.jsonl).
+
+Tried (labels in the results file):
+- Two heavy frames in flight (`heavyInflight=2`; flag since removed): 100% busy, but for 22–25 ms frames
+  preview p95 30→42 ms / 40→49 ms and page rAF max 30–40 ms. Chromium runs compositor work in the
+  same GPU queue, so it waits behind a queued frame.
+- Four in flight: 40–54 ms preview gaps even at Low/1080p.
+- Lead submission (`leadMs`, queue the next frame when the estimated outstanding GPU time < lead):
+  clean and 100% busy up to ~12–13 ms frames; 16 ms frames intermittent (one of three runs with
+  cadence drop or 50 ms gap); 20+ ms frames degrade pacing like two in flight.
+- Close polling near the estimated finish (`spinMs`): halves the gap for one-at-a-time frames
+  (Ultra/1440p 94→97.5%), clean pacing.
+
+**New defaults** (`run.ts`: `LEAD_MS` 4, `LEAD_MAX_FRAME_MS` 14, `SPIN_NEAR_MS` 3; dev overrides
+`?leadMs= ?leadMaxMs= ?spinMs=`, 0 disables): heavy frames ≤ 14 ms use lead submission (2 in flight),
+longer ones run one at a time with close polling. Light frames unchanged.
+
+| Config | Before | New default |
+|---|---|---|
+| Low/720p ×2 | 100% busy, 205–214 FPS | 100%, 205–209, clean |
+| Medium/720p | 100%, 177 | 100%, 175, one 22 ms gap (one-offs seen before too) |
+| Low/1080p | 86–88%, 85 | **100%, 92**, clean |
+| High/1080p | 90%, 76 | **100%, 80**, clean |
+| Extreme/1080p (16 ms) | – | 94%, 56, clean |
+| Medium/1440p | – | 98%, 47, clean |
+| Ultra/1440p | 94%, 41 | 97.5%, 42, clean |
+
+Open: frames between 14 and ~20 ms still lose 2–6%. The 14 ms cut-off is fixed rather than
+refresh-relative and was only tested at 100 Hz; check on 60/144 Hz and on AMD/Intel.
+Next: Matt checks the preview visually at 1080p, then test on another machine.
+
+---
+
 ## After the reboot, 2026-11-08 (Claude), branch `perf/neon-stutter-2`
 
 KDE (kwin_wayland, plasmashell, Xwayland) and Chromium now run natively on the 2080 Ti

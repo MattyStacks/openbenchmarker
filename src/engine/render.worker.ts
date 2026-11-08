@@ -30,7 +30,7 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
   const warm: TimedBatch[] = [], timed: TimedBatch[] = [], gpu: { frame: number; ms: number }[] = [], recent: number[] = [], lapStarts: number[] = [];
   let phase: 'warmup' | 'timed' = 'warmup', stopped = false;
   let runStart = 0, timedStart = 0, lastComplete = 0, frames = 0, submitted = 0, batchCount = 0, batchFrames = 1;
-  let waitSince = 0, postedAt = 0, lastProgress = 0, lastError = 0;
+  let gpuFreeAt = 0, waitSince = 0, postedAt = 0, lastProgress = 0, lastError = 0;
   function poll(): void {
     if (!ext || !pending.length || !gl.getQueryParameter(pending[0].q, gl.QUERY_RESULT_AVAILABLE)) return;
     if (gl.getParameter(ext.GPU_DISJOINT_EXT)) {
@@ -94,18 +94,25 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
       poll(); let k = 0;
       // Avoid queuing several long frames ahead of the next presentation.
       const gpuFrameMs = recent.length ? recent.reduce((sum, ms) => sum + ms, 0) / recent.length : 0;
-      const flightLimit = gpuFrameMs > settings.gpuBatchMs * settings.inFlight ? 1 : settings.inFlight;
+      // Heavy frames: queuing a whole frame ahead keeps the GPU busy but delays the browser
+      // compositor's own GPU work behind it. Moderately heavy frames queue the next frame just
+      // before the current one should finish; longer ones run one at a time and poll closely
+      // near the estimated finish, so the gap between frames stays small.
+      const heavy = gpuFrameMs > settings.gpuBatchMs * settings.inFlight;
+      const lead = heavy && gpuFrameMs <= settings.leadMaxFrameMs ? settings.leadMs : 0;
+      const spin = heavy && !lead ? settings.spinMs : 0;
+      const flightLimit = lead ? 2 : heavy ? 1 : settings.inFlight;
       // Time-based queue: submit while less than queueMs of GPU work is outstanding, so the
       // GPU never runs dry yet the browser compositor's own GPU work never waits long behind it.
       const queued = () => flights.reduce((n, f) => n + f.frames, 0) * gpuFrameMs;
-      const full = () => flights.length >= flightLimit || (!!settings.queueMs && gpuFrameMs > 0 && queued() >= settings.queueMs);
+      const full = () => flights.length >= flightLimit || (!!lead && flights.length > 0 && gpuFreeAt - performance.now() > lead) || (!!settings.queueMs && gpuFrameMs > 0 && queued() >= settings.queueMs);
       while (k < flights.length) {
         const status = gl.clientWaitSync(flights[k].fence, 0, 0);
         if (status === gl.WAIT_FAILED) throw new Error('GPU fence wait failed');
         if (status !== gl.ALREADY_SIGNALED && status !== gl.CONDITION_SATISFIED) break;
         k++;
       }
-      if (k) complete(flights.splice(0, k), tick0);
+      if (k) { complete(flights.splice(0, k), tick0); if (!flights.length) gpuFreeAt = tick0; }
       const end = phase === 'warmup' ? runStart + WARMUP_SECONDS * 1000 : timedStart + settings.duration * 1000;
       if (tick0 >= end) {
         // Stop submission and wait for every fence before changing phases. Reading
@@ -133,12 +140,12 @@ function initialize(canvas: OffscreenCanvas, settings: WorkerSettings): void {
         } while (n < batchFrames && performance.now() - tick0 < settings.cpuBatchMs && performance.now() < end);
         const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
         if (!fence) throw new Error('Could not create GPU fence');
-        gl.flush(); flights.push({ fence, images, phase, frames: n, cpuMs, updateMs: fly.timing.updateMs, waitMs: waitSince ? tick0 - waitSince : 0, yieldMs }); waitSince = 0;
+        gl.flush(); gpuFreeAt = Math.max(gpuFreeAt, performance.now()) + n * gpuFrameMs; flights.push({ fence, images, phase, frames: n, cpuMs, updateMs: fly.timing.updateMs, waitMs: waitSince ? tick0 - waitSince : 0, yieldMs }); waitSince = 0;
       } else if (!waitSince) waitSince = tick0;
       if (tick0 - lastError > 1000) { lastError = tick0; const e = gl.getError(); if (e !== gl.NO_ERROR) throw new Error(`WebGL error 0x${e.toString(16)}`); }
       progress();
       // A timer scheduled from a message task is not nested, so it is not clamped to 4 ms.
-      if (full()) { postedAt = performance.now() + 1; setTimeout(wake, 1); }
+      if (full() && !(spin && gpuFreeAt - performance.now() < spin)) { postedAt = performance.now() + 1; setTimeout(wake, 1); }
       else { postedAt = performance.now(); channel.port2.postMessage(0); }
     } catch (e) { finish(`Render error: ${String(e)}`); }
   }
