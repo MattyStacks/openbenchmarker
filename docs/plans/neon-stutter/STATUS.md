@@ -1,8 +1,45 @@
 # Neon stutter: status and handoff
 
-## Session 2026-11-08 (Claude), branch `perf/neon-stutter-2`
+## After the reboot, 2026-11-08 (Claude), branch `perf/neon-stutter-2`
 
-Continues from the checkpoint below. **Not finished; a reboot is pending.**
+KDE (kwin_wayland, plasmashell, Xwayland) and Chromium now run natively on the 2080 Ti
+(NVIDIA 595.112.07, ANGLE GL ES 3.2). No PRIME-offload env or `--ozone-platform=x11` needed.
+Code unchanged from `aa112d8` (checkpoint + unclamped worker wake). Results:
+[neon-2026-11-08-native-results.jsonl](../../performance/neon-2026-11-08-native-results.jsonl)
+(30 s, one visible window, 100 Hz, OS = nvidia-smi steady mean).
+
+| Config | Render FPS | Timer | OS GPU | Previews/s | Handoff p95 / max | Steady gaps > 2× |
+|---|---:|---:|---:|---:|---:|---:|
+| Low/720p default ×4 | 205–214 | 97.7–97.9% | 100% | 100 | 10.1 / 11–20 ms | 0–1 |
+| Low/720p previews off | 204 | 97.7% | 100% | – | – | – |
+| Medium/720p ×3 | 177–178 | 97.6% | 100% | 100 | 10.1 / 11–40 ms | 0, 0, 5 (one run) |
+| Low/1080p | 85 | 85.0% | 88.2% | 50 | 20.1 / 27 ms | 0 |
+| Medium/1080p | 77 | 87.0% | 90.3% | 50 | 20.1 / 21 ms | 0 |
+
+Findings:
+1. Low/720p on this machine now looks solved by these measures: full GPU utilization and previews
+   at every refresh with no recurring gaps. Previews cost nothing measurable (default ≥ previews off).
+   The pre-reboot preview cost and the ~4% residual gap came from the XWayland/PRIME-offload
+   path and don't apply to native runs. Matt hasn't checked it visually yet.
+2. The one Medium/720p outlier had gaps at seconds 5 and 28 and a 30 ms page animation
+   callback, so the compositor missed frames too. Didn't repeat in two more runs.
+3. **Remaining problem: heavy frames lose ~10–12% utilization.** At 1080p each frame is longer
+   than the queue budget, so the checkpoint's heavy-frame rule drops to one in-flight batch.
+   Previews stay even (cadence divisor 2, 50/s) but the GPU idles between batches.
+4. This is one machine and one driver. The issue was also reported on other machines, so this
+   is not acceptance.
+
+Next: Matt checks Low/720p visually. Then fix the heavy-frame utilization loss, e.g. use the
+time-based queue cap (`?queueMs=`) instead of the one-batch rule, and test Low/1080p with
+`?inflight=4&queueMs=…` for utilization and compositor rAF max. Then test on another machine
+(AMD/Intel) through a preview deploy.
+
+---
+
+## Before the reboot, 2026-11-08 (Claude), branch `perf/neon-stutter-2`
+
+Continues from the checkpoint below. All numbers in this section were measured before the reboot,
+via XWayland + PRIME offload; native runs above supersede them.
 
 **Environment change.** All Codex numbers (2026-11-06/07) were on the 2080 Ti via nouveau/NVK.
 The proprietary NVIDIA 595.112.07 kernel module took over on the 02:09 reboot on 2026-11-07, but
