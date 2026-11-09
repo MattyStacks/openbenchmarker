@@ -339,17 +339,43 @@ This tool feeds a public dataset, so:
   ignored (not validated or exported) when overclocked isn't yes.
 - **Detected** by the browser: WebGL renderer/vendor, ANGLE backend, CPU thread count, battery
   state and browser version. They are stored in a separate, labelled `detected:` block, for the
-  diagnosis only. They **never** fill in the GPU or any `system:` field. A software-rendered run
-  (SwiftShader, llvmpipe, Microsoft Basic Render) can't be submitted.
+  diagnosis. A software-rendered run (SwiftShader, llvmpipe, Microsoft Basic Render) can't be
+  submitted.
+- **Best guesses** (`src/benchmark/guess.ts`): most people won't look up their system details or
+  run commands, so a new run fills every blank field the browser gives a clue about, each marked
+  in amber with where it came from, and the user confirms or changes them. Picking a value from a
+  dropdown confirms it, and a cleared guess stays cleared (`guessed` on the result). The clues:
+  - the WebGL renderer names the GPU. Valve's machines are named outright ("AMD Steam Machine",
+    the Steam Deck's "vangogh"), which fills their CPU, soldered memory and SteamOS too. Other
+    GPUs are matched to the catalog, or to a reference chip when they aren't listed yet;
+  - the OS, and Windows 10 or 11 from UA Client Hints;
+  - Mesa's version where the renderer shows it;
+  - `navigator.deviceMemory`, rounded down by the browser, for memory.
+
+  The run saves the extra signals once as `probe` (`src/app/probe.ts`: client hints, device
+  memory, screen, battery, WebGPU adapter), so a result opened elsewhere keeps the guesses of the
+  machine that ran it. They stay in the browser and aren't in share links or JSON export. The
+  submission YAML comments a value that's still a guess as `# assumed, not confirmed`. Guessing
+  never overwrites a value the user typed or carried over.
 - **Device context (deliberate exception):** each result also saves a separate `device` field
   (`src/app/share-env.ts`: browser + major version, OS, phone/tablet/desktop, WebKit-engine flag,
   and the GPU name as reported by the browser, normalized and labelled "reported by browser").
-  This is a deliberate exception to the browser-hints rule, for display and sharing only: it
-  never fills a `system:` field, is never copied into submission YAML, and older saved results
+  It's for display and sharing: it is never copied into submission YAML (the best guesses above
+  read it, marked, for the user to confirm), and older saved results
   are migrated with only safe inferences (user-filled OS, recorded browser/renderer; an
   old "Chrome N" stays unknown because other Chromium browsers recorded the same) or
   "unknown". Limit: iPadOS Safari sends a Mac UA, so an iPad is recognised only by a Mac UA
   plus more than one touch point; a touch-screen Mac would be misread as an iPad. See [docs/privacy-audit.md](docs/privacy-audit.md).
+- **The form** (`src/app/system-form.ts`): a summary line of what we think the machine is and
+  what's still needed; GPU and OS (the only required fields); overclocking; then the optional
+  details, with dropdowns of common values and "Other… (type it)" (`options` in the field
+  registry). Linux details sit in their own section, and Proton isn't asked for (a browser run
+  never uses it). The GPU is a type-to-search list (`src/benchmark/gpu-search.ts`) of every
+  catalog product ("in the dataset") and every reference chip ("not in the dataset yet"), so
+  "5080", "rx 9070" or "steam deck" finds it. Picking a reference chip fills its name, form factor
+  and requested ID, and anything not in the list can be typed in by name ("Use …"). The lookup
+  commands are optional: one copy, one paste of everything it printed
+  (`parseSysinfoPaste`), which fills every field it found.
 - The GPU should be an exact `gpu_id` from the upstream catalog. If your GPU isn't listed yet,
   choose **My GPU isn't listed**: the form then asks for **Your GPU** (its name) and the
   **Requested gpu_id** (the catalog ID you're asking for). An ID helper builds both: it shows the
@@ -442,8 +468,8 @@ Submitted results stay public, so leave any optional field blank if you'd rather
 
 `src/benchmark/gpu-catalog.json` is a dated snapshot of upstream
 `data/gpus/<form_factor>/<vendor>/*.yaml` (excluding `reference/`). The catalog is new and
-growing: on 2026-10-23 it holds one product, `rtx_5080_16gb_fe` (upstream also has 309
-`reference/` base models, which results can't use). Every card added makes the dataset more
+growing: on 2026-11-09 it holds six products, the RTX 5080 FE, the Steam Machine and four handheld
+PCs (upstream also has 310 `reference/` base models, which results can't use). Every card added makes the dataset more
 useful. To get one added, request it with an issue or open a pull request (see Honest-data rules);
 [docs/upstream-todos.md](docs/upstream-todos.md) lists how requests are handled upstream. After
 upstream merges new cards, refresh the snapshot and release:
@@ -476,7 +502,10 @@ export and the storage migration all read that registry. To add one:
    `checks.py`. If browsers can't detect it and a best guess helps, add a `suggest` rule; the
    value is then marked in the result's `suggested` list and the YAML comments it as assumed.
    Set `carry: true` if it rarely changes between runs on the same machine, and `gpuSpecific: true`
-   if it describes the GPU itself.
+   if it describes the GPU itself. Give it `options` (common values; the form shows a dropdown
+   with "Other… (type it)") when most people would pick from a short list, or `formHidden: true`
+   if it shouldn't be asked for in the form. If the browser gives a clue about it, add the rule
+   to `guessSystem` in `src/benchmark/guess.ts`.
 4. **Tests:** extend `tests/fields.test.ts` (validation, YAML output and order, CSV column, and
    that older saved results load with it blank or suggested).
 5. **Share links** don't carry system fields, except the catalog GPU and overclock details (the

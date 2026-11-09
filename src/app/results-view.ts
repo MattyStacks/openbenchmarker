@@ -1,17 +1,12 @@
 import {
   BENCHMARK,
-  CATALOG_SNAPSHOT_DATE,
   CC_BY_DEED,
   DATA_LICENSE,
-  GPU_CATALOG,
   NOT_LISTED,
   OGB_SITE,
   UPSTREAM_CATALOG_README,
   UPSTREAM_REPO,
   UPSTREAM_TEMPLATES,
-  catalogGroups,
-  catalogLabel,
-  gpuRequestUrl,
 } from "../benchmark/catalog";
 import { download, gamesYamlEntry, suggestedFileName, toCsv, toDraftYaml, toJson, toYaml } from "../benchmark/exporter";
 import { VERDICT_LABEL, diagnose, isMaskedRenderer } from "../benchmark/diagnose";
@@ -21,12 +16,11 @@ import { decodeShare, encodeShare, shareBlocker, sharedRunFrom, type SharedRun }
 import { clearPending, pendingCode, setPending } from "./challenge";
 import { LABELS, bindCompareBoxes, compareBoxHtml, comparePanelHtml } from "./compare-view";
 import { prefillFromShare } from "./home";
-import { SYSINFO_COMMANDS } from "../benchmark/sysinfo";
 import { catalogFile } from "../benchmark/gpu-id";
-import { bindGpuHelper, gpuFileHtml, gpuHelperHtml, osSwitchHtml, renderGpuFile, type CmdOs } from "./gpu-helper";
-import { LINUX_ONLY_FIELDS, OVERCLOCK_FIELDS, SYSTEM_FIELDS, UNLISTED_GPU_FIELDS, fieldFor, submittedGpuId, type SystemField } from "../benchmark/fields";
-import type { BenchResult, SystemInfo } from "../benchmark/types";
-import { submissionWarnings, validateSubmission } from "../benchmark/validate";
+import { submittedGpuId } from "../benchmark/fields";
+import { applyGuesses } from "../benchmark/guess";
+import type { BenchResult } from "../benchmark/types";
+import { missingLabels, submissionWarnings, validateSubmission } from "../benchmark/validate";
 import { $, esc } from "./dom";
 import { BATCH_MS } from "./env";
 import { deviceLine, gpuLine, isPhoneOrTablet, runClass } from "./result-display";
@@ -34,53 +28,24 @@ import { bindShareBox, sharePayload, shareBoxHtml } from "./share";
 import { showView } from "./shell";
 import { completedStress, lapsSectionHtml, stressCardsHtml } from "./stress-view";
 import { upsertResult } from "./store";
-
-/**
- * Hints for the system form. From the run's own recorded diagnostics when present, so a desktop
- * result opened on a phone shows the desktop's values; the live probe (a throwaway WebGL context in
- * THIS browser) is only for old results recorded before diagnostics existed.
- */
-function hintsFor(r: BenchResult): { source: "run" | "live"; rows: [string, string][] } {
-  const d = r.diag;
-  if (d)
-    return {
-      source: "run",
-      rows: [
-        ["WebGL renderer", isMaskedRenderer(d.renderer) ? `hidden by the browser ("${d.renderer}")` : d.renderer],
-        ["Logical CPU threads", d.cpuThreads === null ? "not reported" : String(d.cpuThreads)],
-        ["Browser", d.browser],
-      ],
-    };
-  const h = browserHints();
-  return { source: "live", rows: [["WebGL renderer", h.renderer], ["Logical CPU threads", h.threads], ["User agent", h.ua]] };
-}
-
-function browserHints(): { renderer: string; threads: string; ua: string } {
-  let rendererStr = "unavailable";
-  try {
-    const c = document.createElement("canvas");
-    const g = c.getContext("webgl2") || c.getContext("webgl");
-    if (g) {
-      const ext = g.getExtension("WEBGL_debug_renderer_info");
-      rendererStr = String(ext ? g.getParameter(ext.UNMASKED_RENDERER_WEBGL) : g.getParameter(g.RENDERER));
-      g.getExtension("WEBGL_lose_context")?.loseContext();
-    }
-  } catch {
-    /* ignore */
-  }
-  return { renderer: rendererStr, threads: String(navigator.hardwareConcurrency ?? "unknown"), ua: navigator.userAgent };
-}
-
-/** Typed-in fields of the system form, from the field registry (overclock details go under Overclocked, an unlisted GPU's under GPU). */
-const TEXT_FIELDS = SYSTEM_FIELDS.filter((f) => (f.kind === "text" || f.kind === "digits") && f.section !== "overclock" && f.section !== "unlisted");
-
-function inputField(f: SystemField): string {
-  const need = f.section === "unlisted" ? "needed to submit" : `optional${f.linux ? ", Linux only" : ""}`;
-  return `<label class="field${f.linux ? " linux-only" : ""}"><span>${esc(f.label)} <em>${need}</em> <b class="suggested-tag" data-suggested="${f.key}" hidden>suggested</b></span><input name="${f.key}" placeholder="${esc(f.placeholder ?? "")}" ${f.inputmode ? `inputmode="${f.inputmode}"` : ""}${f.help ? ` aria-describedby="help-${f.key}"` : ""} />${f.help ? `<small class="field-help" id="help-${f.key}">${esc(f.help)}</small>` : ""}</label>`;
-}
+import { bindSystemForm, systemFormHtml } from "./system-form";
 
 const fmtMs = (x: number | null | undefined) => (x === null || x === undefined || !Number.isFinite(x) ? "n/a" : `${x.toFixed(2)} ms`);
 const fmtPct = (x: number | null | undefined) => (x === null || x === undefined || !Number.isFinite(x) ? "n/a" : `${Math.round(x * 100)}%`);
+
+/** The extra browser signals the form's guesses came from (recorded since 4.1), for the signals list. */
+function probeRows(r: BenchResult): string {
+  const p = r.probe;
+  if (!p) return "";
+  const rows: [string, string][] = [
+    ["Platform version", p.platformVersion || "not reported"],
+    ["Device memory", p.deviceMemoryGb ? `${p.deviceMemoryGb} GB or more (rounded down by the browser)` : "not reported"],
+    ["Screen", p.screen ? `${p.screen.width}×${p.screen.height} at ${p.screen.dpr}×` : "not reported"],
+    ["Battery", p.battery ? (p.battery.charging && p.battery.level === 1 ? "none, or full and charging" : `${Math.round(p.battery.level * 100)}%, ${p.battery.charging ? "charging" : "on battery"}`) : "not reported"],
+    ["WebGPU adapter", p.webgpu ? [p.webgpu.vendor, p.webgpu.architecture, p.webgpu.description].filter(Boolean).join(" · ") || "available, unnamed" : "not available"],
+  ];
+  return rows.map(([k, v]) => `<dt>${esc(k)} <em>(detected)</em></dt><dd>${esc(v)}</dd>`).join("");
+}
 
 /** "What limited this run": verdict, time breakdown, findings and every raw signal. */
 function diagPanel(r: BenchResult): string {
@@ -132,6 +97,7 @@ function diagPanel(r: BenchResult): string {
         <dt>CPU threads <em>(detected)</em></dt><dd>${d.cpuThreads ?? "n/a"}</dd>
         <dt>On battery <em>(detected)</em></dt><dd>${d.onBattery === null ? "unknown" : d.onBattery ? "yes" : "no"}</dd>
         <dt>Browser <em>(detected)</em></dt><dd>${esc(d.browser)}</dd>
+        ${probeRows(r)}
       </dl></details>`
         : ""
     }
@@ -184,14 +150,6 @@ export function renderResults(r: BenchResult): void {
   // The comparison is now on its result: the pending one (this tab) is done.
   if (r.challenge && pendingCode() === r.challenge) clearPending();
   const view = $("#view-results");
-  const hints = showSubmit ? hintsFor(r) : null;
-  const gpuOptions = [
-    `<option value="">— Select your exact GPU —</option>`,
-    ...catalogGroups().map(
-      (grp) => `<optgroup label="${esc(grp.label)}">${grp.gpus.map((g) => `<option value="${esc(g.id)}">${esc(catalogLabel(g))} (${esc(g.id)})</option>`).join("")}</optgroup>`,
-    ),
-    `<option value="${NOT_LISTED}">My GPU isn't listed</option>`,
-  ].join("");
   view.innerHTML = `
     <div class="results-head">
       <h1 class="sign">Neon Flythrough result</h1>
@@ -250,63 +208,28 @@ export function renderResults(r: BenchResult): void {
       </div>
     </div>`}
     <div class="results-grid">
-      <form class="card sys-form" id="sys-form" autocomplete="off">
-        <h2><span class="kana" aria-hidden="true">システム</span>System information</h2>
-        <p class="muted">Only you can confirm these; grey text is just an example. To make things easier, we sometimes suggest a value, our best guess, for details most people don't know offhand. Suggested values are always marked, and you can change or clear them. Measured values come from the run. <a href="#/about/faq-suggested">Why?</a></p>
-        ${r.carriedFrom ? `<p class="carried-note" id="carried-note">Filled in from your result of ${esc(r.carriedFrom)}. Check they still match before submitting.</p>` : ""}
-        <label class="field"><span>GPU <em>required</em></span><select name="gpuId">${gpuOptions}</select></label>
-        <p class="muted tiny">The catalog is new and growing: ${GPU_CATALOG.length} GPU${GPU_CATALOG.length === 1 ? "" : "s"} as of ${esc(CATALOG_SNAPSHOT_DATE)} (<a href="${UPSTREAM_REPO}/tree/main/data/gpus" target="_blank" rel="noopener">catalog</a>). Don't see yours? Choose "My GPU isn't listed".</p>
-        <div id="gpu-blocked" class="blocked" hidden>
-          <p><b>Your GPU isn't in the catalog yet — help add it!</b> The catalog is new and growing, and every card added makes the dataset more useful for everyone.</p>
-          ${gpuHelperHtml(r.system.os === "linux" ? "linux" : "windows")}
-          ${UNLISTED_GPU_FIELDS.filter((f) => f.kind === "text").map(inputField).join("")}
-          <p class="muted tiny">Saved with this result and filled in on your next runs, so you can keep running and saving until your GPU is added. <a href="${UPSTREAM_CATALOG_README}" target="_blank" rel="noopener">ID rules</a></p>
-          ${gpuFileHtml()}
-          <div class="blocked-links">
-            <p><a class="btn btn-primary" id="gpu-request" href="${esc(gpuRequestUrl(r.system.gpuName || r.device?.gpuLabel))}" target="_blank" rel="noopener">Request your GPU (open an issue) →</a> <span class="muted tiny">Easiest, no coding needed.</span></p>
-            <p><a class="btn" href="${UPSTREAM_TEMPLATES}" target="_blank" rel="noopener">Add it yourself (pull request) →</a> <span class="muted tiny">If you're comfortable with GitHub (<a href="${UPSTREAM_CATALOG_README}" target="_blank" rel="noopener">ID rules</a>).</span></p>
-          </div>
-          ${r.device?.gpuLabel ? `<p class="muted tiny">The request starts from the name you type above, or if that's blank, <b>${esc(r.device.gpuLabel)}</b> (reported by your browser). Edit it on GitHub to the exact card: brand, model and memory.</p>` : ""}
-          <p>You can submit now, but it <b>will fail the dataset's checks</b> unless your GPU is added to the catalog first, or in the same pull request. Or wait until it's listed, then pick it from the list above and submit.</p>
-        </div>
-        <label class="field"><span>Operating system <em>required</em></span>
-          <select name="os"><option value="">— Select —</option><option value="windows">windows</option><option value="linux">linux</option></select></label>
-        <label class="field"><span>GPU overclocked <em>optional</em></span>
-          <select name="overclocked"><option value="">— Not saying —</option><option value="no">No, stock clocks and power limit</option><option value="yes">Yes, overclocked or raised power limit</option></select></label>
-        <fieldset class="oc-details"><legend>What you raised <span class="muted tiny">(MSI Afterburner or your vendor's tuning tool)</span></legend>${OVERCLOCK_FIELDS.map(inputField).join("")}</fieldset>
-        <label class="field"><span>Graphics API <em>recorded by the run</em></span><input name="graphicsApi" value="${esc(r.graphicsApi)}" readonly aria-readonly="true" /></label>
-        ${TEXT_FIELDS.map(inputField).join("")}
-      </form>
+      ${systemFormHtml(r)}
 
-      <div class="card">
-        <h2><span class="kana" aria-hidden="true">ヒント</span>Browser hints <span class="muted">(for your eyes only)</span></h2>
-        <p class="muted tiny">${
-          hints!.source === "run"
-            ? "Recorded by the browser during this run, often masked or generic."
-            : "Read from this browser now (this result was recorded before the run saved them), often masked or generic."
-        } Never copied into your system fields: use them to help you pick the right values.</p>
-        <dl class="hints">${hints!.rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
-        <div id="os-cmds"></div>
-
-        <h2><span class="kana" aria-hidden="true">送信</span>Export &amp; submit</h2>
+      <div class="card submit-card">
+        <h2><span class="kana" aria-hidden="true">送信</span>Download &amp; submit</h2>
         <div id="submit-export">
         <div id="val-box" aria-live="polite"></div>
         <div class="row">
           <button type="button" class="btn btn-primary" id="exp-yaml">Download YAML</button>
           <button type="button" class="btn" id="copy-yaml">Copy YAML</button>
         </div>
-        <p class="muted tiny why-manual"><b>Why isn't submitting automatic?</b> This site doesn't keep anything. You submit to Open GPU Benchmarks yourself, so you see exactly what's published and decide what goes in it.</p>
+        <p class="muted tiny">Not submitting? The YAML keeps this result with your details, and My Results can download all of them at once.</p>
         </div>
-        <div class="warn-public">
-          <p>Submitting is optional, and it's up to you. Your results stay in this browser unless you choose to share, export or submit them.</p>
-          <p>If you submit to Open GPU Benchmarks, your result joins a public dataset under the CC BY 4.0 license. That's a common license for open data: anyone can reuse the data as long as they credit the source. <a href="${CC_BY_DEED}" target="_blank" rel="noopener">Read what CC BY 4.0 allows →</a> (<a href="${DATA_LICENSE}" target="_blank" rel="noopener">dataset license</a>)</p>
-          <p>Submitted results stay public, so leave any optional field blank if you'd rather not share it. Submissions go through GitHub, so your GitHub username is public on the pull request.</p>
-        </div>
-        <div id="submit-preview">
-        <h3>Submission YAML preview</h3>
-        <pre class="yaml" id="yaml-preview"></pre>
         <div id="submit-steps"></div>
-        </div>
+        <details class="yaml-details"><summary id="yaml-summary">YAML preview</summary><pre class="yaml" id="yaml-preview"></pre></details>
+        <details class="publish-details"><summary>What submitting means</summary>
+          <p class="muted tiny why-manual"><b>Why isn't submitting automatic?</b> This site doesn't keep anything. You submit to Open GPU Benchmarks yourself, so you see exactly what's published and decide what goes in it.</p>
+          <div class="warn-public">
+            <p>Submitting is optional, and it's up to you. Your results stay in this browser unless you choose to share, export or submit them.</p>
+            <p>If you submit to Open GPU Benchmarks, your result joins a public dataset under the CC BY 4.0 license. That's a common license for open data: anyone can reuse the data as long as they credit the source. <a href="${CC_BY_DEED}" target="_blank" rel="noopener">Read what CC BY 4.0 allows →</a> (<a href="${DATA_LICENSE}" target="_blank" rel="noopener">dataset license</a>)</p>
+            <p>Submitted results stay public, so leave any optional field blank if you'd rather not share it. Submissions go through GitHub, so your GitHub username is public on the pull request.</p>
+          </div>
+        </details>
       </div>
     </div>
     </section>` : ""}
@@ -357,106 +280,30 @@ export function renderResults(r: BenchResult): void {
   if (!showSubmit) return;
 
   const form = $<HTMLFormElement>("#sys-form");
-  for (const [k, v] of Object.entries(r.system)) {
-    const el = form.elements.namedItem(k) as HTMLInputElement | HTMLSelectElement | null;
-    if (el) el.value = v;
+  // Guesses for a result saved before they existed (or an old version); a no-op once applied.
+  if (!r.guessed) {
+    Object.assign(r, applyGuesses(r));
+    upsertResult(r);
   }
-  // Read-only lookup commands, Windows unless the form says Linux. Shown only; the page never runs them.
-  let cmdOs: CmdOs = r.system.os === "linux" ? "linux" : "windows";
-  let formOs = r.system.os;
-  const renderCommands = () => {
-    const set = SYSINFO_COMMANDS[cmdOs];
-    const fieldLabel = (f: string) => (f === "gpu" ? "GPU (above)" : (fieldFor(f)?.label ?? f));
-    $("#os-cmds").innerHTML = `<div class="cmds">
-          <h3>Find these values on this ${cmdOs === "windows" ? "PC" : "machine"} <span class="muted">(${esc(set.shell)})</span></h3>
-          ${osSwitchHtml("cmd-os", cmdOs)}
-          ${cmdOs === "windows" ? `<p class="muted tiny">On Linux? Switch to Linux above for the same lookups in a terminal.</p>` : ""}
-          <p class="muted tiny">${esc(set.howToOpen)} These commands only read information. This page never runs them or reads your system: you copy the values into the fields yourself.</p>
-          <div class="cmd"><div class="cmd-head"><b>Everything at once</b><button type="button" class="btn btn-sm" data-copy="all">Copy</button></div><pre>${esc(set.all)}</pre></div>
-          ${set.commands
-            .map(
-              (c, i) => `<div class="cmd"><div class="cmd-head"><b>${esc(c.label)}</b><span class="muted tiny">→ ${esc(fieldLabel(c.field))}</span>${c.command ? `<button type="button" class="btn btn-sm" data-copy="${i}">Copy</button>` : ""}</div>
-              ${c.command ? `<pre>${esc(c.command)}</pre>` : ""}${c.note ? `<p class="muted tiny">${esc(c.note)}</p>` : ""}</div>`,
-            )
-            .join("")}
-        </div>`;
-  };
-  const helper = bindGpuHelper($("#gpu-blocked"), {
-    os: () => cmdOs,
-    setOs: (os) => setCmdOs(os),
-    apply: (vals) => {
-      for (const [k, v] of Object.entries(vals)) {
-        (r.system as unknown as Record<string, string>)[k] = v;
-        const el = form.elements.namedItem(k) as HTMLInputElement | HTMLSelectElement | null;
-        if (el) el.value = v;
-      }
-      saveEdit();
-    },
-    pickListed: (id) => {
-      r.system.gpuId = id;
-      (form.elements.namedItem("gpuId") as HTMLSelectElement).value = id;
-      saveEdit();
-    },
-  });
-  function setCmdOs(os: CmdOs): void {
-    cmdOs = os;
-    renderCommands();
-    helper.renderOs();
-  }
-  $("#os-cmds").addEventListener("change", (e) => {
-    const el = e.target as HTMLInputElement;
-    if (el.name === "cmd-os") setCmdOs(el.value as CmdOs);
-  });
-  $("#os-cmds").addEventListener("click", async (e) => {
-    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-copy]");
-    const set = SYSINFO_COMMANDS[cmdOs];
-    if (!btn) return;
-    const text = btn.dataset.copy === "all" ? set.all : set.commands[Number(btn.dataset.copy)].command;
-    try {
-      await navigator.clipboard.writeText(text);
-      btn.textContent = "Copied ✓";
-    } catch {
-      const pre = btn.closest(".cmd")?.querySelector("pre");
-      if (pre) getSelection()?.selectAllChildren(pre);
-      btn.textContent = "Press Ctrl+C";
-    }
-    setTimeout(() => (btn.textContent = "Copy"), 1800);
-  });
-  renderCommands();
+  const sysForm = bindSystemForm(form, r, () => saveEdit());
 
   const refresh = () => {
-    // Choosing an OS in the form shows its commands; the switch alone doesn't change the form.
-    if (r.system.os !== formOs) {
-      formOs = r.system.os;
-      if (formOs === "windows" || formOs === "linux") setCmdOs(formOs);
-    }
-    form.querySelectorAll<HTMLElement>("[data-suggested]").forEach((t) => (t.hidden = !r.suggested?.includes(t.dataset.suggested as keyof SystemInfo)));
+    sysForm.refresh();
     const errors = validateSubmission(r);
     const ok = errors.length === 0;
-    // Linux-only inputs stay visible once filled, so a windows/linux mix can be seen and fixed.
-    form.classList.toggle("show-linux", r.system.os === "linux" || LINUX_ONLY_FIELDS.some((k) => r.system[k].trim()));
-    form.classList.toggle("show-oc", r.system.overclocked === "yes");
-    // Not listed: the GPU's name and requested id, the ways to add it, and a warning on submit.
     const notListed = r.system.gpuId === NOT_LISTED;
-    $("#gpu-blocked").hidden = !notListed;
-    if (notListed) {
-      $<HTMLAnchorElement>("#gpu-request").href = gpuRequestUrl(r.system.gpuName || r.device?.gpuLabel);
-      renderGpuFile($("#gpu-blocked"), r.system);
-    }
     const warnings = ok ? submissionWarnings(r) : [];
     $("#val-box").innerHTML = ok
       ? warnings.length
         ? `<div class="warn-box" role="note"><b>⚠ Submitting may fail.</b><ul>${warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul><p class="tiny">Your result is saved either way; the YAML is ready below.</p></div>`
-        : `<p class="ok">✓ Ready to submit: all required fields valid.</p>`
-      : `<div class="next-step"><b>Add your system details to submit</b> (saving, sharing and export work anyway):<ul>${errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul></div>`;
-    $<HTMLButtonElement>("#exp-yaml").disabled = !ok;
-    $<HTMLButtonElement>("#copy-yaml").disabled = !ok;
-    const yaml = ok ? toYaml(r) : "";
+        : `<p class="ok">✓ Ready to submit.</p>`
+      : `<div class="next-step"><b>Not ready to submit yet</b>: ${esc(missingLabels(errors).join(", "))} still needed. You can download the YAML now and finish it later.</div>`;
+    const yaml = ok ? toYaml(r) : toDraftYaml(r);
     const gpuId = submittedGpuId(r.system);
     const ff = r.system.gpuFormFactor;
-    const gpuFile = notListed && (ff === "desktop" || ff === "laptop") ? catalogFile(gpuId, r.system.gpuName, ff) : null;
-    $("#yaml-preview").textContent = ok ? yaml : "The YAML appears here once every required field is valid.";
-    $("#yaml-preview").classList.toggle("disabled", !ok);
+    const gpuFile = notListed && (ff === "desktop" || ff === "laptop" || ff === "handheld") ? catalogFile(gpuId, r.system.gpuName, ff) : null;
+    $("#yaml-summary").textContent = ok ? "YAML preview" : "YAML preview (draft, not ready to submit)";
+    $("#yaml-preview").textContent = yaml;
     $("#submit-steps").innerHTML = ok
       ? `<h3>How to submit</h3><ol>
           ${
@@ -466,7 +313,7 @@ export function renderResults(r: BenchResult): void {
                 : `<li>Your GPU isn't in the catalog yet: in the same pull request, add <code>${esc(gpuId)}</code> to <code>data/gpus/</code> using upstream's <a href="${UPSTREAM_TEMPLATES}" target="_blank" rel="noopener">templates</a> (<a href="${UPSTREAM_CATALOG_README}" target="_blank" rel="noopener">ID rules</a>). Without it, the checks fail.</li>`
               : ""
           }
-          <li>Open a pull request to <a href="${UPSTREAM_REPO}" target="_blank" rel="noopener">MattyStacks/open-gpu-benchmarks</a> adding <code>data/community/${esc(gpuId)}/${esc(suggestedFileName(r, "yaml"))}</code> with the YAML above
+          <li>Open a pull request to <a href="${UPSTREAM_REPO}" target="_blank" rel="noopener">MattyStacks/open-gpu-benchmarks</a> adding <code>data/community/${esc(gpuId)}/${esc(suggestedFileName(r, "yaml"))}</code> with the YAML
             (<a target="_blank" rel="noopener" href="${UPSTREAM_REPO}/new/main/data/community/${encodeURIComponent(gpuId)}?filename=${encodeURIComponent(suggestedFileName(r, "yaml"))}&value=${encodeURIComponent(yaml)}">open GitHub's new-file form</a>).</li>
           <li>If <code>${BENCHMARK.gameId}</code> isn't in <code>data/games.yaml</code> yet, add this entry in the same PR (alphabetical by name):<pre class="yaml">${esc(gamesYamlEntry(Number(r.date.slice(0, 4))))}</pre></li>
           <li>Run <code>python scripts/validate.py results</code> upstream, or let the PR checks run.</li></ol>`
@@ -481,19 +328,6 @@ export function renderResults(r: BenchResult): void {
     upsertResult(r);
     refresh();
   }
-  form.addEventListener("input", (e) => {
-    const el = e.target as HTMLInputElement | HTMLSelectElement;
-    if (el.name in r.system) {
-      (r.system as unknown as Record<string, string>)[el.name] = el.value;
-      // Edited (or cleared) by the user: no longer our suggestion.
-      if (r.suggested?.includes(el.name as keyof SystemInfo)) {
-        r.suggested = r.suggested.filter((k) => k !== el.name);
-        if (!r.suggested.length) delete r.suggested;
-      }
-      saveEdit();
-    }
-  });
-  form.addEventListener("submit", (e) => e.preventDefault());
   view.querySelector("#nudge")?.addEventListener("click", (e) => {
     const act = (e.target as HTMLElement).closest<HTMLElement>("[data-nudge]")?.dataset.nudge;
     if (act === "submit") form.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -503,11 +337,12 @@ export function renderResults(r: BenchResult): void {
       $("#nudge").remove();
     }
   });
-  $("#exp-yaml").onclick = () => validateSubmission(r).length === 0 && download(suggestedFileName(r, "yaml"), toYaml(r), "application/x-yaml");
+  // Ready: the submission. Not yet: the same layout as a draft, saying what's missing.
+  const yamlNow = () => (validateSubmission(r).length === 0 ? toYaml(r) : toDraftYaml(r));
+  $("#exp-yaml").onclick = () => download(suggestedFileName(r, "yaml"), yamlNow(), "application/x-yaml");
   $("#copy-yaml").onclick = async () => {
-    if (validateSubmission(r).length) return;
     try {
-      await navigator.clipboard.writeText(toYaml(r));
+      await navigator.clipboard.writeText(yamlNow());
       $("#copy-yaml").textContent = "Copied ✓";
     } catch {
       $("#copy-yaml").textContent = "Copy failed: select the preview";

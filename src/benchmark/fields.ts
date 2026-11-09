@@ -47,7 +47,38 @@ export interface SystemField {
   carry?: boolean;
   /** Describes the GPU itself, so it isn't carried when the browser reports a different GPU. */
   gpuSpecific?: boolean;
+  /**
+   * Common values, shown as a dropdown with "Other… (type it)" at the end; the field's current value
+   * is always offered too. Depends on the OS chosen in the form.
+   */
+  options?: (ctx: { os: string }) => readonly FieldOption[];
+  /** Kept in saved results and exports, but not shown in the form (it doesn't apply to a browser run). */
+  formHidden?: boolean;
 }
+
+export interface FieldOption {
+  value: string;
+  label?: string;
+}
+
+const opts = (values: readonly string[], label?: (v: string) => string): FieldOption[] => values.map((value) => ({ value, ...(label ? { label: label(value) } : {}) }));
+
+const WINDOWS_VERSIONS = ["Windows 11 Pro 25H2", "Windows 11 Home 25H2", "Windows 11 Pro 24H2", "Windows 11 Home 24H2", "Windows 10 Pro 22H2", "Windows 10 Home 22H2"];
+/** Distros people game on; the OS version list adds a current release for the ones with numbered releases. */
+const DISTROS = ["SteamOS", "Bazzite", "CachyOS", "Ubuntu", "Fedora Linux", "Linux Mint", "Pop!_OS", "Arch Linux", "EndeavourOS", "Nobara", "openSUSE Tumbleweed", "Debian"];
+const LINUX_VERSIONS = ["SteamOS", "Bazzite", "CachyOS", "Ubuntu 24.04 LTS", "Ubuntu 25.10", "Fedora Linux 43", "Linux Mint 22.2", "Pop!_OS 24.04", "Arch Linux", "EndeavourOS", "Nobara 42", "openSUSE Tumbleweed", "Debian 13"];
+const MEMORY_GB = ["8", "12", "16", "24", "32", "48", "64", "96", "128", "192", "256"];
+const MEMORY_TYPES = [
+  "DDR4-2666", "DDR4-3000", "DDR4-3200", "DDR4-3600", "DDR4-4000",
+  "DDR5-4800", "DDR5-5200", "DDR5-5600", "DDR5-6000", "DDR5-6400", "DDR5-7200", "DDR5-8000",
+  "LPDDR5-5500", "LPDDR5-6400", "LPDDR5X-7500", "LPDDR5X-8000", "LPDDR5X-8533",
+];
+const CHANNEL_LABELS: Record<string, string> = {
+  "1": "1 (single channel: one stick)",
+  "2": "2 (dual channel: two or four sticks)",
+  "4": "4 (quad channel, or a handheld's LPDDR)",
+  "8": "8 (workstations and servers)",
+};
 
 export const MAX_MEMORY_GB = 65536;
 /** Upstream MAX_MEMORY_CHANNELS. */
@@ -113,7 +144,16 @@ export const SYSTEM_FIELDS: readonly SystemField[] = [
     gpuSpecific: true,
   },
   { key: "os", yaml: "os", section: "system", label: "OS", kind: "choice", required: true, carry: true },
-  { key: "osDetail", yaml: "os_detail", section: "system", label: "OS version", kind: "text", placeholder: "e.g. Windows 11 Pro 24H2", carry: true },
+  {
+    key: "osDetail",
+    yaml: "os_detail",
+    section: "system",
+    label: "OS version",
+    kind: "text",
+    placeholder: "e.g. Windows 11 Pro 24H2",
+    carry: true,
+    options: ({ os }) => opts(os === "linux" ? LINUX_VERSIONS : os === "windows" ? WINDOWS_VERSIONS : [...WINDOWS_VERSIONS, ...LINUX_VERSIONS]),
+  },
   { key: "cpu", yaml: "cpu", section: "system", label: "CPU", kind: "text", placeholder: "e.g. AMD Ryzen 7 7800X3D", carry: true },
   {
     key: "memoryGb",
@@ -125,8 +165,9 @@ export const SYSTEM_FIELDS: readonly SystemField[] = [
     inputmode: "numeric",
     validate: (v) => (wholeNumber(v, MAX_MEMORY_GB) ? null : `Memory: '${v}' must be a whole number of GB (digits only)`),
     carry: true,
+    options: () => opts(MEMORY_GB, (v) => `${v} GB`),
   },
-  { key: "memoryType", yaml: "memory_type", section: "system", label: "Memory type", kind: "text", placeholder: "e.g. DDR5-6000", carry: true },
+  { key: "memoryType", yaml: "memory_type", section: "system", label: "Memory type", kind: "text", placeholder: "e.g. DDR5-6000", carry: true, options: () => opts(MEMORY_TYPES) },
   {
     key: "memoryChannels",
     yaml: "memory_channels",
@@ -141,12 +182,14 @@ export const SYSTEM_FIELDS: readonly SystemField[] = [
     // saved result is already complete when phone runs become submittable.
     suggest: (r) => (isPhoneOrTabletRun(r) ? ASSUMED_PHONE_CHANNELS : null),
     carry: true,
+    options: () => opts(Object.keys(CHANNEL_LABELS), (v) => CHANNEL_LABELS[v]),
   },
   { key: "driver", yaml: "driver", section: "system", label: "GPU driver", kind: "text", placeholder: "e.g. 561.09", carry: true, gpuSpecific: true },
-  { key: "distro", yaml: "distro", section: "system", label: "Distro", kind: "text", placeholder: "e.g. Fedora", linux: true, carry: true },
+  { key: "distro", yaml: "distro", section: "system", label: "Distro", kind: "text", placeholder: "e.g. Fedora", linux: true, carry: true, options: () => opts(DISTROS) },
   { key: "kernel", yaml: "kernel", section: "system", label: "Kernel", kind: "text", placeholder: "e.g. 6.11.4", linux: true },
   { key: "mesa", yaml: "mesa", section: "system", label: "Mesa", kind: "text", placeholder: "e.g. 24.2.5", linux: true },
-  { key: "proton", yaml: "proton", section: "system", label: "Proton", kind: "text", placeholder: "e.g. GE-Proton9-20", linux: true },
+  // Proton runs Windows games through Steam; a browser run never uses it. Kept for older results.
+  { key: "proton", yaml: "proton", section: "system", label: "Proton", kind: "text", placeholder: "e.g. GE-Proton9-20", linux: true, formHidden: true },
   {
     key: "overclocked",
     yaml: "overclocked",
