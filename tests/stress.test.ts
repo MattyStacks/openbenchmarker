@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BENCHMARK, GPU_CATALOG } from "../src/benchmark/catalog";
+import { BENCHMARK } from "../src/benchmark/catalog";
 import { toCsv, toJson, toRunYaml, toYaml } from "../src/benchmark/exporter";
 import { emptySystem, type BenchResult } from "../src/benchmark/types";
 import { validateSubmission } from "../src/benchmark/validate";
@@ -15,7 +15,7 @@ function stressResult(over: Partial<BenchResult> = {}): BenchResult {
     width: 3840, height: 2160, preset: "Extreme", durationS: 576, graphicsApi: "WebGL2", avgFps: 149.5, p1Low: 120.3, p5Low: 131, worstMs: 11.2,
     frameCount: 86112, loopBusy: 0.98, timing: "gpu-timer", valid: true, invalidReason: "", stressTest: "extreme",
     laps: LAPS.map((avgFps) => ({ avgFps, p1Low: avgFps * 0.8 })),
-    system: { ...emptySystem(), gpuId: GPU_CATALOG[0].id, os: "windows" }, ...over,
+    system: { ...emptySystem(), gpuId: "rtx_5080_16gb_fe", os: "windows" }, ...over,
   };
 }
 

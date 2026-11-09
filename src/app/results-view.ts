@@ -9,6 +9,8 @@ import {
   UPSTREAM_CATALOG_README,
   UPSTREAM_REPO,
   UPSTREAM_TEMPLATES,
+  catalogGroups,
+  catalogLabel,
   gpuRequestUrl,
 } from "../benchmark/catalog";
 import { download, gamesYamlEntry, suggestedFileName, toCsv, toJson, toRunYaml, toYaml } from "../benchmark/exporter";
@@ -27,7 +29,7 @@ import type { BenchResult, SystemInfo } from "../benchmark/types";
 import { submissionWarnings, validateSubmission } from "../benchmark/validate";
 import { $, esc } from "./dom";
 import { BATCH_MS } from "./env";
-import { deviceLine, gpuLine, isHandheld, runClass } from "./result-display";
+import { deviceLine, gpuLine, isPhoneOrTablet, runClass } from "./result-display";
 import { bindShareBox, sharePayload, shareBoxHtml } from "./share";
 import { showView } from "./shell";
 import { completedStress, lapsSectionHtml, stressCardsHtml } from "./stress-view";
@@ -171,12 +173,12 @@ export function openResult(id: string, focus: "submit" | null = null): void {
 export function renderResults(r: BenchResult): void {
   showView("results");
   const cls = runClass(r);
-  const handheld = isHandheld(cls);
+  const phone = isPhoneOrTablet(cls);
   const stress = getStressTest(r.stressTest);
   const stressDone = completedStress(r);
   const lapFps = (r.laps ?? []).map((l) => l.avgFps);
   // Stress tests show stability; they aren't submitted to the dataset.
-  const showSubmit = r.valid && !handheld && !stress;
+  const showSubmit = r.valid && !phone && !stress;
   const dev = [deviceLine(r), gpuLine(r) ? `${gpuLine(r)} (reported by browser)` : ""].filter(Boolean).join(" · ");
   const other = comparedWith(r);
   // The comparison is now on its result: the pending one (this tab) is done.
@@ -185,7 +187,9 @@ export function renderResults(r: BenchResult): void {
   const hints = showSubmit ? hintsFor(r) : null;
   const gpuOptions = [
     `<option value="">— Select your exact GPU —</option>`,
-    ...GPU_CATALOG.map((g) => `<option value="${esc(g.id)}">${esc(g.name)} (${esc(g.id)})</option>`),
+    ...catalogGroups().map(
+      (grp) => `<optgroup label="${esc(grp.label)}">${grp.gpus.map((g) => `<option value="${esc(g.id)}">${esc(catalogLabel(g))} (${esc(g.id)})</option>`).join("")}</optgroup>`,
+    ),
     `<option value="${NOT_LISTED}">My GPU isn't listed</option>`,
   ].join("");
   view.innerHTML = `
@@ -229,12 +233,12 @@ export function renderResults(r: BenchResult): void {
     ${r.valid && !shareBlocker(sharedRunFrom(r)) ? compareBoxHtml(r) : ""}
 
     ${
-      handheld && r.valid
-        ? `<p class="handheld-note">📱 Phone and tablet runs can be shared, but not submitted: the Open GPU Benchmarks dataset lists desktop and laptop GPUs.</p>
+      phone && r.valid
+        ? `<p class="handheld-note">📱 Phone and tablet runs can be shared, but not submitted: the Open GPU Benchmarks dataset lists desktop, laptop and handheld PCs.</p>
       <p class="explore-link"><a href="${OGB_SITE}" target="_blank" rel="noopener">Explore results on Open GPU Benchmarks →</a></p>`
         : ""
     }
-    ${stress && r.valid && !handheld ? `<p class="handheld-note">Stress tests show stability, so they aren't submitted to Open GPU Benchmarks. To submit, run a score run or a custom run.</p>` : ""}
+    ${stress && r.valid && !phone ? `<p class="handheld-note">Stress tests show stability, so they aren't submitted to Open GPU Benchmarks. To submit, run a score run or a custom run.</p>` : ""}
     ${showSubmit ? `<section class="submit-section" id="submit-section" aria-labelledby="submit-title">
     <h2 class="section-title" id="submit-title">Submit to Open GPU Benchmarks</h2>
     ${nudgeDismissed ? "" : `<div class="nudge" id="nudge">

@@ -1,4 +1,4 @@
-import { findGpu, UPSTREAM_REPO } from "../benchmark/catalog";
+import { catalogLabel, findGpu, UPSTREAM_REPO } from "../benchmark/catalog";
 import { download } from "../benchmark/exporter";
 import {
   BOARD_BRANDS,
@@ -6,6 +6,8 @@ import {
   boardOf,
   buildGpuId,
   catalogFile,
+  isCatalogIdShape,
+  knownProduct,
   parseGpuInfo,
   productName,
   referenceMatches,
@@ -50,7 +52,7 @@ export function gpuHelperHtml(os: CmdOs): string {
 export function gpuFileHtml(): string {
   return `<div class="gpu-file" id="gpu-file">
     <h3>Your GPU's catalog file</h3>
-    <label class="field"><span>Desktop card or laptop <em>for the file</em></span><select name="gpuFormFactor"><option value="">— Select —</option><option value="desktop">Desktop card</option><option value="laptop">Laptop</option></select></label>
+    <label class="field"><span>Desktop card, laptop or handheld <em>for the file</em></span><select name="gpuFormFactor"><option value="">— Select —</option><option value="desktop">Desktop card</option><option value="laptop">Laptop</option><option value="handheld">Handheld PC</option></select></label>
     <div data-gpu-file-body></div>
   </div>`;
 }
@@ -62,7 +64,12 @@ interface HelperState {
   formFactor: GpuFormFactor;
   maker: string;
   line: string;
+  ramGb: number | null;
 }
+
+const FF_LABEL: Record<GpuFormFactor, string> = { desktop: "Desktop card", laptop: "Laptop", handheld: "Handheld PC" };
+/** System RAM sizes handhelds ship with. */
+const HANDHELD_RAM = [12, 16, 24, 32, 48, 64];
 
 /**
  * Wires the helper. `apply` saves the built name, id and form factor into the result (and the
@@ -72,7 +79,7 @@ export function bindGpuHelper(
   root: HTMLElement,
   opts: { os: () => CmdOs; setOs: (os: CmdOs) => void; apply: (s: Partial<SystemInfo>) => void; pickListed: (id: string) => void },
 ): { renderOs: () => void } {
-  const st: HelperState = { info: null, gpu: 0, base: "", formFactor: "desktop", maker: "", line: "" };
+  const st: HelperState = { info: null, gpu: 0, base: "", formFactor: "desktop", maker: "", line: "", ramGb: null };
   const q = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
 
   const renderOs = () => {
@@ -84,6 +91,8 @@ export function bindGpuHelper(
     root.querySelectorAll<HTMLInputElement>('input[name="helper-os"]').forEach((i) => (i.checked = i.value === opts.os()));
   };
 
+  // A handheld's id needs its device name and RAM before it's worth saving.
+  const complete = (id: string) => st.formFactor !== "handheld" || (!!st.line.trim() && isCatalogIdShape(id));
   const result = q("[data-helper-result]");
   const render = () => {
     const g = st.info?.gpus[st.gpu];
@@ -91,6 +100,12 @@ export function bindGpuHelper(
       result.innerHTML = st.info
         ? `<p class="next-step tiny">No GPU found in that text. Paste everything the command printed, including the lines starting with <code>GPU:</code>.</p>`
         : `<p class="muted tiny">Paste the output above and the ID is built for you.</p>`;
+      return;
+    }
+    const known = knownProduct(g);
+    const knownGpu = known ? findGpu(known) : undefined;
+    if (knownGpu) {
+      result.innerHTML = `<p class="ok tiny">That's a <b>${esc(catalogLabel(knownGpu))}</b>, already in the catalog. <button type="button" class="btn btn-sm" data-helper-listed="${esc(knownGpu.id)}">Use it</button></p>`;
       return;
     }
     const refs = referenceMatches(g);
@@ -105,8 +120,8 @@ export function bindGpuHelper(
           ? `<label class="field"><span>Which GPU ran the benchmark?</span><select data-helper-gpu>${st.info.gpus.map((x, i) => `<option value="${i}"${i === st.gpu ? " selected" : ""}>${esc(x.name)}${x.vramGb ? ` (${x.vramGb} GB)` : ""}</option>`).join("")}</select></label>`
           : ""
       }
-      <div class="field"><span>Desktop card or laptop</span><div class="seg seg-sm" role="radiogroup" aria-label="Desktop card or laptop">${(["desktop", "laptop"] as const)
-        .map((f) => `<label><input type="radio" name="helper-ff" value="${f}"${f === st.formFactor ? " checked" : ""} /><span>${f === "desktop" ? "Desktop card" : "Laptop"}</span></label>`)
+      <div class="field"><span>Desktop card, laptop or handheld</span><div class="seg seg-sm" role="radiogroup" aria-label="Desktop card, laptop or handheld">${(["desktop", "laptop", "handheld"] as const)
+        .map((f) => `<label><input type="radio" name="helper-ff" value="${f}"${f === st.formFactor ? " checked" : ""} /><span>${FF_LABEL[f]}</span></label>`)
         .join("")}</div></div>
       <label class="field"><span>GPU and memory <em>the catalog's reference for this chip</em></span><select data-helper-base>
         ${st.base ? "" : `<option value="">— Choose —</option>`}
@@ -120,16 +135,23 @@ export function bindGpuHelper(
               ${BOARD_BRANDS.map((b) => `<option value="${b.token}"${b.token === st.maker ? " selected" : ""}>${esc(b.label)}</option>`).join("")}
             </select></label>
             ${st.maker && st.maker !== "own" ? `<label class="field"><span>Product line <em>optional, from the box</em></span><input data-helper-line value="${esc(st.line)}" placeholder="e.g. Gaming OC, Ventus 2X OC, TUF Gaming" /></label>` : ""}`
+          : st.formFactor === "handheld"
+          ? `<label class="field"><span>Device <em>as sold</em></span><input data-helper-line value="${esc(st.line)}" placeholder="e.g. ROG Ally X, Legion Go S, MSI Claw 8 AI+" /></label>
+            <label class="field"><span>System RAM <em>shared with the GPU</em></span><select data-helper-ram>
+              <option value="">— Choose —</option>
+              ${HANDHELD_RAM.map((n) => `<option value="${n}"${n === st.ramGb ? " selected" : ""}>${n} GB</option>`).join("")}
+            </select></label>`
           : `<p class="muted tiny">Laptop GPUs use the reference ID: the laptop's maker and model aren't part of it.</p>`
       }
       ${
         id
           ? `<p class="helper-id">ID: <code>${esc(id)}</code>${listed ? "" : " — filled in below"}</p>
              ${listed ? `<p class="ok tiny">It's already in the catalog as ${esc(listed.name)}. <button type="button" class="btn btn-sm" data-helper-listed="${esc(id)}">Use it</button></p>` : ""}
+             ${st.formFactor === "handheld" && (!st.line.trim() || !st.ramGb) ? `<p class="next-step tiny">Add the device name and its RAM to finish the ID.</p>` : ""}
              ${st.formFactor === "desktop" && !st.maker ? `<p class="muted tiny">Not sure who made it? <code>_reference</code> works until someone adds the exact card.</p>` : ""}`
           : `<p class="next-step tiny">Choose the GPU and memory above.</p>`
       }`;
-    if (id && !listed) opts.apply({ gpuName: productName(g.name, st), gpuIdRequested: id, gpuFormFactor: st.formFactor });
+    if (id && !listed && complete(id)) opts.apply({ gpuName: productName(g.name, st), gpuIdRequested: id, gpuFormFactor: st.formFactor });
   };
 
   const fromPaste = (text: string) => {
@@ -145,8 +167,9 @@ export function bindGpuHelper(
     st.base = referenceMatches(g).base ?? "";
     st.formFactor = st.info!.formFactor ?? (/laptop|mobile|\d+m\b/i.test(g.name) ? "laptop" : "desktop");
     const maker = boardOf(g.board);
-    st.maker = st.formFactor === "laptop" || !maker ? "" : "own" in maker ? "own" : maker.brand;
+    st.maker = st.formFactor !== "desktop" || !maker ? "" : "own" in maker ? "own" : maker.brand;
     st.line = "";
+    st.ramGb = null;
     render();
   };
 
@@ -160,6 +183,7 @@ export function bindGpuHelper(
     if (el.matches("[data-helper-base]")) st.base = el.value;
     else if (el.matches('input[name="helper-ff"]')) st.formFactor = el.value as GpuFormFactor;
     else if (el.matches("[data-helper-maker]")) st.maker = el.value;
+    else if (el.matches("[data-helper-ram]")) st.ramGb = el.value ? Number(el.value) : null;
     else if (el.matches("[data-helper-line]")) {
       // Re-rendering would steal focus from the box being typed in: update the id and fields only.
       st.line = el.value;
@@ -167,7 +191,7 @@ export function bindGpuHelper(
       const code = result.querySelector(".helper-id code");
       if (g && st.base && code) {
         code.textContent = buildGpuId(st);
-        opts.apply({ gpuName: productName(g.name, st), gpuIdRequested: buildGpuId(st), gpuFormFactor: st.formFactor });
+        if (complete(buildGpuId(st))) opts.apply({ gpuName: productName(g.name, st), gpuIdRequested: buildGpuId(st), gpuFormFactor: st.formFactor });
       }
       return;
     } else if (el.matches('input[name="helper-os"]')) {
@@ -199,10 +223,10 @@ export function bindGpuHelper(
 export function renderGpuFile(root: HTMLElement, s: Pick<SystemInfo, "gpuIdRequested" | "gpuName" | "gpuFormFactor">): void {
   const body = root.querySelector<HTMLElement>("[data-gpu-file-body]");
   if (!body) return;
-  const ff = s.gpuFormFactor === "desktop" || s.gpuFormFactor === "laptop" ? s.gpuFormFactor : null;
+  const ff = s.gpuFormFactor === "desktop" || s.gpuFormFactor === "laptop" || s.gpuFormFactor === "handheld" ? s.gpuFormFactor : null;
   const f = ff ? catalogFile(s.gpuIdRequested.trim(), s.gpuName, ff) : null;
   if (!f) {
-    body.innerHTML = `<p class="muted tiny">Fill in your GPU's name, the requested gpu_id and desktop card or laptop, and the file appears here.</p>`;
+    body.innerHTML = `<p class="muted tiny">Fill in your GPU's name, the requested gpu_id and desktop card, laptop or handheld, and the file appears here.</p>`;
     return;
   }
   const dir = f.path.slice(0, f.path.lastIndexOf("/"));

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { BENCHMARK, BENCHMARK_VERSION } from "../benchmark/catalog";
 import { browserName, isSoftwareRenderer, liveVerdict, parseBackend } from "../benchmark/diagnose";
-import { NEW_RUN_SYSTEM, carriedSystem, carrySource, isHandheldRun } from "../benchmark/fields";
+import { NEW_RUN_SYSTEM, carriedSystem, carrySource, isPhoneOrTabletRun } from "../benchmark/fields";
 import { computeRunStats, graphPoints, lapStats, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimesInto, scoreFor, type TimedBatch } from "../benchmark/metrics";
 import { STRESS_LAP_SECONDS, WARMUP_SECONDS, getPreset, getResolution, getScoreTest, getStressTest, matchesScoreTest, stressDuration } from "../benchmark/presets";
 import { PRESENT_EVERY, QUEUE_DEPTH, queueSleepMs } from "../benchmark/run-schedule";
@@ -398,8 +398,8 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       system: emptySystem(),
     };
     // A brand-new result: the details the user filled in last time (they rarely change between
-    // runs; handheld runs have no form), then registry suggestions (marked) for what's still missing.
-    const src = isHandheldRun(measured) ? undefined : carrySource(allResults());
+    // runs; phone and tablet runs have no form), then registry suggestions (marked) for what's still missing.
+    const src = isPhoneOrTabletRun(measured) ? undefined : carrySource(allResults());
     const carried = carriedSystem(src, measured);
     const copied = src && Object.values(carried).some((v) => v.trim());
     const result = withSystem(copied ? { ...measured, carriedFrom: `${src.date} ${src.time}` } : measured, { ...NEW_RUN_SYSTEM, ...carried });

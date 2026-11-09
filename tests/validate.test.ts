@@ -5,7 +5,7 @@ import { emptySystem, type BenchResult, type RunDiagnostics } from "../src/bench
 import { missingLabels, validateSubmission } from "../src/benchmark/validate";
 import { csvCells } from "./csv";
 
-const GPU = GPU_CATALOG[0].id;
+const GPU = GPU_CATALOG.find((g) => g.id === "rtx_5080_16gb_fe")!.id;
 
 function result(over: Partial<BenchResult> = {}): BenchResult {
   return {

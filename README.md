@@ -360,7 +360,11 @@ This tool feeds a public dataset, so:
   laptop `<reference>_reference` (`rtx_5090_laptop_24gb_reference`, no laptop maker or model);
   desktop `<reference>_fe` / `_reference` / `_le` for the GPU vendor's own card,
   `<reference>_<brand>_<product_line>` when the line is typed, `<reference>_<brand>_reference`
-  when only the brand is known, or `<reference>_reference`. `reference` stands in for an unknown
+  when only the brand is known, or `<reference>_reference`; handheld `<device>_<chip>_<ram>gb`
+  (`rog_ally_x_z1_extreme_24gb`, the RAM the GPU shares). The computer type is `handheld` for known
+  handheld makers and models, and Valve's Steam Machine (DMI chassis type 10, "notebook") is a
+  desktop. Valve's machines show up as plain AMD chips, so `knownProduct` maps them to their catalog
+  entries. `reference` stands in for an unknown
   variant (proposed upstream, see
   [docs/upstream-submission-changes.md](docs/upstream-submission-changes.md)). The panel also gives
   the GPU's catalog file (`data/gpus/<form_factor>/<vendor>/<id>.yaml`, with `base:` set to the
@@ -394,7 +398,7 @@ This tool feeds a public dataset, so:
 Submitting is optional, and it's up to you. Results stay in the browser unless you share, export or
 submit them. The site keeps nothing and sends nothing itself, so submitting isn't automatic: you
 submit to Open GPU Benchmarks yourself through GitHub, see exactly what's published, and decide what
-goes in it. Your GitHub username is public on the pull request. On desktop and laptop results the
+goes in it. Your GitHub username is public on the pull request. On desktop, laptop and handheld PC results the
 page shows a short, dismissible invitation to submit ("Not now" hides it; nothing is stored), and
 links to [opengpubenchmarks.com](https://opengpubenchmarks.com/) to explore the charts. Nothing
 opens on its own and there are no pop-ups.
@@ -438,7 +442,10 @@ upstream merges new cards, refresh the snapshot and release:
 npm run refresh-catalog   # optionally GITHUB_TOKEN=... to avoid rate limits
 ```
 
-The script refuses to overwrite the snapshot with an empty list.
+The script refuses to overwrite the snapshot with an empty list. Besides each product's id, name,
+vendor and form factor, it keeps the specs the results form can pre-fill (memory size and type, a
+handheld's maker, CPU, RAM speed and shipped OS), and the name and specs of every `reference/` file,
+so a GPU without a product file can still be filled in. The GPU list groups products by form factor.
 
 ## How to add a field
 
@@ -495,7 +502,7 @@ values shown, and every `#/about/<id>` link elsewhere must have a target.
 ## Phones and tablets
 
 Phones and tablets can run the benchmark, and share or compare results. They can't submit to Open
-GPU Benchmarks yet, because the dataset lists desktop and laptop GPUs (an upstream schema change is
+GPU Benchmarks yet, because the dataset lists desktop, laptop and handheld PCs, not phones (an upstream schema change is
 planned; see [docs/upstream-todos.md](docs/upstream-todos.md)). Phones can run out of memory at
 1440p and 4K, so the site asks for a one-tap confirmation before those runs and offers a lower
 resolution after a crash ([docs/high-res-memory.md](docs/high-res-memory.md)). The layout is designed

@@ -53,10 +53,10 @@ export const MAX_MEMORY_GB = 65536;
 /** Upstream MAX_MEMORY_CHANNELS. */
 export const MAX_MEMORY_CHANNELS = 32;
 /** Best guess for phones and tablets: flagship phone memory runs as four 16-bit channels. */
-export const ASSUMED_HANDHELD_CHANNELS = "4";
+export const ASSUMED_PHONE_CHANNELS = "4";
 
-/** Same rule as runClass/isHandheld in src/app/result-display.ts (kept DOM-free here). */
-export function isHandheldRun(r: Pick<BenchResult, "device" | "mobile">): boolean {
+/** Same rule as runClass/isPhoneOrTablet in src/app/result-display.ts (kept DOM-free here). */
+export function isPhoneOrTabletRun(r: Pick<BenchResult, "device" | "mobile">): boolean {
   const t = r.device?.deviceType;
   return t === "phone" || t === "tablet" || r.mobile === true;
 }
@@ -106,9 +106,9 @@ export const SYSTEM_FIELDS: readonly SystemField[] = [
     key: "gpuFormFactor",
     yaml: "gpu_form_factor",
     section: "unlisted",
-    label: "Desktop card or laptop",
+    label: "Desktop card, laptop or handheld",
     kind: "choice",
-    validate: (v) => (v === "desktop" || v === "laptop" ? null : `GPU type: '${v}' must be desktop or laptop`),
+    validate: (v) => (v === "desktop" || v === "laptop" || v === "handheld" ? null : `GPU type: '${v}' must be desktop, laptop or handheld`),
     carry: true,
     gpuSpecific: true,
   },
@@ -139,7 +139,7 @@ export const SYSTEM_FIELDS: readonly SystemField[] = [
     validate: (v) => (wholeNumber(v, MAX_MEMORY_CHANNELS) ? null : `Memory channels: '${v}' must be a whole number from 1 to ${MAX_MEMORY_CHANNELS} (2 for dual channel)`),
     // Browsers can't see how memory is wired. Phones and tablets get a marked best guess, so the
     // saved result is already complete when phone runs become submittable.
-    suggest: (r) => (isHandheldRun(r) ? ASSUMED_HANDHELD_CHANNELS : null),
+    suggest: (r) => (isPhoneOrTabletRun(r) ? ASSUMED_PHONE_CHANNELS : null),
     carry: true,
   },
   { key: "driver", yaml: "driver", section: "system", label: "GPU driver", kind: "text", placeholder: "e.g. 561.09", carry: true, gpuSpecific: true },
@@ -241,7 +241,7 @@ export const NEW_RUN_SYSTEM: Readonly<Partial<SystemInfo>> = { overclocked: "no"
  */
 export function carrySource(history: readonly BenchResult[]): BenchResult | undefined {
   return history.find(
-    (r) => !isHandheldRun(r) && SYSTEM_FIELDS.some((f) => f.carry && f.key !== "overclocked" && String(r.system?.[f.key] ?? "").trim()),
+    (r) => !isPhoneOrTabletRun(r) && SYSTEM_FIELDS.some((f) => f.carry && f.key !== "overclocked" && String(r.system?.[f.key] ?? "").trim()),
   );
 }
 

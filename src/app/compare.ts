@@ -73,9 +73,9 @@ export function deviceKind(d: SharedRun["device"]): string {
 /** Column device line: "📱 iPad · Brave (WebKit)" or "🖥 Brave 155 · Windows". */
 export function deviceSummary(r: SharedRun): string {
   const kind = deviceKind(r.device);
-  const handheld = r.device.deviceType === "phone" || r.device.deviceType === "tablet";
+  const phone = r.device.deviceType === "phone" || r.device.deviceType === "tablet";
   const browser = r.device.browser !== "other" ? browserLabel(r.device) : "";
-  if (handheld) return ["📱 " + kind, browser].filter(Boolean).join(" · ");
+  if (phone) return ["📱 " + kind, browser].filter(Boolean).join(" · ");
   const os = r.device.os !== "other" ? osLabel(r.device) : "";
   const parts = [browser, os].filter(Boolean).join(" · ");
   return parts ? `${kind ? "🖥 " : ""}${parts}` : "";

@@ -147,3 +147,26 @@ test("the share link carries the GPU and overclock filled in after the page open
   await expect(facts).toContainText("Yes: core +150 MHz, power limit 110%");
   await expect(facts).toContainText("NVIDIA GeForce RTX 5080");
 });
+
+test("handhelds: the GPU list groups them, Valve's machines are recognised, and the helper builds a handheld ID", async ({ page }) => {
+  await page.goto(`/#/result/${RESULT.id}`);
+  const form = page.locator("#sys-form");
+  const select = form.locator('[name="gpuId"]');
+  await expect(select.locator('optgroup[label="Handheld PCs"] option[value="steam_deck_lcd_16gb"]')).toHaveText(/Valve Steam Deck LCD \(16 GB\)/);
+  await expect(select.locator('optgroup[label="Desktop cards and PCs"] option[value="steam_machine_8gb_valve"]')).toHaveCount(1);
+
+  await select.selectOption("__not_listed__");
+  const helper = page.locator("#gpu-helper");
+  // Real output of the Linux command on a Steam Machine.
+  await helper.locator("[data-helper-paste]").fill("Computer type: desktop\nGPU: Navi 33 [Radeon Graphics] (8 GB) [board 1e44]");
+  await helper.getByRole("button", { name: "Use it" }).click();
+  await expect(select).toHaveValue("steam_machine_8gb_valve");
+
+  await select.selectOption("__not_listed__");
+  await helper.locator("[data-helper-paste]").fill("Computer type: handheld\nGPU: AMD Radeon RX 7600M XT (8 GB) [board 1043]");
+  await helper.locator("[data-helper-line]").fill("ROG Ally X");
+  await helper.locator("[data-helper-ram]").selectOption("24");
+  await expect(form.locator('[name="gpuIdRequested"]')).toHaveValue("rog_ally_x_rx_7600m_xt_24gb");
+  await expect(form.locator('[name="gpuFormFactor"]')).toHaveValue("handheld");
+  await expect(page.locator("#gpu-file")).toContainText("data/gpus/handheld/amd/rog_ally_x_rx_7600m_xt_24gb.yaml");
+});

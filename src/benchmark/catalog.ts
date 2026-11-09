@@ -1,10 +1,31 @@
 import snapshot from "./gpu-catalog.json";
 
-export interface CatalogGpu {
+/** Specs kept from a catalog file for pre-filling the results form; any of them may be missing. */
+export interface GpuSpecs {
+  memoryGb?: number;
+  /** GPU memory type, e.g. GDDR7, or the shared system memory of a handheld (LPDDR5). */
+  memoryType?: string;
+  /** Graphics memory is system RAM (handhelds, integrated GPUs). */
+  memoryShared?: boolean;
+  architecture?: string;
+  boostMhz?: number;
+  tdpW?: number;
+  /** A handheld's platform: maker, CPU, RAM speed (MT/s), shipped OS and screen. */
+  oem?: string;
+  cpu?: string;
+  ramMts?: number;
+  osShipped?: string;
+  display?: string;
+}
+
+export interface CatalogGpu extends GpuSpecs {
   id: string;
   name: string;
   vendor: string;
+  /** desktop, laptop, handheld or igpu (the upstream folder). */
   formFactor: string;
+  /** The reference file this product builds on, when it has one. */
+  base?: string;
 }
 
 /**
@@ -19,11 +40,36 @@ export const GPU_CATALOG: readonly CatalogGpu[] = snapshot.gpus;
  * chip and memory size, e.g. rtx_5090_laptop_24gb. Results never use them; they're the `base:` a
  * product builds on, and its id starts with them. Used to build the id of a GPU that isn't listed.
  */
-export interface ReferenceGpu {
+export interface ReferenceGpu extends GpuSpecs {
   id: string;
   vendor: string;
+  name: string;
 }
 export const GPU_REFERENCES: readonly ReferenceGpu[] = snapshot.references;
+
+/** Dropdown groups, in order: upstream form factors with the names people know them by. */
+export const FORM_FACTOR_GROUPS: readonly { formFactor: string; label: string }[] = [
+  { formFactor: "desktop", label: "Desktop cards and PCs" },
+  { formFactor: "laptop", label: "Laptop GPUs" },
+  { formFactor: "handheld", label: "Handheld PCs" },
+  { formFactor: "igpu", label: "Integrated graphics" },
+];
+
+/** How a product reads in the GPU list: its maker first for a handheld ("Valve Steam Deck LCD (16 GB)"). */
+export function catalogLabel(g: CatalogGpu): string {
+  const name = g.oem && !g.name.toLowerCase().startsWith(g.oem.toLowerCase()) ? `${g.oem} ${g.name}` : g.name;
+  return g.memoryGb && !/\b\d+\s*GB\b/i.test(name) ? `${name} (${g.memoryGb} GB)` : name;
+}
+
+/** The catalog grouped by form factor for the GPU list, in FORM_FACTOR_GROUPS order, empty groups left out. */
+export function catalogGroups(gpus: readonly CatalogGpu[] = GPU_CATALOG): { label: string; gpus: CatalogGpu[] }[] {
+  const known = FORM_FACTOR_GROUPS.map((f) => f.formFactor);
+  const groups = FORM_FACTOR_GROUPS.map((f) => ({ label: f.label, gpus: gpus.filter((g) => g.formFactor === f.formFactor) }));
+  const other = gpus.filter((g) => !known.includes(g.formFactor));
+  if (other.length) groups.push({ label: "Other", gpus: other });
+  for (const g of groups) g.gpus.sort((a, b) => catalogLabel(a).localeCompare(catalogLabel(b)));
+  return groups.filter((g) => g.gpus.length);
+}
 
 /** Sentinel for "my GPU is not in the catalog": blocks submission, never a gpu_id. */
 export const NOT_LISTED = "__not_listed__";
@@ -46,7 +92,7 @@ export function gpuRequestUrl(gpuLabel: string | null | undefined): string {
   const body = [
     "**GPU to add:** <!-- the exact product: brand, model and memory, e.g. MSI GeForce RTX 5060 Ti 16 GB Ventus 2X OC -->",
     "",
-    "**Form factor:** desktop / laptop <!-- keep one -->",
+    "**Form factor:** desktop / laptop / handheld <!-- keep one -->",
     "",
     "**Product or spec page:** <!-- optional link, helps get the details right -->",
     "",

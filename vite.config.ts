@@ -5,7 +5,7 @@ export default defineConfig({
   // Tests run in Node; a test that needs a DOM starts with `// @vitest-environment happy-dom`.
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.ts", "tests/**/*.test.mjs"],
     coverage: { provider: "v8", include: ["src/**"], reporter: ["text", "html"] },
   },
 } as never);

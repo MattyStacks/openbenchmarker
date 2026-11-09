@@ -20,8 +20,8 @@ export function runClass(r: BenchResult): RunClass {
   return "unknown";
 }
 
-/** Phone and tablet runs can't be submitted (the catalog lists desktop and laptop GPUs, and the OS must be windows or linux). */
-export function isHandheld(c: RunClass): boolean {
+/** Phone and tablet runs can't be submitted (the catalog lists desktop, laptop and handheld PCs, and the OS must be windows or linux). A handheld PC such as a Steam Deck runs a desktop browser, so it counts as desktop here. */
+export function isPhoneOrTablet(c: RunClass): boolean {
   return c === "phone" || c === "tablet" || c === "mobile";
 }
 
@@ -36,7 +36,7 @@ export function deviceLine(r: BenchResult): string {
   const c = runClass(r);
   const d = r.device;
   const knownBrowser = d && d.browser !== "other" ? browserLabel(d) : "";
-  if (isHandheld(c)) return ["📱 " + handheldName(c, d), knownBrowser].filter(Boolean).join(" · ");
+  if (isPhoneOrTablet(c)) return ["📱 " + handheldName(c, d), knownBrowser].filter(Boolean).join(" · ");
   const os = d && d.os !== "other" ? osLabel(d) : "";
   const parts = [knownBrowser, os].filter(Boolean);
   if (!parts.length) return "";
@@ -50,7 +50,7 @@ export function gpuLine(r: BenchResult): string {
 
 export type SubmissionStatus =
   | { kind: "invalid"; text: string }
-  | { kind: "handheld"; text: "" }
+  | { kind: "phone"; text: "" }
   /** Stress tests show stability; they are never submitted. */
   | { kind: "stress"; text: "" }
   | { kind: "ready"; text: string }
@@ -64,7 +64,7 @@ export type SubmissionStatus =
  */
 export function submissionStatus(r: BenchResult): SubmissionStatus {
   if (!r.valid) return { kind: "invalid", text: `Invalid: ${r.invalidReason || "unknown reason"}` };
-  if (isHandheld(runClass(r))) return { kind: "handheld", text: "" };
+  if (isPhoneOrTablet(runClass(r))) return { kind: "phone", text: "" };
   if (r.stressTest) return { kind: "stress", text: "" };
   const errs = validateSubmission(r);
   if (!errs.length)
@@ -143,6 +143,6 @@ export function tableStatus(r: BenchResult): { cls: "good" | "next" | "muted" | 
   if (s.kind === "gpu-not-listed") return { cls: "next", text: "Add your GPU →" };
   if (s.kind === "ready-unlisted") return { cls: "next", text: "⚠ GPU not listed yet" };
   if (s.kind === "next-step") return { cls: "next", text: `Needs: ${s.missing.join(", ")}` };
-  if (s.kind === "handheld" || s.kind === "stress") return { cls: "muted", text: "Share only" };
+  if (s.kind === "phone" || s.kind === "stress") return { cls: "muted", text: "Share only" };
   return { cls: "bad", text: s.text };
 }
