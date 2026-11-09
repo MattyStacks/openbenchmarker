@@ -72,13 +72,15 @@ export const BENCHMARK = BENCHMARKS[0];
  * rain streaks, height fog, skyline, a new 96 s 3D flight path) and reworked presets. The
  * workload is different, so 2.x scores aren't comparable with 1.x. Measurement is unchanged.
  * 1.1.0: no per-frame readback, Avg FPS is throughput. Not comparable with 1.0.0 scores.
+ * 4.0.0: back to 2.2.0's presets and render loop (main thread, three batches queued). 3.x's
+ * render worker starved fast GPUs on Windows (a 5080 ran at 25-55% GPU busy) and its 64-step haze
+ * on every preset made Low too heavy for phones. The canvas now updates every other display
+ * refresh: on every refresh, Edge 157 stalled at 4K (5080 High: 80 FPS instead of ~150). Same
+ * frames as 2.2.0; not comparable with 3.x scores, and the new major keeps them apart.
+ * 3.x (3.0.0-3.1.0): 64-step volumetric lighting on every preset, rendering in a worker with
+ * display-paced previews. Withdrawn by 4.0.0.
  */
-// 3.0.0: fixed 64-step volumetric lighting on every preset; separate GPU batch and CPU task budgets.
-// A different workload: do not compare scores with 2.x.
-// 3.0.1: timestamped display-paced preview; fixed rendered workload unchanged.
-// 3.1.0: heavy frames (over 8 ms GPU) keep the GPU fed between frames; same workload, but
-// GPU-limited FPS at 1080p and up can be several percent higher than 3.0.x.
-export const BENCHMARK_VERSION = "3.1.0";
+export const BENCHMARK_VERSION = "4.0.0";
 
 export function findGpu(id: string): CatalogGpu | undefined {
   return GPU_CATALOG.find((g) => g.id === id);

@@ -155,6 +155,10 @@ describe("renderer and browser parsing", () => {
 
   it("live verdict thresholds", () => {
     expect([liveVerdict(0.95), liveVerdict(0.8), liveVerdict(0.5), liveVerdict(null)]).toEqual(["gpu", "mixed", "cpu", null]);
+    // Idle JavaScript and a long wait on the GPU queue is not a CPU limit (a 5080 at 55% busy, 0.16 ms JS of 2.78 ms).
+    expect(liveVerdict(0.55, 0.06, 0.69)).toBe("driver");
+    expect(liveVerdict(0.55, 0.6, 0.2)).toBe("cpu");
+    expect(liveVerdict(0.95, 0.06, 0.69)).toBe("gpu");
   });
 
   it("flags a renderer string hidden by the browser (Brave)", () => {

@@ -184,9 +184,10 @@ describe("GPU-bound and CPU signals", () => {
   });
 
   it("live breakdown uses the recent window", () => {
-    const live = liveBreakdown([b(10, 100, { cpuMs: 20 })], 9);
+    const live = liveBreakdown([b(10, 100, { cpuMs: 20, syncMs: 50 })], 9);
     expect(live.frameMs).toBeCloseTo(10, 6);
     expect(live.cpuMs).toBeCloseTo(2, 6);
+    expect(live.syncMs).toBeCloseTo(5, 6);
     expect(live.gpuBusy).toBeCloseTo(0.9, 6);
     expect(liveBreakdown([b(10, 100)], null).gpuBusy).toBeNull();
   });

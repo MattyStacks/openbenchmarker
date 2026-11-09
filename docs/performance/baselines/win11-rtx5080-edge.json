@@ -1,0 +1,50 @@
+{
+  "machine": "win11-rtx5080-edge",
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "version": "4.0.0",
+  "recorded": "2026-11-09",
+  "configs": {
+    "Low/720p": {
+      "fps": 4744.8,
+      "timerCoverage": 0.98,
+      "osGpuBusy": 97.9,
+      "version": "4.0.0",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    },
+    "Low/4K": {
+      "fps": 810.1,
+      "timerCoverage": 0.986,
+      "osGpuBusy": 99.4,
+      "version": "4.0.0",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    },
+    "Medium/4K": {
+      "fps": 218.5,
+      "timerCoverage": 0.991,
+      "osGpuBusy": 100,
+      "version": "4.0.0",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    },
+    "High/4K": {
+      "fps": 149.7,
+      "timerCoverage": 0.969,
+      "osGpuBusy": 97.3,
+      "version": "4.0.0",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    },
+    "Ultra/4K": {
+      "fps": 106,
+      "timerCoverage": 0.992,
+      "osGpuBusy": 100,
+      "version": "4.0.0",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    },
+    "Extreme/4K": {
+      "fps": 69.3,
+      "timerCoverage": 0.943,
+      "osGpuBusy": 97.5,
+      "version": "4.0.0",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    }
+  }
+}

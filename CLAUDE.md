@@ -2,9 +2,12 @@
 
 ## Neon performance handoff
 
-For the locally tested stuttering checkpoint on `perf/neon-stutter-checkpoint`, start with
-`docs/plans/neon-stutter/STATUS.md` and `PLAN.md` in that folder. This is separate
-from Ashen Horizon. The selected version is a partial improvement, not a completed fix.
+Start with `docs/plans/neon-stutter/STATUS.md`. Benchmark 4.0.0 withdrew 3.x's render worker and
+heavier presets and restored 2.2.0's loop and workload: GPU utilization and comparable results
+come before preview smoothness. Any change to the render loop, its scheduling or the presets must
+pass `npm test` (`tests/run-schedule.test.ts`) and `npm run perf:matrix` on both the Windows 5080
+and the Linux 2080 Ti, plus a phone Low/720p check (README, "Real-GPU regression check").
+This is separate from Ashen Horizon.
 
 ## Ashen Horizon
 

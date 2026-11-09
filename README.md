@@ -30,7 +30,29 @@ npm run preview    # serve dist/ locally
 npm run deploy     # build + wrangler deploy (production)
 npm run preview:deploy -- <name>  # build + upload a preview at <name>.opengpubenchmarker.com
 npm run check:share     # after a build: every Share button must pass the link (Playwright)
+npm run perf:matrix     # real GPU: compare this machine with its baseline (see below)
 ```
+
+### Real-GPU regression check (every test machine)
+
+Unit tests can't see a real GPU, and a loop tuned on one machine can starve another: 3.1.0
+looked fine on a Linux 2080 Ti but kept a Windows RTX 5080 in Edge only 25-55% busy, and a
+browser update made 2.2.0's per-refresh canvas updates stall Edge 157 at 4K. Two layers guard
+against that:
+
+- `tests/run-schedule.test.ts` (part of `npm test`) simulates the run loop feeding GPUs from
+  0.3 to 25 ms per frame under Linux and worst-case Windows timers and main-thread hiccups,
+  and requires at least 95% GPU busy everywhere.
+- `npm run perf:matrix` runs Low/720p plus every preset at 4K in a real browser on this machine
+  (`scripts/profile-run.mjs`) and compares FPS, GPU timer coverage and the OS GPU counter
+  with `docs/performance/baselines/<machine>.json`; `-- --record` writes the baseline. Machine
+  setup (browser launch, CDP port, GPU counter command) goes in an untracked
+  `.perf-machine.json`; the format is at the top of `scripts/perf-matrix.mjs`.
+
+No change to the render loop, its scheduling or the preset workload ships until
+`perf:matrix` passes on the Windows 5080 and the Linux 2080 Ti machines and Low/720p is
+checked on a phone, all against a preview deploy. Phones can't be automated: their reference is
+in `docs/performance/baselines/phone-manual.md`.
 
 ### Testing on a phone (LAN) and preview deploys
 
@@ -143,7 +165,7 @@ and lists fixes. All of it comes from signals the browser exposes (`src/benchmar
 |---|---|
 | GPU busy % / GPU ms per frame | `EXT_disjoint_timer_query_webgl2` time per frame ÷ wall-clock |
 | JS ms per frame (scene update vs draw submission) | `performance.now()` around each frame, and around the scene update |
-| GPU wait per frame | Time spent waiting with the GPU queue full (two batches queued) |
+| GPU wait per frame | Time spent waiting with the GPU queue full (three batches queued) |
 | Browser overhead | Share of wall-clock outside render batches (`1 − loop busy`) |
 | Main-thread stalls | Yields delayed > 20 ms by other work (tabs, extensions, GC) |
 | Hitches, frame-time spread | Frames > 2.5× the median and at least 4 ms over it; standard deviation |
@@ -156,7 +178,7 @@ The verdicts:
 - **Mixed** at 75–90%.
 - Below that it is **CPU-limited** when the page's JavaScript or browser overhead dominates, or
   **Driver / browser-limited** when JS is idle but each batch still waits for the GPU. That wait
-  can include GPU execution, driver work and delayed fence notifications; it does not
+  can include GPU execution, driver work and late wake-ups or fence notifications; it does not
   identify a saturated CPU core.
 - Without GPU timers (Firefox, Safari), the verdict is estimated from the GPU wait and marked
   "est.".
@@ -182,26 +204,26 @@ The diagnosis also flags:
    creates the WebGL context, builds the city, and renders one frame right away so
    any setup failure shows up at once.
 3. A **3 s warm-up** follows. It is never counted.
-4. The **timed phase** follows. A dedicated worker owns scene updates, WebGL submission
-   and GPU queries, leaving the main thread available for the HUD and controls. Browsers
-   without the required worker/bitmap APIs use the main-thread compatibility path.
-   - **Pipelined (WebGL2):** two batches can be queued, each targeting 4 ms of GPU
-     work with a separate 8 ms CPU task budget. Batch size uses recent GPU timings,
-     or a smoothed completion window without timers. Fence notification jitter does
-     not directly feed back into the next batch size. A full queue uses bounded polling.
-   - **Presentation:** throughput is uncapped. The worker sends completed images after
-     their fences signal. Preview requests follow display callbacks, at an integer divisor
-     of refresh selected during warm-up with 10% render-throughput headroom. A short buffer
-     (at least 50 ms, longer for slow GPUs, rounded to complete preview intervals) delivers images on their target
-     display callback rather than immediately on arrival. This trades preview latency for
-     steadier motion. Changing displays recalibrates the cadence. Render FPS is not the
-     number of visible screen updates; preview handoff statistics are exported separately.
-     Browser/compositor delays and GPU throughput below the selected cadence can still
-     cause missed updates; canvas handoffs do not measure physical monitor scanout.
-   - **Batch intervals:** a batch's interval runs from the previous completion to its own.
-   - **Phase boundaries:** the worker stops submitting and waits for all outstanding
-     fences before switching phases. The main-thread compatibility path uses readback
-     to drain its queue. Warm-up/timed membership is fixed at submission.
+4. The **timed phase** follows. Frames render back-to-back in batches of about 8 ms,
+   chained over a `MessageChannel`. Batches don't wait for vsync, so the score can go well
+   above the monitor's refresh rate. The browser only shows the canvas between tasks (a
+   batch's last frame), so batches are kept short for smooth motion on screen; 2.1.0's
+   28 ms batches showed only ~35 updates a second however high the FPS.
+   - **Canvas updates:** one frame every other display refresh goes to the canvas (30 a second
+     at 60 Hz); the rest render the same work offscreen. Updating it on every refresh stalled
+     the browser's GPU pipeline until the next refresh in Edge 157 (RTX 5080 High/4K: 80 FPS,
+     52% GPU busy, against 153 FPS and 99% every other refresh).
+   - **Pipelined (WebGL2):** each batch ends with a fence, and three batches are kept queued
+     on the GPU. When one finishes, the next is already waiting, so the GPU doesn't idle while
+     the page updates the HUD, yields, or builds the next frame. While the queue is full, the
+     loop sleeps until shortly before the oldest batch is due, instead of pinning a CPU core.
+   - **Batch intervals:** a batch's interval runs from the previous batch's completion to its
+     own.
+   - **Phase boundaries:** the queue is drained with a 1-pixel `readPixels` at the warm-up→timed
+     switch and at the end, so timing starts and stops on an idle GPU. Chrome's `gl.finish()`
+     doesn't actually wait, so it isn't used. Warm-up/timed membership is fixed when a frame is
+     submitted.
+   - **WebGL1:** it has no fences, so every batch is drained with a readback.
    - **Pre-roll:** while the city is built, every material is compiled and frames are rendered
      at 16 points across the whole flight, so shader compiles and texture uploads happen
      before the warm-up rather than as hitches mid-run (a cold shader cache, e.g. the first
@@ -231,11 +253,11 @@ page flow (never fixed or sticky), so the HUD can't end up hidden under it.
 
 | Preset  | Towers | Detail | Rain    | Signs | Cars  | Lane levels | Drones | Far drones | Holos | Skyline | Clouds | Shafts | Bloom | Shadow map | MSAA | Reflections | Haze steps |
 |---------|-------:|-------:|--------:|------:|------:|------------:|-------:|-----------:|------:|--------:|-------:|-------:|------:|-----------:|-----:|------------:|-----------:|
-| Low     | 260    | 0      | 3 000   | 120   | 90    | 2           | 8      | 120        | 2     | 1       | 1      | 2      | 0.4   | –          | –    | –           | 64         |
-| Medium  | 520    | 1      | 5 000   | 260   | 200   | 3           | 16     | 300        | 4     | 2       | 1      | 4      | 0.55  | 1024       | 8    | –           | 64         |
-| High    | 900    | 2      | 8 000   | 500   | 400   | 4           | 28     | 700        | 6     | 3       | 2      | 8      | 0.6   | 2048       | 8    | –           | 64         |
-| Ultra   | 1 600  | 3      | 24 000  | 1 100 | 900   | 5           | 70     | 2 000      | 14    | 4       | 3      | 14     | 0.7   | 2048       | 8    | 1.0×        | 64         |
-| Extreme | 2 700  | 3      | 330 000 | 2 600 | 2 200 | 5           | 260    | 6 000      | 40    | 4       | 3      | 24     | 0.7   | 8192       | 8    | 1.0×        | 64         |
+| Low     | 260    | 0      | 3 000   | 120   | 90    | 2           | 8      | 120        | 2     | 1       | 1      | 2      | 0.4   | –          | –    | –           | –          |
+| Medium  | 520    | 1      | 5 000   | 260   | 200   | 3           | 16     | 300        | 4     | 2       | 1      | 4      | 0.55  | 1024       | 8    | –           | –          |
+| High    | 900    | 2      | 8 000   | 500   | 400   | 4           | 28     | 700        | 6     | 3       | 2      | 8      | 0.6   | 2048       | 8    | –           | 6          |
+| Ultra   | 1 600  | 3      | 24 000  | 1 100 | 900   | 5           | 70     | 2 000      | 14    | 4       | 3      | 14     | 0.7   | 2048       | 8    | 1.0×        | 12         |
+| Extreme | 2 700  | 3      | 330 000 | 2 600 | 2 200 | 5           | 260    | 6 000      | 40    | 4       | 3      | 24     | 0.7   | 8192       | 8    | 1.0×        | 24         |
 
 - **Towers** get the full archetype treatment (slab, tiered setback, podium + tower,
   round/octagonal, megastructure) on the lots nearest the flight; every other lot of the
@@ -252,7 +274,8 @@ page flow (never fixed or sticky), so the HUD can't end up hidden under it.
 - The shadow map is capped at the GPU's `MAX_TEXTURE_SIZE` (Extreme asks for 8192); a capped
   run says so and isn't comparable.
 - 2.2.0 rebalanced the presets to load fast GPUs about twice as hard (target on an RTX 5080
-  at 4K: Extreme ~65 FPS, Ultra ~100, High ~150, Medium ~250; these are historical 2.2.0 targets). Measured with the dev-only preset lab (`/?lab` on `npm run dev`).
+  at 4K: Extreme ~65 FPS, Ultra ~100, High ~150, Medium ~250; Low stays light enough for
+  phones). Measured with the dev-only preset lab (`/?lab` on `npm run dev`).
 - Every field is non-decreasing from Low to Extreme (a test enforces it).
 
 The streets are drawn procedurally on the ground plane on every preset, at no extra draw
@@ -270,10 +293,10 @@ frame, including shadow, reflection and post passes), v1.1.0 → v2.0.0:
 
 | Preset  | Draw calls v1 → v2 | Triangles v1 → v2      |
 |---------|-------------------:|-----------------------:|
-| Low     | 25 → 23            | 64         |
-| Medium  | 52 → 52            | 64         |
-| High    | 53 → 56            | 64         |
-| Ultra   | 103 → 96           | 64         |
+| Low     | 25 → 23            | 15 k → 92 k            |
+| Medium  | 52 → 52            | 24 k → 416 k           |
+| High    | 53 → 56            | 34 k → 1.16 M          |
+| Ultra   | 103 → 96           | 136 k → 4.14 M         |
 | Extreme | 165 → 115          | 339 k → 7.47 M         |
 
 **Camera clearance.** Nothing solid comes within 14 units (`CLEAR_SOLID`) of the camera
@@ -612,25 +635,15 @@ renderer, WebGPU adapter and timer queries the browser under test has.
 
 ## Notes on measurement
 
-- Verify the actual renderer before using performance measurements. Software renderers
-  such as SwiftShader do not measure the physical GPU. Headless browsers can use a real
-  GPU, but their presentation behavior differs from a visible browser.
-- GPU timer coverage measures timed GPU work relative to elapsed time. OS utilization
-  counters sample different scopes and intervals; they need not agree exactly.
-- Rendering runs in one dedicated worker, while the main thread handles UI. This separates
-  those workloads across threads; it does not parallelize all draw calls across CPU cores.
-  Total CPU utilization is not expected to match across machines with different core counts.
+- Headless or software (SwiftShader) numbers come from software rendering. Use them
+  to compare relative load, not real GPU performance.
+- Three batches stay queued on the GPU (WebGL2), so a GPU-limited run keeps the GPU busy close
+  to 100%. The results page reports GPU busy % from timer queries; Task Manager's GPU graph
+  should agree.
+- The browser drives the GPU from one thread (the page's main thread, plus the browser's GPU
+  process). A CPU-limited run is limited by that one thread's speed, so Task Manager shows low
+  total CPU use on many-core CPUs.
 - On the dev server, `?inflight=N` changes how many batches are queued (1 drains the GPU
   between batches, like 2.0.0). Production builds ignore it.
 - The results page shows "Loop busy %": the share of timed wall-clock time spent submitting
   frames or waiting on a full GPU queue, rather than yielding or updating the HUD.
-
-### 3.0 GPU workload
-
-Every preset now uses fixed 64-step volumetric lighting, including Low and Medium.
-This adds useful per-pixel GPU work without proportionally increasing scene-update
-CPU work. The submission queue holds two batches targeting 4 ms of GPU work each,
-while retaining the separate 8 ms CPU task budget.
-Scores are not comparable with 2.x; historical results remain readable. GPU timer
-coverage is an estimate, not an OS-wide hardware utilization counter. No preset
-can guarantee full utilization on every browser and hardware combination.

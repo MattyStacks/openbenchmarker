@@ -1,5 +1,83 @@
 # Neon stutter: status and handoff
 
+**Benchmark 4.0.0 (branch `perf/restore-2-2-core`, 2026-11-09) withdraws 3.x.** Matt's decision:
+GPU utilization and comparable results come before preview smoothness. 4.0.0 restores 2.2.0's
+render loop (main thread, three batches queued) and 2.2.0's presets, and updates the canvas every
+other display refresh. The 3.x worker/preview-pacing work below is shelved; it stays in git
+history (`c025343`, 3.1.0).
+
+## Why 3.1.0 was withdrawn, 2026-11-09 (Claude), RTX 5080, Windows 11, Edge 157
+
+All 3.x tuning was measured on one machine (2080 Ti, native Linux, 100 Hz). In production:
+- Matt's 5080 in Brave 156, Low/720p: 55.6% GPU busy, JS 0.16 ms/frame, 1.93 ms/frame waiting.
+  Labelled "limit: cpu", but the page's thread was idle; the GPU was underfed.
+- Matt's iPhone (Safari 27), Low/720p: 17-21 FPS against ~300 on 2.2.0. 3.0.0 gave every preset
+  64-step haze (Low had none). `limit: gpu`, 41.7 of 47 ms per frame waiting on the GPU.
+
+Measured here (WSL drives Windows Edge over CDP; OS counter = `nvidia-smi` steady mean, 60 Hz
+display): [neon-2026-11-09-win-5080-results.jsonl](../../performance/neon-2026-11-09-win-5080-results.jsonl).
+
+| Config (Edge 157) | 3.1.0 FPS / OS GPU | 2.2.0 FPS / OS GPU |
+|---|---|---|
+| Low/720p | 155 / 24% | 4342 / 93% |
+| Low/4K | 67 / 95% | 787 / 98% |
+| Medium/4K | 52.5 / 93% | 88.5 / 41% |
+| High/4K | 51 / 91% | 80 / 52% |
+| Ultra/4K | 42 / 85% | 80 / 76% |
+| Extreme/4K | 40 / 88% | 60.0 / 82% |
+
+3.1.0 `?mainThread` Low/720p: 595 FPS, 99.4%, so its worker path starved the GPU, not the workload.
+
+2.2.0 High/4K variants (Edge unless noted):
+
+| Variant | FPS | OS GPU |
+|---|---:|---:|
+| default (canvas every refresh, 3 batches) | 80 | 52% |
+| `nvidia-smi` polling off | 93 | – |
+| `?presentHz=1` | 150 | 99.6% |
+| `?presentHz=30` (every other refresh) | 153 | 98.7% |
+| `?presentHz=20` | 157 | 98.7% |
+| `?inflight=2` | 120 | 78% |
+| `?inflight=1` | **60.0** | 40% |
+| Brave 156, default | 146.5 | 93.5% |
+
+Findings:
+1. **Canvas updates on every refresh stall Edge 157's GPU pipeline until the next refresh.** One
+   batch queued locks to exactly 60.0 FPS; a deeper queue only partly hides it. Every other refresh
+   removes it. Brave 156 barely stalls, so a browser update changed this: 2.2.0 had ~150 on High/4K
+   in October. 4.0.0 updates the canvas every other refresh (`PRESENT_EVERY` in
+   `src/benchmark/run-schedule.ts`).
+2. **Timers are not the cause here.** Edge 157 `setTimeout` from a message task, idle page: median
+   0.5-1 ms late, max 2.6 ms, main thread and worker alike. The Windows worst case (15.6 ms system
+   tick) stays in `tests/run-schedule.test.ts` as a robustness guard only.
+3. **Not a CPU limit.** JS was 0.1-0.9 ms/frame on every run. One WebGL context's commands go through
+   one pipeline (page thread → command buffer → browser GPU-process thread → ANGLE/D3D11 → driver);
+   more cores can't split it, and a worker doesn't either (3.x). The HUD now says "DRIVER / BROWSER",
+   not "CPU", when the page's JavaScript is idle and the loop waits on the GPU.
+
+**4.0.0 on the 5080** (Edge 157, `npm run perf:matrix -- --record`, now the baseline in
+[`baselines/win11-rtx5080-edge.json`](../../performance/baselines/win11-rtx5080-edge.json)):
+
+| Config | FPS | Timer | OS GPU | 2.2.0 target (Oct) |
+|---|---:|---:|---:|---:|
+| Low/720p | 4745 | 98.0% | 97.9% | – |
+| Low/4K | 810 | 98.6% | 99.4% | ~740 |
+| Medium/4K | 218.5 | 99.1% | 100% | ~195 |
+| High/4K | 149.7 | 96.9% | 97.3% | ~150 |
+| Ultra/4K | 106 | 99.2% | 100% | ~100 |
+| Extreme/4K | 69.3 | 94.3% | 97.5% | 60–70 |
+
+Checks: 307 unit tests, build, 7 e2e (7 GPU e2e skipped: no configured GPU browser), 30 share checks.
+
+**Release rule:** no change to the render loop, its scheduling or the presets ships until
+`npm run perf:matrix` passes on the Windows 5080 and the Linux 2080 Ti and Low/720p is checked on a
+phone (`docs/performance/baselines/`), against a preview deploy.
+
+Open: the 2080 Ti/Linux baseline for 4.0.0 (Matt runs `npm run perf:matrix -- --record` there);
+phone check; whether 144/240 Hz displays need a larger `PRESENT_EVERY`.
+
+---
+
 **Released 2026-11-08 as benchmark 3.1.0** (main + production) after Matt tested the
 `neon-stutter-2` preview. `perf/neon-cpu-overhead` (`2607a6f`, 3.0.2) was not merged and remains
 untested; don't merge it blindly. Remaining work: frames of 14–20 ms GPU, other machines and refresh rates.

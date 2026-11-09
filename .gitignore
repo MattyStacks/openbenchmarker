@@ -158,3 +158,6 @@ shots/
 /test-results/
 /playwright-report/
 /blob-report/
+
+# Per-machine perf-matrix setup (scripts/perf-matrix.mjs)
+.perf-machine.json

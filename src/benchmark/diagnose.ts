@@ -261,7 +261,14 @@ export function diagnose(r: BenchResult): Diagnosis {
 }
 
 /** Live HUD classification from a rolling GPU-busy estimate. */
-export function liveVerdict(gpuBusy: number | null): "gpu" | "cpu" | "mixed" | null {
+/**
+ * The HUD's live limit. Below CPU_BOUND it is "driver" when the page's JavaScript was mostly idle
+ * and the loop waited on a full GPU queue (as on the results page): a fast CPU can show low GPU
+ * busy without the CPU being the limit. jsShare and waitShare are fractions of frame time.
+ */
+export function liveVerdict(gpuBusy: number | null, jsShare = 1, waitShare = 0): "gpu" | "cpu" | "mixed" | "driver" | null {
   if (gpuBusy === null) return null;
-  return gpuBusy >= GPU_BOUND ? "gpu" : gpuBusy >= CPU_BOUND ? "mixed" : "cpu";
+  if (gpuBusy >= GPU_BOUND) return "gpu";
+  if (gpuBusy >= CPU_BOUND) return "mixed";
+  return jsShare < 0.5 && waitShare >= 0.35 ? "driver" : "cpu";
 }

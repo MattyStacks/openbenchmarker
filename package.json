@@ -22,6 +22,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "check:share": "node scripts/check-share.mjs",
+    "perf:matrix": "node scripts/perf-matrix.mjs",
     "deploy": "npm run build && wrangler deploy",
     "preview:deploy": "npm run build && wrangler preview --name",
     "refresh-catalog": "node scripts/refresh-catalog.mjs"

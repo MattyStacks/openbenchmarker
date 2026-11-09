@@ -307,16 +307,17 @@ export function liveBreakdown(
   batches: readonly TimedBatch[],
   recentGpuMs: number | null,
   windowMs = 1000,
-): { frameMs: number; cpuMs: number; gpuBusy: number | null } {
-  let ms = 0, n = 0, cpu = 0;
+): { frameMs: number; cpuMs: number; syncMs: number; gpuBusy: number | null } {
+  let ms = 0, n = 0, cpu = 0, sync = 0;
   for (let i = batches.length - 1; i >= 0 && ms < windowMs; i--) {
     ms += batches[i].ms;
     n += batches[i].frames;
     cpu += batches[i].cpuMs ?? 0;
+    sync += batches[i].syncMs ?? 0;
   }
-  if (n === 0) return { frameMs: 0, cpuMs: 0, gpuBusy: null };
+  if (n === 0) return { frameMs: 0, cpuMs: 0, syncMs: 0, gpuBusy: null };
   const frameMs = ms / n;
-  return { frameMs, cpuMs: cpu / n, gpuBusy: recentGpuMs !== null && frameMs > 0 ? Math.min(1, recentGpuMs / frameMs) : null };
+  return { frameMs, cpuMs: cpu / n, syncMs: sync / n, gpuBusy: recentGpuMs !== null && frameMs > 0 ? Math.min(1, recentGpuMs / frameMs) : null };
 }
 
 /**
