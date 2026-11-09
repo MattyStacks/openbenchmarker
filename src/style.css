@@ -516,6 +516,8 @@ table.history { width: 100%; border-collapse: collapse; font-size: 14px; }
 .show-more { width: 100%; min-height: 48px; margin-top: 12px; }
 .hist-footer { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 8px; }
 .hist-footer .btn { min-height: 44px; }
+.yaml-all { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.yaml-all label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .linklike { font: inherit; color: var(--cyan); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; min-height: 0; }
 .empty-state { display: grid; gap: 14px; margin: 18px 0; }
 

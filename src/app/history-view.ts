@@ -1,5 +1,6 @@
 import { BENCHMARK_VERSION, NOT_LISTED, findGpu } from "../benchmark/catalog";
-import { download, suggestedFileName, toCsv, toJson, toYaml } from "../benchmark/exporter";
+import { download, suggestedFileName, toCsv, toDraftYaml, toJson, toYaml } from "../benchmark/exporter";
+import { yamlArchive } from "../benchmark/yaml-archive";
 import { VERDICT_LABEL, diagnose } from "../benchmark/diagnose";
 import { round1 } from "../benchmark/metrics";
 import { getScoreTest, getStressTest } from "../benchmark/presets";
@@ -122,7 +123,8 @@ function card(r: BenchResult): string {
           ${canShare(r) ? `<button type="button" data-act="code">Copy code</button>` : ""}
           <button type="button" data-act="json">Export JSON</button>
           <button type="button" data-act="csv">Export CSV</button>
-          ${yamlOk ? `<button type="button" data-act="yaml">Download YAML</button><button type="button" data-act="submit">Submit…</button>` : ""}
+          ${r.valid ? `<button type="button" data-act="yaml">Download YAML</button>` : ""}
+          ${yamlOk ? `<button type="button" data-act="submit">Submit…</button>` : ""}
           <button type="button" class="danger" data-act="delete">Delete</button>
         </div>
       </details>
@@ -251,6 +253,7 @@ export function renderHistory(): void {
     ${all.length ? toolbar(all) : ""}
     <div id="hist-list"></div>
     <div class="hist-footer">
+      ${all.some((r) => r.valid) ? `<div class="yaml-all"><button type="button" class="btn" data-act="yaml-all">Download all as YAML (.zip)</button><label class="tiny"><input type="checkbox" data-yaml-ready-only /> Only results ready to submit</label></div>` : ""}
       ${all.length ? `<button type="button" class="btn" data-act="csv-all">Export all as CSV</button>` : ""}
       ${all.length ? `<button type="button" class="linklike view-link" data-hist-view="${state.view === "table" ? "cards" : "table"}">${state.view === "table" ? "Card view" : "Table view"}</button>` : ""}
       <button type="button" class="btn danger" data-act="clear-all">Clear my saved results</button>
@@ -323,7 +326,7 @@ export function renderHistory(): void {
       });
     } else if (act === "json" && r) download(suggestedFileName(r, "json"), toJson(r), "application/json");
     else if (act === "csv" && r) download(suggestedFileName(r, "csv"), toCsv([r]), "text/csv");
-    else if (act === "yaml" && r && canExportYaml(r)) download(suggestedFileName(r, "yaml"), toYaml(r), "application/x-yaml");
+    else if (act === "yaml" && r && r.valid) download(suggestedFileName(r, "yaml"), canExportYaml(r) ? toYaml(r) : toDraftYaml(r), "application/x-yaml");
     else if (act === "submit" && r) openResult(r.id, "submit");
     else if (act === "delete" && r) {
       if (!confirm("Delete this result from this browser?")) return;
@@ -340,6 +343,16 @@ export function renderHistory(): void {
       state.shown = PAGE;
       renderHistory();
     } else if (act === "csv-all") download("openbenchmarker_results.csv", toCsv(allResults()), "text/csv");
+    else if (act === "yaml-all") {
+      const readyOnly = !!view.querySelector<HTMLInputElement>("[data-yaml-ready-only]")?.checked;
+      const a = yamlArchive(allResults(), { readyOnly });
+      if (!a.entries.length) {
+        btn.textContent = "No results ready to submit";
+        setTimeout(() => (btn.textContent = "Download all as YAML (.zip)"), 2500);
+        return;
+      }
+      download(a.fileName, a.bytes, "application/zip");
+    }
     else if (act === "clear-all") {
       const n = allResults().length;
       if (!confirm(`Delete all ${n} saved result${n === 1 ? "" : "s"} from this browser? This can't be undone. Results you already shared or submitted aren't affected.`)) return;
