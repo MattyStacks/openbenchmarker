@@ -264,9 +264,12 @@ export function toJson(r: BenchResult): string {
   const diagnosis = r.diag ? diagnose(r) : undefined;
   // The compared-with run belongs to someone else (or another session): not part of this export.
   // Where the system details were copied from is only for the form's note.
-  const { challenge: _compared, carriedFrom: _carried, ...own } = r;
+  // The extra browser signals only feed the form's guesses: the fields the user kept are exported.
+  const { challenge: _compared, carriedFrom: _carried, probe: _probe, guessed: _guessed, ...own } = r;
   void _compared;
   void _carried;
+  void _probe;
+  void _guessed;
   const stab = r.stressTest ? stability(r.laps ?? []) : null;
   return JSON.stringify({ ...own, ...(stab !== null ? { stabilityPct: pct1(stab) } : {}), diagnosis, submittable: errors.length === 0, blockingIssues: errors }, null, 2) + "\n";
 }

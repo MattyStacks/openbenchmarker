@@ -1,3 +1,5 @@
+import { probeSystem } from "./probe";
+import { applyGuesses } from "../benchmark/guess";
 import * as THREE from "three";
 import { BENCHMARK, BENCHMARK_VERSION } from "../benchmark/catalog";
 import { browserName, isSoftwareRenderer, liveVerdict, parseBackend } from "../benchmark/diagnose";
@@ -5,7 +7,7 @@ import { NEW_RUN_SYSTEM, carriedSystem, carrySource, isPhoneOrTabletRun } from "
 import { computeRunStats, graphPoints, lapStats, liveBatchFps, liveBreakdown, lowFpsSelect, nextBatchFrames, runFrameTimesInto, scoreFor, type TimedBatch } from "../benchmark/metrics";
 import { STRESS_LAP_SECONDS, WARMUP_SECONDS, getPreset, getResolution, getScoreTest, getStressTest, matchesScoreTest, stressDuration } from "../benchmark/presets";
 import { PRESENT_EVERY, QUEUE_DEPTH, queueSleepMs } from "../benchmark/run-schedule";
-import { emptySystem, type BenchResult, type GraphicsApi, type RunDiagnostics } from "../benchmark/types";
+import { emptySystem, type BenchResult, type GraphicsApi, type RunDiagnostics, type SystemProbe } from "../benchmark/types";
 import { makeFlythrough, type Flythrough } from "../engine/scenes";
 import { $, esc, nextFrame } from "./dom";
 import { BATCH_MS, MOBILE } from "./env";
@@ -194,6 +196,9 @@ export async function startRun(cfg: RunConfig): Promise<void> {
   // Display/sharing only. The async read (navigator.brave.isBrave(), high-entropy platform) resolves before warm-up ends.
   let device = detectDeviceContext(info.renderer, info.vendor);
   void detectDeviceContextAsync(info.renderer, info.vendor).then((d) => (device = d));
+  // Extra signals for the results form's best guesses; never delays the run.
+  let probe: SystemProbe | undefined;
+  void probeSystem().then((p) => (probe = p)).catch(() => undefined);
 
   const px = new Uint8Array(4);
   const timed: TimedBatch[] = [];
@@ -395,6 +400,7 @@ export async function startRun(cfg: RunConfig): Promise<void> {
       ...(cfg.challenge ? { challenge: cfg.challenge } : {}),
       diag,
       device,
+      ...(probe ? { probe } : {}),
       system: emptySystem(),
     };
     // A brand-new result: the details the user filled in last time (they rarely change between
@@ -402,7 +408,9 @@ export async function startRun(cfg: RunConfig): Promise<void> {
     const src = isPhoneOrTabletRun(measured) ? undefined : carrySource(allResults());
     const carried = carriedSystem(src, measured);
     const copied = src && Object.values(carried).some((v) => v.trim());
-    const result = withSystem(copied ? { ...measured, carriedFrom: `${src.date} ${src.time}` } : measured, { ...NEW_RUN_SYSTEM, ...carried });
+    const completed = withSystem(copied ? { ...measured, carriedFrom: `${src.date} ${src.time}` } : measured, { ...NEW_RUN_SYSTEM, ...carried });
+    // Then best guesses from the browser for what's still blank (marked, never over the user's values).
+    const result = isPhoneOrTabletRun(measured) ? completed : applyGuesses(completed);
     upsertResult(result);
     if (valid) markFinished(resolution, preset.id);
     cleanup();

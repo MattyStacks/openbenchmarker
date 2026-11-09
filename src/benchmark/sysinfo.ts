@@ -169,3 +169,48 @@ export const SYSINFO_COMMANDS: Record<"windows" | "linux", OsCommands> = {
 export function commandsFor(os: string): OsCommands | null {
   return os === "windows" || os === "linux" ? SYSINFO_COMMANDS[os] : null;
 }
+
+/**
+ * Reads what the "everything at once" command printed (pasted by the user; the page never runs it):
+ * the labelled lines above, on Windows or Linux. Blank or missing values are left out, so a lookup
+ * that needed sudo and printed nothing doesn't clear a field. The GPU lines go through
+ * parseGpuInfo (src/benchmark/gpu-id.ts) separately.
+ */
+export function parseSysinfoPaste(text: string): Partial<SystemInfo> {
+  const lines = String(text ?? "").split(/\r?\n/);
+  const get = (label: RegExp): string => {
+    for (const l of lines) {
+      const m = label.exec(l);
+      if (m) return l.slice(m[0].length).trim();
+    }
+    return "";
+  };
+  const out: Partial<SystemInfo> = {};
+  const put = (k: keyof SystemInfo, v: string) => {
+    if (v) out[k] = v;
+  };
+  const osVersion = get(/^\s*OS version:/i);
+  const distro = get(/^\s*Distro:/i);
+  const kernel = get(/^\s*Kernel:/i);
+  const mesa = /^\d+\.\d+(\.\d+)?$/.exec(get(/^\s*Mesa \(AMD\/Intel driver\):/i))?.[0] ?? "";
+  const linux = !!(distro || kernel) || /linux|steamos|ubuntu|fedora|arch|debian|mint|bazzite|cachyos|pop!_os|opensuse/i.test(osVersion);
+  if (/windows/i.test(osVersion)) out.os = "windows";
+  else if (linux) out.os = "linux";
+  put("osDetail", osVersion);
+  put("cpu", get(/^\s*CPU:/i));
+  put("memoryGb", /^\d+$/.exec(get(/^\s*Memory \(GB\):/i))?.[0] ?? "");
+  put("memoryType", /^(LP)?DDR\d+X?-\d{3,5}$/i.exec(get(/^\s*Memory type:/i))?.[0].toUpperCase() ?? "");
+  // The driver line for the GPU that's there: NVIDIA's own number, AMD's Adrenalin or Intel's version
+  // ("AMD Radeon RX 9070 XT: 25.10.1" gives 25.10.1), or Mesa on Linux.
+  const nvidia = get(/^\s*GPU driver \(NVIDIA\):/i);
+  const vendorDriver = (label: RegExp) => get(label).split(": ").pop()?.trim() ?? "";
+  const driver = nvidia || vendorDriver(/^\s*GPU driver \(AMD\):/i) || vendorDriver(/^\s*GPU driver \(Intel\):/i) || (mesa ? `Mesa ${mesa}` : "");
+  put("driver", driver);
+  if (out.os === "linux") {
+    put("distro", distro);
+    put("kernel", kernel);
+    // Mesa isn't the driver on NVIDIA's proprietary driver.
+    if (!nvidia) put("mesa", mesa);
+  }
+  return out;
+}
