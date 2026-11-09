@@ -1,6 +1,6 @@
 # Neon stutter: status and handoff
 
-**Benchmark 4.0.0 (branch `perf/restore-2-2-core`, 2026-11-09) withdraws 3.x.** Matt's decision:
+**Benchmark 4.0.0 (released 2026-11-09: main + production, from `perf/restore-2-2-core`) withdraws 3.x.** Matt's decision:
 GPU utilization and comparable results come before preview smoothness. 4.0.0 restores 2.2.0's
 render loop (main thread, three batches queued) and 2.2.0's presets, and updates the canvas every
 other display refresh. The 3.x worker/preview-pacing work below is shelved; it stays in git
