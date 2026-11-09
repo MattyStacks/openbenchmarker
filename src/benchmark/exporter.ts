@@ -4,7 +4,7 @@ import { round1, stability } from "./metrics";
 import { WARMUP_SECONDS } from "./presets";
 import { OVERCLOCK_FIELDS, SYSTEM_FIELDS, fieldApplies, submittedGpuId, type SystemField } from "./fields";
 import type { BenchResult } from "./types";
-import { PROOF_METHOD, validateSubmission } from "./validate";
+import { PROOF_METHOD, missingLabels, validateSubmission } from "./validate";
 
 const q = (s: string) => JSON.stringify(s); // JSON strings are valid YAML double-quoted scalars
 
@@ -90,7 +90,7 @@ function overclockLines(r: BenchResult): string[] {
   return lines.length ? [`overclock: # as set in the submitter's tuning tool`, ...lines] : [];
 }
 
-/** Stress test, stability and every lap. Only in run reports: stress runs are never submitted. */
+/** Stress test, stability and every lap. Only in drafts: stress runs are never submitted. */
 function stressLines(r: BenchResult): string[] {
   if (!r.stressTest) return [];
   const laps = r.laps ?? [];
@@ -103,50 +103,46 @@ function stressLines(r: BenchResult): string[] {
   ];
 }
 
-/**
- * Run report YAML for results that can't be submitted (stress tests): the same result, run details
- * and detected values as a submission, for pasting into a bug report or chat. Not for upstream.
- */
-export function toRunYaml(r: BenchResult): string {
-  const lines = [
-    `# Run report from Open GPU Benchmarker ${r.benchmarkVersion} (https://opengpubenchmarker.com/), benchmark "${BENCHMARK.name}". Not a submission.`,
-    `game_id: ${r.gameId}`,
-    `date: ${q(r.date)}`,
-    `version: ${q(r.benchmarkVersion)}`,
-    `valid: ${r.valid}`,
-    ...(r.valid ? [] : [`invalid_reason: ${q(r.invalidReason)}`]),
-    `result:`,
-    `  - resolution: ${q(r.resolution)}`,
-    `    time: ${q(r.time)}`,
-    `    graphics_preset: ${q(r.preset)}`,
-    `    avg_fps: ${round1(r.avgFps)}`,
-    `    p1_low: ${round1(r.p1Low)}`,
-    `    p5_low: ${round1(r.p5Low)}`,
-    `    duration: ${r.durationS}`,
-    `    frame_count: ${r.frameCount}`,
-    ...stressLines(r),
-    ...runDetailLines(r),
-    `graphics_api: ${r.graphicsApi}`,
-    ...detectedLines(r),
-  ];
-  return lines.join("\n") + "\n";
-}
-
 /** Upstream submission YAML (block style only). Throws if the result does not validate. */
 export function toYaml(r: BenchResult): string {
   const errors = validateSubmission(r);
   if (errors.length) throw new Error(`Not submittable: ${errors.join("; ")}`);
   const s = r.system;
   const gpuId = submittedGpuId(s);
-  const lines = [
-    `# Captured by Open GPU Benchmarker ${r.benchmarkVersion} (https://opengpubenchmarker.com/), benchmark "${BENCHMARK.name}".`,
-    `# Timed in the browser: Avg FPS = frames / wall-clock; lows from ${r.timing === "gpu-timer" ? "GPU timer queries" : "per-batch frame times"}. Hardware fields under system: were entered by the submitter; detected: was read from the browser.`,
+  return submissionYaml(r, [
     `# Save as data/community/${gpuId}/${suggestedFileName(r, "yaml")} in a PR to ${UPSTREAM_REPO}`,
     `# Submitted data is public under CC BY 4.0 (data/LICENSE) and cannot be taken back.`,
     ...(s.gpuId === NOT_LISTED
       ? [`# This GPU isn't in the catalog yet: add data/gpus entry ${gpuId} for ${q(s.gpuName.trim())} first or in the same PR, or the checks fail.`]
       : []),
-    `gpu_id: ${gpuId}`,
+  ]);
+}
+
+/**
+ * Any saved result in the submission layout, ready or not: for keeping your own results and for
+ * finishing them later. What's missing is said at the top, and blank required fields stay blank,
+ * so the upstream checks catch a draft that's submitted as it is. Invalid runs say so.
+ */
+export function toDraftYaml(r: BenchResult): string {
+  const errors = validateSubmission(r);
+  if (!errors.length && r.valid && !r.stressTest) return toYaml(r);
+  const missing = missingLabels(errors);
+  const why = !r.valid
+    ? `the run was invalid (${r.invalidReason || "unknown reason"})`
+    : r.stressTest
+      ? "stress tests show stability and aren't submitted"
+      : `it still needs ${missing.join(", ")}`;
+  return submissionYaml(r, [`# Not ready to submit: ${why}. Kept in the submission layout so you can finish it later.`]);
+}
+
+function submissionYaml(r: BenchResult, notes: string[]): string {
+  const s = r.system;
+  const gpuId = submittedGpuId(s);
+  const lines = [
+    `# Captured by Open GPU Benchmarker ${r.benchmarkVersion} (https://opengpubenchmarker.com/), benchmark "${BENCHMARK.name}".`,
+    `# Timed in the browser: Avg FPS = frames / wall-clock; lows from ${r.timing === "gpu-timer" ? "GPU timer queries" : "per-batch frame times"}. Hardware fields under system: were entered by the submitter; detected: was read from the browser.`,
+    ...notes,
+    `gpu_id: ${gpuId || q("")}`,
     `game_id: ${r.gameId}`,
     `date: ${q(r.date)}`,
     `version: ${q(r.benchmarkVersion)}`,
@@ -162,6 +158,7 @@ export function toYaml(r: BenchResult): string {
     `    p5_low: ${round1(r.p5Low)}`,
     `    duration: ${r.durationS}`,
     `    frame_count: ${r.frameCount}`,
+    ...stressLines(r),
     ...runDetailLines(r),
     `system:`,
   ];
@@ -278,8 +275,8 @@ export function suggestedFileName(r: BenchResult, ext: "yaml" | "json" | "csv"):
   return `result_${r.date.replace(/-/g, "")}_${r.gameId}.${ext}`;
 }
 
-export function download(fileName: string, text: string, mime: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type: mime }));
+export function download(fileName: string, data: string | Uint8Array, mime: string): void {
+  const url = URL.createObjectURL(new Blob([data as BlobPart], { type: mime }));
   const a = document.createElement("a");
   a.href = url;
   a.download = fileName;

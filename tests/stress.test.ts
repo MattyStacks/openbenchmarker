@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BENCHMARK } from "../src/benchmark/catalog";
-import { toCsv, toJson, toRunYaml, toYaml } from "../src/benchmark/exporter";
+import { toCsv, toDraftYaml, toJson, toYaml } from "../src/benchmark/exporter";
 import { emptySystem, type BenchResult } from "../src/benchmark/types";
 import { validateSubmission } from "../src/benchmark/validate";
 import { submissionStatus, tableStatus } from "../src/app/result-display";
@@ -37,13 +37,13 @@ describe("stress results", () => {
     expect(tableStatus(stressResult())).toEqual({ cls: "muted", text: "Share only" });
   });
 
-  it("export stability and every lap in the run report, JSON and CSV", () => {
-    const y = toRunYaml(stressResult());
-    expect(y).toMatch(/Not a submission/);
+  it("export stability and every lap in the YAML draft, JSON and CSV", () => {
+    const y = toDraftYaml(stressResult());
+    expect(y).toMatch(/^# Not ready to submit: stress tests show stability and aren't submitted\./m);
     expect(y).toMatch(/^ {4}stress_test: extreme$/m);
     expect(y).toMatch(/^ {4}stability_pct: 96\.4$/m);
     expect(y).toMatch(/^ {6}- \{ lap: 6, avg_fps: 146\.7, p1_low: 117\.4 \}$/m);
-    expect(y).toMatch(/^graphics_api: WebGL2$/m);
+    expect(y).toMatch(/^ {2}graphics_api: WebGL2 #/m);
     expect(JSON.parse(toJson(stressResult())).stabilityPct).toBe(96.4);
     const [head, row] = toCsv([stressResult()]).trim().split("\n").map(csvCells);
     const col = (k: string) => row[head.indexOf(k)];
