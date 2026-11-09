@@ -148,8 +148,8 @@ Two long locked runs for sustained performance (thermal throttling, power limits
 - A browser can't read temperatures or clocks, so the verdict comes from frame rates alone.
 - Stress runs are saved, shared (the link carries every lap, see
   [docs/share-links.md](docs/share-links.md)) and compared like other runs, but **never
-  submitted** to Open GPU Benchmarks: their average includes throttled laps. "Copy run report
-  (YAML)" gives the same details for pasting.
+  submitted** to Open GPU Benchmarks: their average includes throttled laps. "Download YAML" and
+  "Copy YAML" give the same details in the submission layout, marked as not ready to submit.
 - The run keeps the screen awake (Screen Wake Lock API, every run), and the crash record notes
   each finished lap, so a phone that shuts the page down from heat says how far it got.
 - Dev server only: `?laps=N` runs a stress test with N laps for testing; the result doesn't
@@ -407,6 +407,16 @@ Besides the upstream fields, each result item carries run details. These are the
 the browser-read values, and there is an optional top-level `overclocked`. Upstream accepts these
 today without validating them. `docs/upstream-submission-changes.md` spells out the
 `checks.py`/template changes that make them first-class.
+
+**Download all as YAML (.zip)** on My Results saves every valid result as its own YAML file, in
+one zip (`src/benchmark/yaml-archive.ts`, written by the dependency-free `src/benchmark/zip.ts`).
+Results ready to submit go in `data/community/<gpu_id>/result_YYYYMMDD_<game_id>[_n].yaml`, the
+upstream layout, so the zip can be unzipped straight into a checkout. Everything else goes in
+`not-ready/` in the same layout: phone and stress runs, results still missing a required field, and
+GPUs not in the catalog yet. Each of those files says at the top what it still needs, and its
+required fields stay blank so the upstream checks catch it. `README.txt` lists every file and its
+status. Invalid runs are left out, and a checkbox keeps only the ready ones. Any valid result can
+also be downloaded on its own as YAML from its menu, ready or not.
 
 The first PR that uses this benchmark must also add it to upstream `data/games.yaml`:
 

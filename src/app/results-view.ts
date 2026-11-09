@@ -11,7 +11,7 @@ import {
   UPSTREAM_TEMPLATES,
   gpuRequestUrl,
 } from "../benchmark/catalog";
-import { download, gamesYamlEntry, suggestedFileName, toCsv, toJson, toRunYaml, toYaml } from "../benchmark/exporter";
+import { download, gamesYamlEntry, suggestedFileName, toCsv, toDraftYaml, toJson, toYaml } from "../benchmark/exporter";
 import { VERDICT_LABEL, diagnose, isMaskedRenderer } from "../benchmark/diagnose";
 import { round1 } from "../benchmark/metrics";
 import { getScoreTest, getStressTest } from "../benchmark/presets";
@@ -223,7 +223,7 @@ export function renderResults(r: BenchResult): void {
       <div class="row export-row">
         <button type="button" class="btn" id="exp-json">Export JSON</button>
         <button type="button" class="btn" id="exp-csv">Export CSV</button>
-        ${showSubmit ? "" : `<button type="button" class="btn" id="copy-report">Copy run report (YAML)</button><span class="muted tiny" id="copy-report-status" role="status"></span>`}
+        ${showSubmit || !r.valid ? "" : `<button type="button" class="btn" id="draft-yaml">Download YAML</button><button type="button" class="btn" id="copy-report">Copy YAML</button><span class="muted tiny" id="copy-report-status" role="status"></span>`}
       </div>
     </details>
     ${r.valid && !shareBlocker(sharedRunFrom(r)) ? compareBoxHtml(r) : ""}
@@ -334,15 +334,18 @@ export function renderResults(r: BenchResult): void {
   if (shareBox) bindShareBox(shareBox, () => sharedRunFrom(r));
   $("#exp-json").onclick = () => download(suggestedFileName(r, "json"), toJson(r), "application/json");
   $("#exp-csv").onclick = () => download(suggestedFileName(r, "csv"), toCsv([r]), "text/csv");
+  // Results that aren't submitted here (phones, stress tests): the same YAML layout, saying what's missing.
+  const draft = view.querySelector<HTMLButtonElement>("#draft-yaml");
+  if (draft) draft.onclick = () => download(suggestedFileName(r, "yaml"), toDraftYaml(r), "application/x-yaml");
   const report = view.querySelector<HTMLButtonElement>("#copy-report");
-  // Plain HTTP (LAN testing) has no clipboard: download the report instead.
+  // Plain HTTP (LAN testing) has no clipboard: download it instead.
   if (report)
     report.onclick = async () => {
       try {
-        await navigator.clipboard.writeText(toRunYaml(r));
+        await navigator.clipboard.writeText(toDraftYaml(r));
         $("#copy-report-status").textContent = "Copied ✓";
       } catch {
-        download(suggestedFileName(r, "yaml"), toRunYaml(r), "application/x-yaml");
+        download(suggestedFileName(r, "yaml"), toDraftYaml(r), "application/x-yaml");
       }
     };
   const focus = pendingFocus;
