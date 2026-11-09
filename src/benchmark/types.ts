@@ -24,6 +24,26 @@ export interface DeviceContext {
   gpuLabel: string | null;
 }
 
+/**
+ * What the browser exposes about the machine beyond the WebGL renderer, read once at run start
+ * (src/app/probe.ts) so a result opened on another device still has the guesses of the machine
+ * that ran it. Every field is null when the browser doesn't offer it. Local only: never shared,
+ * submitted or exported as such (the fields the user confirms are).
+ */
+export interface SystemProbe {
+  /** UA Client Hints (Chromium only): platformVersion ("15.0.0"; "" on Linux), model, formFactors. */
+  platformVersion: string | null;
+  model: string | null;
+  formFactors: string[] | null;
+  /** navigator.deviceMemory: GB, rounded down to a power of two by the browser. */
+  deviceMemoryGb: number | null;
+  screen: { width: number; height: number; dpr: number } | null;
+  /** Battery API (Chromium only): a desktop reports charging at 100%; a discharging battery means a portable. */
+  battery: { charging: boolean; level: number } | null;
+  /** WebGPU adapter info, where WebGPU is available. */
+  webgpu: { vendor: string; architecture: string; description: string } | null;
+}
+
 export function unknownDevice(): DeviceContext {
   return { browser: "other", browserMajor: null, os: "other", deviceType: "unknown", webkitEngine: false, gpuLabel: null };
 }
@@ -171,6 +191,12 @@ export interface BenchResult {
    * memoryChannels on phones. Editing a field removes it from this list. Absent when none.
    */
   suggested?: (keyof SystemInfo)[];
+  /** For each suggested field, where the guess came from ("from your browser", "Steam Deck LCD spec"). */
+  suggestedWhy?: Partial<Record<keyof SystemInfo, string>>;
+  /** Extra browser signals for the guesses (absent on results from before 4.1). */
+  probe?: SystemProbe;
+  /** Set once the guesses were applied, so a field the user cleared isn't filled in again. */
+  guessed?: boolean;
   /**
    * Set when a new run copied the user's details from an earlier result: that result's
    * "YYYY-MM-DD HH:MM", for the form's "filled in from" note. Removed on the first edit. Local only:

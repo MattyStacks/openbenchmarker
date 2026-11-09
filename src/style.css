@@ -386,6 +386,39 @@ ol { padding-left: 20px; }
 ol li { margin-bottom: 8px; }
 code { font-family: var(--mono); font-size: 0.92em; color: var(--cyan); word-break: break-all; }
 
+/* System details form: guess summary, searchable GPU list, dropdowns with "Other", optional sections. */
+.guess-summary { padding: 10px 12px; border: 1px solid var(--line-hi); border-radius: 10px; background: rgba(46, 233, 255, 0.06); display: grid; gap: 4px; }
+.guess-summary p { margin: 0; }
+.guess-line { font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
+.next-step { color: var(--amber); }
+.field .field-label { font: 600 12px/1.4 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 6px; }
+.field .suggested-tag { text-transform: none; letter-spacing: 0.02em; font-weight: 600; }
+.gpu-search-wrap { position: relative; }
+.gpu-results { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; max-height: min(60vh, 420px); overflow-y: auto; background: #0d0924; border: 1px solid var(--line-hi); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55); }
+.gpu-results li { display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; cursor: pointer; min-height: 44px; align-content: center; }
+.gpu-results li[aria-selected="true"], .gpu-results li:hover { background: rgba(255, 62, 219, 0.14); }
+.gpu-results li.hint { cursor: default; color: var(--dim); font-size: 13px; min-height: 0; }
+.gpu-results li.hint:hover { background: none; }
+.gpu-results .opt-name { font-weight: 600; overflow-wrap: anywhere; }
+.gpu-results .opt-detail { font-size: 12px; color: var(--muted); }
+.gpu-results li.product .opt-detail { color: var(--good); }
+.gpu-results li.typed { border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; }
+.combo .combo-other { margin-top: 6px; }
+.opt-head { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); }
+.sys-form details > summary, .submit-card details > summary { cursor: pointer; color: var(--cyan); min-height: 44px; display: flex; align-items: center; }
+.sys-form details[open] > summary { margin-bottom: 6px; }
+.linux-more, .exact { display: grid; gap: 12px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.linux-more[open], .exact[open] { padding-bottom: 12px; }
+.sys-form .linux-more:not([open]), .sys-form .exact:not([open]) { gap: 0; }
+.sys-form .linux-more.linux-only { display: none; }
+.sys-form.show-linux .linux-more.linux-only { display: grid; }
+.exact textarea { width: 100%; box-sizing: border-box; font: 12px var(--mono); padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); resize: vertical; }
+.exact pre[data-cmd-all] { max-height: 180px; overflow: auto; }
+.exact p { margin: 0; }
+.cmd-list .cmds { margin-top: 6px; }
+.gpu-more { display: grid; gap: 10px; }
+.submit-card .yaml-details pre { margin-top: 6px; }
+
 /* System-info lookup commands */
 .cmds { display: grid; gap: 10px; padding: 12px; border: 1px dashed var(--line-hi); border-radius: 10px; background: rgba(46, 233, 255, 0.04); min-width: 0; }
 .cmds h3 { margin: 0; font-size: 14px; }

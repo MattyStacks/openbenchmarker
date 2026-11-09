@@ -85,7 +85,7 @@ export function chipTokens(name: string): string[] {
   const bracket = /\[([^\]]+)\]/.exec(name);
   const base = (bracket ? bracket[1] : name)
     .replace(/\((?:R|TM)\)|[®™]/gi, " ")
-    .replace(/\(\s*\d+\s*GB\s*\)/gi, " ")
+    .replace(/\(\s*\d+\s*GB\s*\)|\b\d+\s*GB\b/gi, " ")
     .replace(/\b(nvidia|geforce|amd|ati|radeon|intel|graphics|gpu|corporation)\b/gi, " ");
   const parts = base.split("/").map((p) => p.trim()).filter((p) => /\d/.test(p));
   if (!parts.length) return [];
