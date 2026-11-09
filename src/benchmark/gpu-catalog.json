@@ -1,1250 +1,2900 @@
 {
-  "snapshotDate": "2026-10-27",
-  "source": "https://github.com/MattyStacks/open-gpu-benchmarks/tree/fc94e56089f39b79ebbf6a474342747882f09f8d/data/gpus",
+  "snapshotDate": "2026-11-09",
+  "source": "https://github.com/MattyStacks/open-gpu-benchmarks/tree/49fadf22bc70af359ecb0180c36b9dab771f8280/data/gpus",
   "gpus": [
+    {
+      "id": "steam_machine_8gb_valve",
+      "name": "Steam Machine",
+      "vendor": "amd",
+      "formFactor": "desktop",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "boostMhz": 2450,
+      "tdpW": 110
+    },
     {
       "id": "rtx_5080_16gb_fe",
       "name": "GeForce RTX 5080 Founders Edition",
       "vendor": "nvidia",
-      "formFactor": "desktop"
+      "formFactor": "desktop",
+      "base": "rtx_5080_16gb",
+      "memoryGb": 16,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2620,
+      "tdpW": 360
+    },
+    {
+      "id": "legion_go_s_z1_extreme_16gb",
+      "name": "Legion Go S Z1 Extreme 16 GB",
+      "vendor": "amd",
+      "formFactor": "handheld",
+      "base": "z1_extreme",
+      "memoryShared": true,
+      "architecture": "RDNA 3",
+      "boostMhz": 2900,
+      "tdpW": 28,
+      "memoryGb": 16,
+      "memoryType": "LPDDR5X",
+      "oem": "Lenovo",
+      "cpu": "Zen 4 8C/16T",
+      "ramMts": 7500,
+      "osShipped": "Windows 11 Home or SteamOS",
+      "display": "8 in 1920x1200 120 Hz VRR"
+    },
+    {
+      "id": "legion_go_s_z1_extreme_32gb",
+      "name": "Legion Go S Z1 Extreme 32 GB",
+      "vendor": "amd",
+      "formFactor": "handheld",
+      "base": "z1_extreme",
+      "memoryShared": true,
+      "architecture": "RDNA 3",
+      "boostMhz": 2900,
+      "tdpW": 28,
+      "memoryGb": 32,
+      "memoryType": "LPDDR5X",
+      "oem": "Lenovo",
+      "cpu": "Zen 4 8C/16T",
+      "ramMts": 7500,
+      "osShipped": "Windows 11 Home or SteamOS",
+      "display": "8 in 1920x1200 120 Hz VRR"
+    },
+    {
+      "id": "steam_deck_lcd_16gb",
+      "name": "Steam Deck LCD",
+      "vendor": "amd",
+      "formFactor": "handheld",
+      "memoryGb": 16,
+      "memoryType": "LPDDR5",
+      "memoryShared": true,
+      "architecture": "RDNA 2",
+      "boostMhz": 1600,
+      "tdpW": 15,
+      "oem": "Valve",
+      "cpu": "Zen 2 4C/8T",
+      "ramMts": 5500,
+      "osShipped": "SteamOS",
+      "display": "7 in 1280x800 60 Hz"
+    },
+    {
+      "id": "onexplayer_3_arc_g3_extreme_32gb",
+      "name": "ONEXPLAYER 3 Arc G3 Extreme 32 GB",
+      "vendor": "intel",
+      "formFactor": "handheld",
+      "memoryGb": 32,
+      "memoryType": "LPDDR5X",
+      "memoryShared": true,
+      "boostMhz": 2300,
+      "tdpW": 35,
+      "oem": "ONE-NETBOOK",
+      "cpu": "2P+8E+4LP 14C/14T",
+      "ramMts": 8533,
+      "osShipped": "Windows 11 Home",
+      "display": "8.8 in 1920x1200 144 Hz AMOLED"
     }
   ],
   "references": [
     {
       "id": "hd_5450_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 5450",
+      "memoryGb": 1,
+      "boostMhz": 650
     },
     {
       "id": "hd_5570_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 5570",
+      "memoryGb": 1,
+      "boostMhz": 650
     },
     {
       "id": "hd_5670_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 5670",
+      "memoryGb": 1,
+      "memoryType": "GDDR5",
+      "boostMhz": 775
     },
     {
       "id": "hd_5750_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 5750",
+      "memoryGb": 1,
+      "boostMhz": 700
     },
     {
       "id": "hd_5770_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 5770",
+      "memoryGb": 1,
+      "boostMhz": 850
     },
     {
       "id": "hd_5830_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 5830",
+      "memoryGb": 1,
+      "boostMhz": 800
     },
     {
       "id": "hd_5850_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 5850",
+      "memoryGb": 1,
+      "boostMhz": 725
     },
     {
       "id": "hd_5870_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 5870",
+      "memoryGb": 1,
+      "boostMhz": 850
     },
     {
       "id": "hd_5970_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 5970",
+      "memoryGb": 2,
+      "boostMhz": 725,
+      "tdpW": 300
     },
     {
       "id": "hd_6450_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 6450",
+      "memoryGb": 1,
+      "architecture": "TeraScale 2",
+      "boostMhz": 750,
+      "tdpW": 30
     },
     {
       "id": "hd_6570_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 6570",
+      "memoryGb": 1,
+      "memoryType": "GDDR5",
+      "architecture": "TeraScale 2",
+      "boostMhz": 650,
+      "tdpW": 40
     },
     {
       "id": "hd_6670_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 6670",
+      "memoryGb": 1,
+      "architecture": "TeraScale 2",
+      "boostMhz": 800
     },
     {
       "id": "hd_6750_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 6750",
+      "memoryGb": 1,
+      "architecture": "TeraScale 2",
+      "boostMhz": 900
     },
     {
       "id": "hd_6770_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 6770",
+      "memoryGb": 1,
+      "architecture": "TeraScale 2",
+      "boostMhz": 900
     },
     {
       "id": "hd_6850_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 6850",
+      "memoryGb": 1,
+      "architecture": "TeraScale 2"
     },
     {
       "id": "hd_6870_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 6870",
+      "memoryGb": 1,
+      "architecture": "TeraScale 2",
+      "boostMhz": 900
     },
     {
       "id": "hd_6950_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 6950",
+      "memoryGb": 2,
+      "architecture": "TeraScale 3",
+      "boostMhz": 800,
+      "tdpW": 500
     },
     {
       "id": "hd_6970_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 6970",
+      "memoryGb": 2,
+      "architecture": "TeraScale 3",
+      "boostMhz": 880,
+      "tdpW": 550
     },
     {
       "id": "hd_7730",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 7730",
+      "architecture": "GCN 1"
     },
     {
       "id": "hd_7750_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 7750",
+      "memoryGb": 1,
+      "architecture": "GCN 1",
+      "boostMhz": 800,
+      "tdpW": 75
     },
     {
       "id": "hd_7770_ghz_edition_1gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 7770 GHz Edition",
+      "memoryGb": 1,
+      "architecture": "GCN 1",
+      "boostMhz": 1000,
+      "tdpW": 125
     },
     {
       "id": "hd_7790",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 7790",
+      "architecture": "GCN 2"
     },
     {
       "id": "hd_7850_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 7850",
+      "memoryGb": 2,
+      "architecture": "GCN 1",
+      "boostMhz": 1000,
+      "tdpW": 225
     },
     {
       "id": "hd_7870_ghz_edition_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 7870 GHz Edition",
+      "memoryGb": 2,
+      "architecture": "GCN 1",
+      "boostMhz": 1000,
+      "tdpW": 225
     },
     {
       "id": "hd_7950_3gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 7950",
+      "memoryGb": 3,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 1250,
+      "tdpW": 300
     },
     {
       "id": "hd_7970_3gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 7970",
+      "memoryGb": 3,
+      "architecture": "GCN 1",
+      "boostMhz": 925,
+      "tdpW": 300
     },
     {
       "id": "hd_7970_ghz_edition_3gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 7970 GHz Edition",
+      "memoryGb": 3,
+      "architecture": "GCN 1",
+      "boostMhz": 1050,
+      "tdpW": 250
     },
     {
       "id": "hd_7990",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 7990",
+      "architecture": "GCN 1"
     },
     {
       "id": "hd_8570m_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 8570M Series GPU",
+      "memoryGb": 2,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 650
     },
     {
       "id": "hd_8590m_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 8590M Series GPU",
+      "memoryGb": 2,
+      "memoryType": "GDDR5",
+      "boostMhz": 750
     },
     {
       "id": "hd_8670m_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 8670M Series GPU",
+      "memoryGb": 2,
+      "memoryType": "DDR3",
+      "architecture": "GCN 1",
+      "boostMhz": 775
     },
     {
       "id": "hd_8690m_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 8690M Series GPU",
+      "memoryGb": 2,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 775
     },
     {
       "id": "hd_8730m_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 8730M Series GPU",
+      "memoryGb": 2,
+      "memoryType": "DDR3",
+      "architecture": "GCN 1",
+      "boostMhz": 650
     },
     {
       "id": "hd_8750m_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 8750M Series GPU",
+      "memoryGb": 2,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 775
     },
     {
       "id": "hd_8770m_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 8770M Series GPU",
+      "memoryGb": 2,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 775
     },
     {
       "id": "hd_8790m_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 8790M Series GPU",
+      "memoryGb": 2,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 850
     },
     {
       "id": "hd_8830m_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 8830M Series GPU",
+      "memoryGb": 2,
+      "memoryType": "DDR3",
+      "architecture": "GCN 1",
+      "boostMhz": 575
     },
     {
       "id": "hd_8850m_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 8850M Series GPU",
+      "memoryGb": 2,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 725
     },
     {
       "id": "hd_8870m_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 8870M Series GPU",
+      "memoryGb": 2,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 725
     },
     {
       "id": "hd_8970m_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon HD 8970M Series GPU",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 850
     },
     {
       "id": "r5_230_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R5 230",
+      "memoryGb": 4,
+      "architecture": "TeraScale 2"
     },
     {
       "id": "r5_235_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R5 235",
+      "memoryGb": 4,
+      "architecture": "TeraScale 2"
     },
     {
       "id": "r5_m230_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R5 M230",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "architecture": "GCN 1",
+      "boostMhz": 855
     },
     {
       "id": "r5_m240",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R5 M240"
     },
     {
       "id": "r5_m240x",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R5 M240X"
     },
     {
       "id": "r5_m255_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R5 M255",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "architecture": "GCN 3",
+      "boostMhz": 940
     },
     {
       "id": "r5_m255x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R5 M255X",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "boostMhz": 940
     },
     {
       "id": "r5_m315_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R5 M315",
+      "memoryGb": 4,
+      "memoryType": "DDR3"
     },
     {
       "id": "r5_m320_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R5 M320",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "boostMhz": 855
     },
     {
       "id": "r5_m330_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R5 M330",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "architecture": "GCN 1",
+      "boostMhz": 1030
     },
     {
       "id": "r5_m335_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R5 M335",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "architecture": "GCN 1",
+      "boostMhz": 1070
     },
     {
       "id": "r5_m335x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R5 M335X",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "boostMhz": 1070
     },
     {
       "id": "r7_240_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 240",
+      "memoryGb": 2,
+      "architecture": "GCN 1",
+      "boostMhz": 780,
+      "tdpW": 50
     },
     {
       "id": "r7_250_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 250",
+      "memoryGb": 2,
+      "architecture": "GCN 1",
+      "boostMhz": 1050,
+      "tdpW": 75
     },
     {
       "id": "r7_250x_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 250X",
+      "memoryGb": 2,
+      "architecture": "GCN 1",
+      "boostMhz": 1000
     },
     {
       "id": "r7_260_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 260",
+      "memoryGb": 2,
+      "architecture": "GCN 2",
+      "boostMhz": 1100,
+      "tdpW": 115
     },
     {
       "id": "r7_260x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 260X",
+      "memoryGb": 4,
+      "architecture": "GCN 2",
+      "boostMhz": 1000
     },
     {
       "id": "r7_265_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 265",
+      "memoryGb": 4,
+      "architecture": "GCN 1",
+      "boostMhz": 925
     },
     {
       "id": "r7_360_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 360",
+      "memoryGb": 2,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 2",
+      "boostMhz": 1000
     },
     {
       "id": "r7_370_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 370",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 975
     },
     {
       "id": "r7_m260_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M260",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "architecture": "GCN 3",
+      "boostMhz": 980
     },
     {
       "id": "r7_m260x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M260X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 715
     },
     {
       "id": "r7_m265_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M265",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "architecture": "GCN 1",
+      "boostMhz": 825
     },
     {
       "id": "r7_m265ae",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M265AE"
     },
     {
       "id": "r7_m265x",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M265X"
     },
     {
       "id": "r7_m270",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M270"
     },
     {
       "id": "r7_m340_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M340",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "boostMhz": 1021
     },
     {
       "id": "r7_m350_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M350",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "boostMhz": 825
     },
     {
       "id": "r7_m360_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M360",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "architecture": "GCN 1",
+      "boostMhz": 1125
     },
     {
       "id": "r7_m365_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M365",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "boostMhz": 960
     },
     {
       "id": "r7_m365x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M365X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "boostMhz": 825
     },
     {
       "id": "r7_m370_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M370",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "boostMhz": 960
     },
     {
       "id": "r7_m375_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M375",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "boostMhz": 915
     },
     {
       "id": "r7_m380_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R7 M380",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "boostMhz": 915
     },
     {
       "id": "r9_270_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 270",
+      "memoryGb": 2,
+      "architecture": "GCN 1",
+      "boostMhz": 925,
+      "tdpW": 150
     },
     {
       "id": "r9_270x_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 270X",
+      "memoryGb": 2,
+      "architecture": "GCN 1",
+      "boostMhz": 1050,
+      "tdpW": 180
     },
     {
       "id": "r9_280_3gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 280",
+      "memoryGb": 3,
+      "architecture": "GCN 1",
+      "boostMhz": 933
     },
     {
       "id": "r9_280x_3gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 280X",
+      "memoryGb": 3,
+      "architecture": "GCN 1",
+      "boostMhz": 1000,
+      "tdpW": 250
     },
     {
       "id": "r9_285",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 285",
+      "architecture": "GCN 3"
     },
     {
       "id": "r9_290",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 290",
+      "architecture": "GCN 2"
     },
     {
       "id": "r9_290x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 290X",
+      "memoryGb": 4,
+      "architecture": "GCN 2",
+      "boostMhz": 947,
+      "tdpW": 250
     },
     {
       "id": "r9_295x2_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 295X2",
+      "memoryGb": 8,
+      "architecture": "GCN 2",
+      "boostMhz": 1018,
+      "tdpW": 500
     },
     {
       "id": "r9_380_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 380",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 3",
+      "boostMhz": 970
     },
     {
       "id": "r9_380x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 380X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 3",
+      "boostMhz": 970
     },
     {
       "id": "r9_390_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 390",
+      "memoryGb": 8,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 2",
+      "boostMhz": 1000
     },
     {
       "id": "r9_390x_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 390X",
+      "memoryGb": 8,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 2",
+      "boostMhz": 1050
     },
     {
       "id": "r9_fury_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 Fury",
+      "memoryGb": 4,
+      "memoryType": "HBM",
+      "architecture": "GCN 3",
+      "boostMhz": 1000,
+      "tdpW": 275
     },
     {
       "id": "r9_fury_x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 Fury X",
+      "memoryGb": 4,
+      "memoryType": "HBM",
+      "architecture": "GCN 3",
+      "boostMhz": 1050,
+      "tdpW": 275
     },
     {
       "id": "r9_m265x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M265X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 625
     },
     {
       "id": "r9_m270x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M270X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 775
     },
     {
       "id": "r9_m275x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M275X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 925
     },
     {
       "id": "r9_m280_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M280",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "boostMhz": 1100
     },
     {
       "id": "r9_m280x",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M280X",
+      "architecture": "GCN 2"
     },
     {
       "id": "r9_m285x",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M285X"
     },
     {
       "id": "r9_m290x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M290X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 900
     },
     {
       "id": "r9_m295x",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M295X",
+      "architecture": "GCN 3"
     },
     {
       "id": "r9_m360_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M360",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "boostMhz": 925
     },
     {
       "id": "r9_m365x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M365X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 925
     },
     {
       "id": "r9_m375_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M375",
+      "memoryGb": 4,
+      "memoryType": "DDR3",
+      "architecture": "GCN 1",
+      "boostMhz": 1015
     },
     {
       "id": "r9_m375x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M375X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 1015
     },
     {
       "id": "r9_m380_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M380",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 1000
     },
     {
       "id": "r9_m385_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M385",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "boostMhz": 1100
     },
     {
       "id": "r9_m385x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M385X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 2",
+      "boostMhz": 1100
     },
     {
       "id": "r9_m390_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M390",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1"
     },
     {
       "id": "r9_m390x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M390X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 3"
     },
     {
       "id": "r9_m395_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M395",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 3"
     },
     {
       "id": "r9_m395x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 M395X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 3"
     },
     {
       "id": "r9_nano_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon R9 Nano",
+      "memoryGb": 4,
+      "memoryType": "HBM",
+      "architecture": "GCN 3",
+      "boostMhz": 1000,
+      "tdpW": 175
     },
     {
       "id": "radeon_520_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon 520",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 1030
     },
     {
       "id": "radeon_530_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon 530",
+      "memoryGb": 4,
+      "architecture": "GCN 3",
+      "boostMhz": 1024
     },
     {
       "id": "radeon_535_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon 535",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 3",
+      "boostMhz": 1024
     },
     {
       "id": "radeon_540_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon 540",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "boostMhz": 1124
     },
     {
       "id": "radeon_540x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon 540X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1219
     },
     {
       "id": "radeon_550x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon 550X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1287
     },
     {
       "id": "radeon_610_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon 610",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 1",
+      "boostMhz": 1030
     },
     {
       "id": "radeon_620_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon 620",
+      "memoryGb": 4,
+      "architecture": "GCN 3",
+      "boostMhz": 1024
     },
     {
       "id": "radeon_625_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon 625",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 3",
+      "boostMhz": 1024
     },
     {
       "id": "radeon_630_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon 630",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1219
     },
     {
       "id": "radeon_vii_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon VII",
+      "memoryGb": 16,
+      "memoryType": "HBM2",
+      "architecture": "GCN 5",
+      "boostMhz": 1750,
+      "tdpW": 300
     },
     {
       "id": "rx_460_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 460",
+      "memoryGb": 2,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1200,
+      "tdpW": 70
     },
     {
       "id": "rx_470_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 470",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1206,
+      "tdpW": 120
     },
     {
       "id": "rx_480_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 480",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1266,
+      "tdpW": 150
     },
     {
       "id": "rx_5300_3gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 5300",
+      "memoryGb": 3,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA",
+      "boostMhz": 1645,
+      "tdpW": 100
     },
     {
       "id": "rx_5300m_3gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 5300M",
+      "memoryGb": 3,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA",
+      "boostMhz": 1445
     },
     {
       "id": "rx_540_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 540",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1219
     },
     {
       "id": "rx_540x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 540X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "boostMhz": 1219
     },
     {
       "id": "rx_550_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 550",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1183,
+      "tdpW": 50
     },
     {
       "id": "rx_5500_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 5500",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA",
+      "boostMhz": 1845,
+      "tdpW": 150
     },
     {
       "id": "rx_5500_xt_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 5500 XT",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA",
+      "boostMhz": 1845,
+      "tdpW": 130
     },
     {
       "id": "rx_5500m_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 5500M",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA",
+      "boostMhz": 1645
     },
     {
       "id": "rx_550x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 550X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1287
     },
     {
       "id": "rx_560_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 560",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1275,
+      "tdpW": 80
     },
     {
       "id": "rx_560_oem_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 560 (OEM)",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "tdpW": 80
     },
     {
       "id": "rx_5600_6gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 5600",
+      "memoryGb": 6,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA",
+      "boostMhz": 1560,
+      "tdpW": 150
     },
     {
       "id": "rx_5600_xt_6gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 5600 XT",
+      "memoryGb": 6,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA",
+      "boostMhz": 1560,
+      "tdpW": 150
     },
     {
       "id": "rx_5600m_6gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 5600M",
+      "memoryGb": 6,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA",
+      "boostMhz": 1265
     },
     {
       "id": "rx_560x_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 560X",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1275
     },
     {
       "id": "rx_570_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 570",
+      "memoryGb": 8,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1244,
+      "tdpW": 150
     },
     {
       "id": "rx_570_oem_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 570 (OEM)",
+      "memoryGb": 8,
+      "memoryType": "GDDR5",
+      "tdpW": 150
     },
     {
       "id": "rx_5700_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 5700",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA",
+      "boostMhz": 1725,
+      "tdpW": 180
     },
     {
       "id": "rx_5700_xt_50th_anniversary_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 5700 XT 50th Anniversary",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA",
+      "boostMhz": 1980,
+      "tdpW": 235
     },
     {
       "id": "rx_5700_xt_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 5700 XT",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA",
+      "boostMhz": 1905,
+      "tdpW": 225
     },
     {
       "id": "rx_5700m_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 5700M",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA",
+      "boostMhz": 1720
     },
     {
       "id": "rx_570x_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 570X",
+      "memoryGb": 8,
+      "memoryType": "GDDR5",
+      "boostMhz": 1244
     },
     {
       "id": "rx_580_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 580",
+      "memoryGb": 8,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1340,
+      "tdpW": 185
     },
     {
       "id": "rx_580_oem_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 580 (OEM)",
+      "memoryGb": 8,
+      "memoryType": "GDDR5",
+      "tdpW": 185
     },
     {
       "id": "rx_580x_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 580X",
+      "memoryGb": 8,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1340
     },
     {
       "id": "rx_590_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 590",
+      "memoryGb": 8,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1545
     },
     {
       "id": "rx_6300m_2gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6300M",
+      "memoryGb": 2,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 25
     },
     {
       "id": "rx_640_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 640",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "GCN 4",
+      "boostMhz": 1287
     },
     {
       "id": "rx_6400_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6400",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2321,
+      "tdpW": 53
     },
     {
       "id": "rx_6450m_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6450M",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 50
     },
     {
       "id": "rx_6500_xt_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6500 XT (4GB)",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2815,
+      "tdpW": 107
     },
     {
       "id": "rx_6500_xt_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6500 XT",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2815,
+      "tdpW": 113
     },
     {
       "id": "rx_6500m_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6500M",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 50
     },
     {
       "id": "rx_6550m_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6550M",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 80
     },
     {
       "id": "rx_6550s_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6550S",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 50
     },
     {
       "id": "rx_6600_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6600",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2491,
+      "tdpW": 132
     },
     {
       "id": "rx_6600_xt_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6600 XT",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2589,
+      "tdpW": 160
     },
     {
       "id": "rx_6600m_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6600M",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 100
     },
     {
       "id": "rx_6600s_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6600S",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 80
     },
     {
       "id": "rx_6650_xt_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6650 XT",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2635,
+      "tdpW": 180
     },
     {
       "id": "rx_6650m_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6650M",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 120
     },
     {
       "id": "rx_6650m_xt_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6650M XT",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 120
     },
     {
       "id": "rx_6700_10gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6700",
+      "memoryGb": 10,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2450,
+      "tdpW": 175
     },
     {
       "id": "rx_6700_xt_12gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6700 XT",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2581,
+      "tdpW": 230
     },
     {
       "id": "rx_6700m_10gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6700M",
+      "memoryGb": 10,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 135
     },
     {
       "id": "rx_6700s_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6700S",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 80
     },
     {
       "id": "rx_6750_xt_12gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6750 XT",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2600,
+      "tdpW": 250
     },
     {
       "id": "rx_6800_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6800",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2105,
+      "tdpW": 250
     },
     {
       "id": "rx_6800_xt_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6800 XT",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2250,
+      "tdpW": 300
     },
     {
       "id": "rx_6800m_12gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6800M",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 145
     },
     {
       "id": "rx_6800s_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6800S",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 100
     },
     {
       "id": "rx_6850m_xt_12gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6850M XT",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "tdpW": 165
     },
     {
       "id": "rx_6900_xt_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6900 XT",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2250,
+      "tdpW": 300
     },
     {
       "id": "rx_6950_xt_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 6950 XT",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 2",
+      "boostMhz": 2310,
+      "tdpW": 335
     },
     {
       "id": "rx_7400_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7400",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "tdpW": 55
     },
     {
       "id": "rx_7600_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7600",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "boostMhz": 2655,
+      "tdpW": 165
     },
     {
       "id": "rx_7600_xt_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7600 XT",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "boostMhz": 2755,
+      "tdpW": 190
     },
     {
       "id": "rx_7600m_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7600M",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "tdpW": 90
     },
     {
       "id": "rx_7600m_xt_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7600M XT",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "tdpW": 120
     },
     {
       "id": "rx_7600s_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7600S",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "tdpW": 75
     },
     {
       "id": "rx_7700_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7700",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "tdpW": 263
     },
     {
       "id": "rx_7700_xt_12gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7700 XT",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "boostMhz": 2544,
+      "tdpW": 245
     },
     {
       "id": "rx_7700s_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7700S",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "tdpW": 100
     },
     {
       "id": "rx_7800_xt_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7800 XT",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "boostMhz": 2430,
+      "tdpW": 263
     },
     {
       "id": "rx_7800m_12gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7800M",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "tdpW": 180
     },
     {
       "id": "rx_7900_gre_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7900 GRE",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "boostMhz": 2245,
+      "tdpW": 260
     },
     {
       "id": "rx_7900_xt_20gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7900 XT",
+      "memoryGb": 20,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "boostMhz": 2400,
+      "tdpW": 315
     },
     {
       "id": "rx_7900_xtx_24gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7900 XTX",
+      "memoryGb": 24,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "boostMhz": 2500,
+      "tdpW": 355
     },
     {
       "id": "rx_7900m_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 7900M",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 3",
+      "tdpW": 180
     },
     {
       "id": "rx_9050_4gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 9050 (4GB)",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 4",
+      "boostMhz": 2600,
+      "tdpW": 92
     },
     {
       "id": "rx_9050_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 9050",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 4",
+      "boostMhz": 2600,
+      "tdpW": 92
     },
     {
       "id": "rx_9060_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 9060",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 4",
+      "boostMhz": 2990,
+      "tdpW": 132
     },
     {
       "id": "rx_9060_xt_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 9060 XT",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 4",
+      "boostMhz": 3130,
+      "tdpW": 160
     },
     {
       "id": "rx_9060_xt_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 9060 XT (8GB)",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 4",
+      "boostMhz": 3130,
+      "tdpW": 150
     },
     {
       "id": "rx_9060_xt_lp_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 9060 XT LP",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "tdpW": 140
     },
     {
       "id": "rx_9070_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 9070",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 4",
+      "boostMhz": 2520,
+      "tdpW": 220
     },
     {
       "id": "rx_9070_gre_12gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 9070 GRE",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 4",
+      "boostMhz": 2790,
+      "tdpW": 220
     },
     {
       "id": "rx_9070_xt_16gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX 9070 XT",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "RDNA 4",
+      "boostMhz": 2970,
+      "tdpW": 304
     },
     {
       "id": "rx_vega_56_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX Vega 56",
+      "memoryGb": 8,
+      "memoryType": "HBM2",
+      "architecture": "GCN 5",
+      "boostMhz": 1471,
+      "tdpW": 210
     },
     {
       "id": "rx_vega_64_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX Vega 64",
+      "memoryGb": 8,
+      "memoryType": "HBM2",
+      "architecture": "GCN 5",
+      "boostMhz": 1546,
+      "tdpW": 295
     },
     {
       "id": "rx_vega_64_liquid_cooled_8gb",
-      "vendor": "amd"
+      "vendor": "amd",
+      "name": "Radeon RX Vega 64 Liquid Cooled",
+      "memoryGb": 8,
+      "memoryType": "HBM2",
+      "boostMhz": 1677,
+      "tdpW": 345
+    },
+    {
+      "id": "z1_extreme",
+      "vendor": "amd",
+      "name": "Ryzen Z1 Extreme",
+      "memoryShared": true,
+      "architecture": "RDNA 3",
+      "boostMhz": 2900,
+      "tdpW": 28
     },
     {
       "id": "arc_130t",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc 130T GPU",
+      "memoryShared": true,
+      "boostMhz": 2200
     },
     {
       "id": "arc_130v",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc 130V GPU",
+      "memoryShared": true,
+      "boostMhz": 2200
     },
     {
       "id": "arc_140t",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc 140T GPU",
+      "memoryShared": true,
+      "boostMhz": 2350
     },
     {
       "id": "arc_140v",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc 140V GPU",
+      "memoryShared": true,
+      "boostMhz": 2350
     },
     {
       "id": "arc_a310_4gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A310",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 75
     },
     {
       "id": "arc_a310e_4gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A310E",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 75
     },
     {
       "id": "arc_a350e_4gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A350E",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 35
     },
     {
       "id": "arc_a350m_4gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A350M",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 35
     },
     {
       "id": "arc_a370e_4gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A370E",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 50
     },
     {
       "id": "arc_a370m_4gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A370M",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 50
     },
     {
       "id": "arc_a380_6gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A380",
+      "memoryGb": 6,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 75
     },
     {
       "id": "arc_a380e_6gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A380E",
+      "memoryGb": 6,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 75
     },
     {
       "id": "arc_a530m",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A530M",
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 95
     },
     {
       "id": "arc_a550m_8gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A550M",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 80
     },
     {
       "id": "arc_a570m_8gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A570M",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 95
     },
     {
       "id": "arc_a580_8gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A580",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 185
     },
     {
       "id": "arc_a580e_16gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A580E",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 185
     },
     {
       "id": "arc_a730m_12gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A730M",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 120
     },
     {
       "id": "arc_a750_8gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A750",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 225
     },
     {
       "id": "arc_a750e_16gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A750E",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 225
     },
     {
       "id": "arc_a770_16gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A770 (16GB)",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 225
     },
     {
       "id": "arc_a770_8gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A770 (8GB)",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 225
     },
     {
       "id": "arc_a770m_16gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc A770M",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "Xe HPG",
+      "tdpW": 150
     },
     {
       "id": "arc_b370",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc B370 GPU",
+      "memoryShared": true,
+      "boostMhz": 2400
     },
     {
       "id": "arc_b390",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc B390 GPU",
+      "memoryShared": true,
+      "boostMhz": 2500
     },
     {
       "id": "arc_b570_10gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc B570",
+      "memoryGb": 10,
+      "memoryType": "GDDR6",
+      "architecture": "Xe2",
+      "tdpW": 150
     },
     {
       "id": "arc_b580_12gb",
-      "vendor": "intel"
+      "vendor": "intel",
+      "name": "Arc B580",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "Xe2",
+      "tdpW": 190
     },
     {
       "id": "gt_1030_2gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GT 1030",
+      "memoryGb": 2,
+      "memoryType": "GDDR5",
+      "architecture": "Pascal",
+      "boostMhz": 1468,
+      "tdpW": 30
     },
     {
       "id": "gt_1030_ddr4_2gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GT 1030 (DDR4)",
+      "memoryGb": 2,
+      "memoryType": "DDR4",
+      "architecture": "Pascal",
+      "boostMhz": 1379,
+      "tdpW": 20
     },
     {
       "id": "gtx_1050_2gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1050",
+      "memoryGb": 2,
+      "memoryType": "GDDR5",
+      "architecture": "Pascal",
+      "boostMhz": 1455,
+      "tdpW": 75
     },
     {
       "id": "gtx_1050_3gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1050 3 GB",
+      "memoryGb": 3,
+      "memoryType": "GDDR5",
+      "architecture": "Pascal",
+      "boostMhz": 1518,
+      "tdpW": 75
     },
     {
       "id": "gtx_1050_ti_4gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1050 Ti",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "Pascal",
+      "boostMhz": 1392,
+      "tdpW": 75
     },
     {
       "id": "gtx_1060_3gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1060 3 GB",
+      "memoryGb": 3,
+      "memoryType": "GDDR5",
+      "architecture": "Pascal",
+      "boostMhz": 1708,
+      "tdpW": 120
     },
     {
       "id": "gtx_1060_6gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1060 6 GB",
+      "memoryGb": 6,
+      "memoryType": "GDDR5",
+      "architecture": "Pascal",
+      "boostMhz": 1708,
+      "tdpW": 120
     },
     {
       "id": "gtx_1070_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1070",
+      "memoryGb": 8,
+      "memoryType": "GDDR5",
+      "architecture": "Pascal",
+      "boostMhz": 1683,
+      "tdpW": 150
     },
     {
       "id": "gtx_1070_ti_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1070 Ti",
+      "memoryGb": 8,
+      "memoryType": "GDDR5",
+      "architecture": "Pascal",
+      "boostMhz": 1683,
+      "tdpW": 180
     },
     {
       "id": "gtx_1080_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1080",
+      "memoryGb": 8,
+      "memoryType": "GDDR5X",
+      "architecture": "Pascal",
+      "boostMhz": 1733,
+      "tdpW": 180
     },
     {
       "id": "gtx_1080_ti_11gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1080 Ti",
+      "memoryGb": 11,
+      "memoryType": "GDDR5X",
+      "architecture": "Pascal",
+      "boostMhz": 1582,
+      "tdpW": 250
     },
     {
       "id": "gtx_1630_4gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1630",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1785,
+      "tdpW": 75
     },
     {
       "id": "gtx_1650_4gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1650 (GDDR5)",
+      "memoryGb": 4,
+      "memoryType": "GDDR5",
+      "architecture": "Turing",
+      "boostMhz": 1665,
+      "tdpW": 75
     },
     {
       "id": "gtx_1650_gddr6_4gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1650 (GDDR6)",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1590,
+      "tdpW": 75
     },
     {
       "id": "gtx_1650_super_4gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1650 Super",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1725,
+      "tdpW": 100
     },
     {
       "id": "gtx_1660_6gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1660",
+      "memoryGb": 6,
+      "memoryType": "GDDR5",
+      "architecture": "Turing",
+      "boostMhz": 1785,
+      "tdpW": 120
     },
     {
       "id": "gtx_1660_super_6gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1660 Super",
+      "memoryGb": 6,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1785,
+      "tdpW": 125
     },
     {
       "id": "gtx_1660_ti_6gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce GTX 1660 Ti",
+      "memoryGb": 6,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1770,
+      "tdpW": 120
     },
     {
       "id": "rtx_2060_12gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 2060 12 GB",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1650,
+      "tdpW": 185
     },
     {
       "id": "rtx_2060_6gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 2060 6 GB",
+      "memoryGb": 6,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1680,
+      "tdpW": 160
     },
     {
       "id": "rtx_2060_super_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 2060 Super",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1650,
+      "tdpW": 175
     },
     {
       "id": "rtx_2070_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 2070",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1710,
+      "tdpW": 185
     },
     {
       "id": "rtx_2070_super_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 2070 Super",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1770,
+      "tdpW": 215
     },
     {
       "id": "rtx_2080_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 2080",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1800,
+      "tdpW": 225
     },
     {
       "id": "rtx_2080_super_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 2080 Super",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1820,
+      "tdpW": 250
     },
     {
       "id": "rtx_2080_ti_11gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 2080 Ti",
+      "memoryGb": 11,
+      "memoryType": "GDDR6",
+      "architecture": "Turing",
+      "boostMhz": 1640,
+      "tdpW": 260
     },
     {
       "id": "rtx_3050_6gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3050 6 GB",
+      "memoryGb": 6,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1470,
+      "tdpW": 70
     },
     {
       "id": "rtx_3050_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3050 8 GB",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1780,
+      "tdpW": 130
     },
     {
       "id": "rtx_3050_laptop_4gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3050 Laptop GPU 4 GB",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1740,
+      "tdpW": 80
     },
     {
       "id": "rtx_3050_laptop_6gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3050 Laptop GPU 6 GB",
+      "memoryGb": 6,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1740,
+      "tdpW": 80
     },
     {
       "id": "rtx_3050_ti_laptop_4gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3050 Ti Laptop GPU",
+      "memoryGb": 4,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1695
     },
     {
       "id": "rtx_3060_12gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3060 12 GB",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1780,
+      "tdpW": 170
     },
     {
       "id": "rtx_3060_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3060 8 GB",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1780,
+      "tdpW": 170
     },
     {
       "id": "rtx_3060_laptop_6gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3060 Laptop GPU",
+      "memoryGb": 6,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1703,
+      "tdpW": 115
     },
     {
       "id": "rtx_3060_ti_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3060 Ti",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1670,
+      "tdpW": 200
     },
     {
       "id": "rtx_3060_ti_gddr6x_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3060 Ti (GDDR6X)",
+      "memoryGb": 8,
+      "memoryType": "GDDR6X",
+      "architecture": "Ampere",
+      "boostMhz": 1670,
+      "tdpW": 200
     },
     {
       "id": "rtx_3070_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3070",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1730,
+      "tdpW": 220
     },
     {
       "id": "rtx_3070_laptop_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3070 Laptop GPU",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1620,
+      "tdpW": 125
     },
     {
       "id": "rtx_3070_ti_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3070 Ti",
+      "memoryGb": 8,
+      "memoryType": "GDDR6X",
+      "architecture": "Ampere",
+      "boostMhz": 1770,
+      "tdpW": 290
     },
     {
       "id": "rtx_3070_ti_laptop_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3070 Ti Laptop GPU",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1485
     },
     {
       "id": "rtx_3080_10gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3080 10 GB",
+      "memoryGb": 10,
+      "memoryType": "GDDR6X",
+      "architecture": "Ampere",
+      "boostMhz": 1710,
+      "tdpW": 320
     },
     {
       "id": "rtx_3080_12gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3080 12 GB",
+      "memoryGb": 12,
+      "memoryType": "GDDR6X",
+      "architecture": "Ampere",
+      "boostMhz": 1710,
+      "tdpW": 350
     },
     {
       "id": "rtx_3080_laptop_16gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3080 Laptop GPU 16 GB",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1710,
+      "tdpW": 150
     },
     {
       "id": "rtx_3080_laptop_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3080 Laptop GPU 8 GB",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1710,
+      "tdpW": 150
     },
     {
       "id": "rtx_3080_ti_12gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3080 Ti",
+      "memoryGb": 12,
+      "memoryType": "GDDR6X",
+      "architecture": "Ampere",
+      "boostMhz": 1670,
+      "tdpW": 350
     },
     {
       "id": "rtx_3080_ti_laptop_16gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3080 Ti Laptop GPU",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "Ampere",
+      "boostMhz": 1590
     },
     {
       "id": "rtx_3090_24gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3090",
+      "memoryGb": 24,
+      "memoryType": "GDDR6X",
+      "architecture": "Ampere",
+      "boostMhz": 1700,
+      "tdpW": 350
     },
     {
       "id": "rtx_3090_ti_24gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 3090 Ti",
+      "memoryGb": 24,
+      "memoryType": "GDDR6X",
+      "architecture": "Ampere",
+      "boostMhz": 1860,
+      "tdpW": 450
     },
     {
       "id": "rtx_4050_laptop_6gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4050 Laptop GPU",
+      "memoryGb": 6,
+      "memoryType": "GDDR6",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2370,
+      "tdpW": 115
     },
     {
       "id": "rtx_4060_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4060",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2460,
+      "tdpW": 115
     },
     {
       "id": "rtx_4060_laptop_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4060 Laptop GPU",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2370,
+      "tdpW": 115
     },
     {
       "id": "rtx_4060_ti_16gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4060 Ti 16 GB",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2540,
+      "tdpW": 165
     },
     {
       "id": "rtx_4060_ti_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4060 Ti 8 GB",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2540,
+      "tdpW": 160
     },
     {
       "id": "rtx_4070_12gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4070",
+      "memoryGb": 12,
+      "memoryType": "GDDR6X",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2480,
+      "tdpW": 200
     },
     {
       "id": "rtx_4070_gddr6_12gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4070 (GDDR6)",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2480,
+      "tdpW": 200
     },
     {
       "id": "rtx_4070_laptop_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4070 Laptop GPU",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2175,
+      "tdpW": 115
     },
     {
       "id": "rtx_4070_super_12gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4070 Super",
+      "memoryGb": 12,
+      "memoryType": "GDDR6X",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2480,
+      "tdpW": 220
     },
     {
       "id": "rtx_4070_ti_12gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4070 Ti",
+      "memoryGb": 12,
+      "memoryType": "GDDR6X",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2610,
+      "tdpW": 285
     },
     {
       "id": "rtx_4070_ti_super_16gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4070 Ti Super",
+      "memoryGb": 16,
+      "memoryType": "GDDR6X",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2610,
+      "tdpW": 285
     },
     {
       "id": "rtx_4080_16gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4080",
+      "memoryGb": 16,
+      "memoryType": "GDDR6X",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2510,
+      "tdpW": 320
     },
     {
       "id": "rtx_4080_laptop_12gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4080 Laptop GPU",
+      "memoryGb": 12,
+      "memoryType": "GDDR6",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2280,
+      "tdpW": 150
     },
     {
       "id": "rtx_4080_super_16gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4080 Super",
+      "memoryGb": 16,
+      "memoryType": "GDDR6X",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2550,
+      "tdpW": 320
     },
     {
       "id": "rtx_4090_24gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4090",
+      "memoryGb": 24,
+      "memoryType": "GDDR6X",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2520,
+      "tdpW": 450
     },
     {
       "id": "rtx_4090_laptop_16gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 4090 Laptop GPU",
+      "memoryGb": 16,
+      "memoryType": "GDDR6",
+      "architecture": "Ada Lovelace",
+      "boostMhz": 2040,
+      "tdpW": 150
     },
     {
       "id": "rtx_5050_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5050",
+      "memoryGb": 8,
+      "memoryType": "GDDR6",
+      "architecture": "Blackwell",
+      "boostMhz": 2570,
+      "tdpW": 130
     },
     {
       "id": "rtx_5050_laptop_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5050 Laptop GPU",
+      "memoryGb": 8,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2662,
+      "tdpW": 100
     },
     {
       "id": "rtx_5060_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5060",
+      "memoryGb": 8,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2500,
+      "tdpW": 145
     },
     {
       "id": "rtx_5060_laptop_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5060 Laptop GPU",
+      "memoryGb": 8,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2497,
+      "tdpW": 100
     },
     {
       "id": "rtx_5060_ti_16gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5060 Ti 16 GB",
+      "memoryGb": 16,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2570,
+      "tdpW": 180
     },
     {
       "id": "rtx_5060_ti_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5060 Ti 8 GB",
+      "memoryGb": 8,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2570,
+      "tdpW": 180
     },
     {
       "id": "rtx_5070_12gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5070",
+      "memoryGb": 12,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2510,
+      "tdpW": 250
     },
     {
       "id": "rtx_5070_laptop_12gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5070 Laptop GPU 12 GB",
+      "memoryGb": 12,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2347,
+      "tdpW": 100
     },
     {
       "id": "rtx_5070_laptop_8gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5070 Laptop GPU 8 GB",
+      "memoryGb": 8,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2347,
+      "tdpW": 100
     },
     {
       "id": "rtx_5070_ti_16gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5070 Ti",
+      "memoryGb": 16,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2450,
+      "tdpW": 300
     },
     {
       "id": "rtx_5070_ti_laptop_12gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5070 Ti Laptop GPU",
+      "memoryGb": 12,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2220,
+      "tdpW": 115
     },
     {
       "id": "rtx_5080_16gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5080",
+      "memoryGb": 16,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2620,
+      "tdpW": 360
     },
     {
       "id": "rtx_5080_laptop_16gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5080 Laptop GPU",
+      "memoryGb": 16,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2287,
+      "tdpW": 150
     },
     {
       "id": "rtx_5090_32gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5090",
+      "memoryGb": 32,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2410,
+      "tdpW": 575
     },
     {
       "id": "rtx_5090_laptop_24gb",
-      "vendor": "nvidia"
+      "vendor": "nvidia",
+      "name": "GeForce RTX 5090 Laptop GPU",
+      "memoryGb": 24,
+      "memoryType": "GDDR7",
+      "architecture": "Blackwell",
+      "boostMhz": 2160,
+      "tdpW": 150
     }
   ]
 }

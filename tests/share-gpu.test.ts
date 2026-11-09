@@ -10,7 +10,7 @@ import { chosenGpuName, overclockLabel, shareText, sharerGpuRows } from "../src/
 // else typed into the results form.
 
 const TODAY = new Date("2026-10-22T12:00:00Z");
-const GPU = GPU_CATALOG[0];
+const GPU = GPU_CATALOG.find((g) => g.id === "rtx_5080_16gb_fe")!;
 
 function run(over: Partial<SharedRun> = {}): SharedRun {
   return {

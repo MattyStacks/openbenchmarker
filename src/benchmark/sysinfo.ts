@@ -27,11 +27,21 @@ const WIN_MEM_TYPES = "@{20='DDR';21='DDR2';24='DDR3';26='DDR4';30='LPDDR4';34='
 
 const MEM_CHANNELS_NOTE = "No command reads this reliably. Most desktops run 2 (dual channel) with two or four sticks, and 1 with a single stick. CPU-Z's Memory tab (Windows) or your motherboard manual tells you for sure.";
 
+/**
+ * Handheld PCs by the maker, model or family their firmware reports: Steam Deck (Jupiter LCD,
+ * Galileo OLED), ROG Ally (RC71L, RC72LA for the X), Legion Go, MSI Claw, ONEXPLAYER, AYANEO,
+ * AOKZOE and GPD's WIN line.
+ */
+const HANDHELD_NAMES = ["Jupiter", "Galileo", "ROG Ally", "RC71L", "RC72L", "Legion Go", "Claw", "ONEXPLAYER", "ONE-NETBOOK", "AYANEO", "AOKZOE", "GPD WIN"];
+const HANDHELD_WIN = HANDHELD_NAMES.join("|");
+const HANDHELD_SH = HANDHELD_NAMES.map((n) => (n.includes(" ") ? `*"${n}"*` : `*${n}*`)).join("|");
+
 const WIN = {
-  // Desktop or laptop, then each GPU with its VRAM and its board maker (PCI subsystem vendor), in
-  // the lines the results page reads to build a catalog id (src/benchmark/gpu-id.ts).
+  // Desktop, laptop or handheld, then each GPU with its VRAM and its board maker (PCI subsystem
+  // vendor), in the lines the results page reads to build a catalog id (src/benchmark/gpu-id.ts).
+  // Handhelds report themselves as portables, so they're told apart by maker and model first.
   gpu: [
-    `$t = if ((Get-CimInstance Win32_ComputerSystem).PCSystemType -eq 2) { 'laptop' } else { 'desktop' }; "Computer type: $t"`,
+    `$cs = Get-CimInstance Win32_ComputerSystem; $t = if ("$($cs.Manufacturer) $($cs.Model) $($cs.SystemFamily)" -match '${HANDHELD_WIN}') { 'handheld' } elseif ($cs.PCSystemType -eq 2) { 'laptop' } else { 'desktop' }; "Computer type: $t"`,
     `$keys = Get-ItemProperty '${WIN_GPU_KEY}' -ErrorAction SilentlyContinue`,
     `Get-CimInstance Win32_VideoController | ForEach-Object { $n = $_.Name; $k = $keys | Where-Object { $_.DriverDesc -eq $n -and $_.'HardwareInformation.qwMemorySize' } | Select-Object -First 1; $gb = if ($k) { [math]::Round($k.'HardwareInformation.qwMemorySize' / 1GB) } else { '?' }; $b = if ($_.PNPDeviceID -match 'SUBSYS_[0-9A-F]{4}([0-9A-F]{4})') { $Matches[1] } else { '?' }; "GPU: $n ($gb GB) [board $b]" }`,
   ].join("\n"),
@@ -57,8 +67,9 @@ const LINUX_MESA = `{ glxinfo -B 2>/dev/null | grep -o 'Mesa [0-9][0-9.]*' | cut
 const LINUX = {
   // Same lines as the Windows command. chassis_type 8-14 and 30-32 are portables; the board maker is
   // the PCI subsystem vendor (nvidia-smi gives it as the last 4 hex digits of pci.sub_device_id).
+  // Valve's machines first: the Steam Machine (Fremont) reports chassis type 10, a notebook.
   gpu: [
-    `case "$(cat /sys/class/dmi/id/chassis_type 2>/dev/null)" in 8|9|10|11|14|30|31|32) echo "Computer type: laptop";; *) echo "Computer type: desktop";; esac`,
+    `dmi="$(cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name /sys/class/dmi/id/product_family 2>/dev/null | tr '\\n' ' ')"; case "$dmi" in *Valve*Fremont*) echo "Computer type: desktop";; ${HANDHELD_SH}) echo "Computer type: handheld";; *) case "$(cat /sys/class/dmi/id/chassis_type 2>/dev/null)" in 8|9|10|11|14|30|31|32) echo "Computer type: laptop";; *) echo "Computer type: desktop";; esac;; esac`,
     `command -v nvidia-smi >/dev/null && nvidia-smi --query-gpu=name,memory.total,pci.sub_device_id --format=csv,noheader,nounits | awk -F', ' '{printf "GPU: %s (%d GB) [board %s]\\n", $1, ($2 + 512) / 1024, substr($3, length($3) - 3)}'`,
     `for d in /sys/bus/pci/devices/*; do case "$(cat "$d/class")" in 0x03*) ;; *) continue;; esac; [ "$(cat "$d/vendor")" = 0x10de ] && command -v nvidia-smi >/dev/null && continue; n=$(lspci -mm -s "\${d##*/}" 2>/dev/null | cut -d'"' -f6); [ -n "$n" ] || continue; v=$(cat "$d/mem_info_vram_total" 2>/dev/null); g='?'; [ -n "$v" ] && g=$(( (v + 536870912) / 1073741824 )); echo "GPU: $n ($g GB) [board $(cut -c3- "$d/subsystem_vendor")]"; done`,
   ].join("\n"),

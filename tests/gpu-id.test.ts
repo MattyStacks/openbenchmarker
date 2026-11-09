@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GPU_REFERENCES } from "../src/benchmark/catalog";
-import { boardOf, buildGpuId, catalogFile, chipTokens, isCatalogIdShape, parseGpuInfo, productName, referenceMatches, vendorOf } from "../src/benchmark/gpu-id";
+import { boardOf, buildGpuId, catalogFile, chipTokens, isCatalogIdShape, knownProduct, parseGpuInfo, productName, referenceIn, referenceMatches, vendorOf } from "../src/benchmark/gpu-id";
 
 // Real output of the Windows GPU command on an RTX 5090 laptop (Lenovo Legion Pro 7).
 const LAPTOP_WIN = "Computer type: laptop\r\nGPU: NVIDIA GeForce RTX 5090 Laptop GPU (24 GB) [board 17AA]\r\nGPU: Intel(R) Graphics (? GB) [board 17AA]\r\n";
@@ -121,5 +121,43 @@ describe("the catalog file", () => {
     expect(catalogFile("rtx_6090_48gb_reference", "RTX 6090", "desktop")!.yaml).not.toContain("base:");
     expect(catalogFile("RTX 5080", "x", "desktop")).toBeNull();
     expect(catalogFile("mystery_8gb_reference", "x", "desktop")).toBeNull();
+  });
+});
+
+describe("handheld PCs", () => {
+  it("reads a handheld computer type", () => {
+    expect(parseGpuInfo("Computer type: handheld\nGPU: AMD Radeon(TM) Graphics (? GB) [board 1043]").formFactor).toBe("handheld");
+  });
+
+  it("builds <device>_<chip>_<ram>gb, the RAM replacing a chip's own memory token", () => {
+    expect(buildGpuId({ base: "z1_extreme", formFactor: "handheld", line: "ROG Ally X", ramGb: 24 })).toBe("rog_ally_x_z1_extreme_24gb");
+    expect(buildGpuId({ base: "arc_140v_16gb", formFactor: "handheld", line: "MSI Claw 8 AI+", ramGb: 32 })).toBe("msi_claw_8_ai_arc_140v_32gb");
+    // Not finished until it has a RAM size: no memory token, so not a valid id yet.
+    expect(isCatalogIdShape(buildGpuId({ base: "z1_extreme", formFactor: "handheld", line: "ROG Ally" }))).toBe(false);
+    expect(productName("AMD Radeon(TM) Graphics", { base: "z1_extreme", formFactor: "handheld", line: "ROG Ally X", ramGb: 24 })).toBe("ROG Ally X 24 GB");
+  });
+
+  it("finds the chip's reference after the device name, for the vendor and base:", () => {
+    expect(referenceIn("rog_ally_x_z1_extreme_24gb")).toBe("z1_extreme");
+    expect(referenceIn("rtx_5080_16gb_gigabyte_gaming_oc")).toBe("rtx_5080_16gb");
+    expect(vendorOf("rog_ally_x_z1_extreme_24gb")).toBe("amd");
+    // The chip's reference names its own memory (rx_7600m_xt_8gb), not the handheld's RAM.
+    expect(vendorOf("rog_ally_x_rx_7600m_xt_24gb")).toBe("amd");
+    expect(vendorOf("msi_claw_8_ai_arc_140v_32gb")).toBe("intel");
+    const f = catalogFile("rog_ally_x_z1_extreme_24gb", "ROG Ally X 24 GB", "handheld")!;
+    expect(f.path).toBe("data/gpus/handheld/amd/rog_ally_x_z1_extreme_24gb.yaml");
+    expect(f.yaml).toContain("base: z1_extreme\n");
+    expect(f.yaml).toContain("  form_factor: handheld\n");
+    expect(f.yaml).toContain("  capacity_gb: 24\n  shared: true\n");
+    expect(f.yaml).not.toContain("board_partner");
+  });
+
+  it("recognises Valve's machines, whose GPU names don't say what they are", () => {
+    // Real Linux command output on a Steam Machine.
+    const machine = parseGpuInfo("Computer type: desktop\nGPU: Navi 33 [Radeon Graphics] (8 GB) [board 1e44]\n");
+    expect(knownProduct(machine.gpus[0])).toBe("steam_machine_8gb_valve");
+    expect(knownProduct({ name: "VanGogh [AMD Custom GPU 0405]", vramGb: 1, board: "1002" })).toBe("steam_deck_lcd_16gb");
+    // A Navi 33 card from anyone else is just a Radeon card.
+    expect(knownProduct({ name: "Navi 33 [Radeon RX 7600/7600 XT]", vramGb: 8, board: "1da2" })).toBeNull();
   });
 });

@@ -4,16 +4,18 @@ import { GPU_REFERENCES } from "./catalog";
 // Building the catalog id of a GPU that isn't listed yet, from what the lookup command printed
 // (pasted by the user; the page never reads the system). Ids follow the upstream catalog rules
 // (data/gpus/README.md): lowercase letters, digits and single underscores, one <n>gb token, and
-// desktop and laptop ids start with their reference ("base") id. For a product whose exact model
+// desktop and laptop ids start with their reference ("base") id, and a handheld names its device first. For a product whose exact model
 // isn't known, this tool uses `reference` (proposed upstream in docs/upstream-submission-changes.md):
 //   laptop                        <base>_reference             rtx_5090_laptop_24gb_reference
 //   desktop, chip vendor's card   <base>_fe | _reference | _le rtx_5080_16gb_fe
 //   desktop, brand and line       <base>_<brand>_<line>        rtx_5080_16gb_gigabyte_gaming_oc
 //   desktop, brand only           <base>_<brand>_reference     rtx_5080_16gb_gigabyte_reference
 //   desktop, brand unknown        <base>_reference             rtx_5080_16gb_reference
+//   handheld                      <device>_<chip>_<ram>gb      rog_ally_z1_extreme_16gb
+// A handheld's memory token is its system RAM, which the GPU shares.
 // ---------------------------------------------------------------------------
 
-export type GpuFormFactor = "desktop" | "laptop";
+export type GpuFormFactor = "desktop" | "laptop" | "handheld";
 export type GpuVendor = "nvidia" | "amd" | "intel";
 
 export interface DetectedGpu {
@@ -54,7 +56,7 @@ export function parseGpuInfo(text: string): GpuInfo {
   const gpus: DetectedGpu[] = [];
   for (const raw of String(text ?? "").split(/\r?\n|;/)) {
     const line = raw.trim();
-    const t = /computer type:\s*(laptop|desktop)/i.exec(line);
+    const t = /computer type:\s*(laptop|desktop|handheld)/i.exec(line);
     if (t) {
       formFactor = t[1].toLowerCase() as GpuFormFactor;
       continue;
@@ -160,9 +162,35 @@ export function boardOf(board: string): { brand: string } | { own: true } | null
   return b ? { brand: b.token } : null;
 }
 
+/** The longest reference id inside a product id: at the start (cards, laptops) or after a handheld's device name. */
+export function referenceIn(id: string): string | undefined {
+  const t = `_${id}_`;
+  return GPU_REFERENCES.map((r) => r.id)
+    .filter((r) => t.includes(`_${r}_`))
+    .sort((a, b) => Number(id.startsWith(`${b}_`) || id === b) - Number(id.startsWith(`${a}_`) || id === a) || b.length - a.length)[0];
+}
+
+/** Valve's PCI subsystem vendor id. */
+export const VALVE_PCI = "1e44";
+
+/**
+ * A catalog product the lookup output names outright, even though its GPU name doesn't: Valve's
+ * machines show up as plain AMD chips ("Navi 33 [Radeon Graphics]", "VanGogh [AMD Custom GPU 0405]").
+ */
+export function knownProduct(g: Pick<DetectedGpu, "name" | "vramGb" | "board">): string | null {
+  if (/navi ?33/i.test(g.name) && g.board === VALVE_PCI) return "steam_machine_8gb_valve";
+  if (/vangogh|custom gpu 0405/i.test(g.name)) return "steam_deck_lcd_16gb";
+  return null;
+}
+
 /** The GPU vendor of a reference or product id. */
 export function vendorOf(id: string): GpuVendor | null {
-  const ref = GPU_REFERENCES.find((r) => id === r.id || id.startsWith(`${r.id}_`));
+  const refId = referenceIn(id);
+  // A handheld's id carries its RAM, not the chip's memory, so also match the chip without its memory token.
+  const chipOnly = (r: string) => r.replace(/_\d+gb(?=_|$)/, "");
+  const ref = refId
+    ? GPU_REFERENCES.find((r) => r.id === refId)
+    : GPU_REFERENCES.filter((r) => `_${id}_`.includes(`_${chipOnly(r.id)}_`)).sort((a, b) => chipOnly(b.id).length - chipOnly(a.id).length)[0];
   if (ref && (ref.vendor === "nvidia" || ref.vendor === "amd" || ref.vendor === "intel")) return ref.vendor;
   if (/^(rtx|gtx|gt|titan|quadro)_/.test(id)) return "nvidia";
   if (/^(rx|hd|r[579]|radeon|vega|w\d)/.test(id)) return "amd";
@@ -175,13 +203,22 @@ export interface IdChoice {
   formFactor: GpuFormFactor;
   /** Desktop only: "" not sure, "own" the GPU vendor's own card, or a board brand token. */
   maker?: string;
-  /** Desktop only, with a brand: the product line from the box, e.g. "Gaming OC". */
+  /** Desktop, with a brand: the product line from the box, e.g. "Gaming OC". Handheld: the device, e.g. "ROG Ally X". */
   line?: string;
+  /** Handheld only: system RAM in GB, which the GPU shares (the id's memory token). */
+  ramGb?: number | null;
+}
+
+/** A handheld's id: device, chip, RAM. The chip's own memory token, if any, gives way to the RAM. */
+function handheldId(base: string, line: string, ramGb: number | null | undefined): string {
+  const chip = ramGb ? base.replace(/_\d+gb(?=_|$)/, "") : base;
+  return [slug(line), chip, ramGb ? `${ramGb}gb` : ""].filter(Boolean).join("_");
 }
 
 /** The product id, per the convention at the top of this file. */
-export function buildGpuId({ base, formFactor, maker = "", line = "" }: IdChoice): string {
+export function buildGpuId({ base, formFactor, maker = "", line = "", ramGb }: IdChoice): string {
   if (formFactor === "laptop") return `${base}_reference`;
+  if (formFactor === "handheld") return handheldId(base, line, ramGb);
   if (maker === "own") {
     const v = vendorOf(base);
     return `${base}_${v ? OWN_CARD[v].token : "reference"}`;
@@ -192,7 +229,7 @@ export function buildGpuId({ base, formFactor, maker = "", line = "" }: IdChoice
 }
 
 /** A name for the product, e.g. "Gigabyte GeForce RTX 5080 Gaming OC", from the system's name for the GPU. */
-export function productName(gpuName: string, { base, formFactor, maker = "", line = "" }: IdChoice): string {
+export function productName(gpuName: string, { base, formFactor, maker = "", line = "", ramGb }: IdChoice): string {
   const clean = gpuName
     .replace(/^.*\[([^\]]+)\].*$/, "$1")
     .replace(/\((?:R|TM)\)|[®™]/gi, "")
@@ -200,6 +237,7 @@ export function productName(gpuName: string, { base, formFactor, maker = "", lin
     .replace(/\s+/g, " ")
     .trim();
   if (formFactor === "laptop") return clean;
+  if (formFactor === "handheld") return [line.trim() || clean, ramGb ? `${ramGb} GB` : ""].filter(Boolean).join(" ");
   if (maker === "own") {
     const v = vendorOf(base);
     return v ? `${clean} ${OWN_CARD[v].label}` : clean;
@@ -225,10 +263,10 @@ export function catalogFile(id: string, name: string, formFactor: GpuFormFactor)
   const vendor = vendorOf(id);
   if (!vendor) return null;
   const capacity = Number(/(?:^|_)(\d+)gb(?:_|$)/.exec(id)![1]);
-  const base = GPU_REFERENCES.map((r) => r.id)
-    .filter((r) => id.startsWith(`${r}_`))
-    .sort((a, b) => b.length - a.length)[0];
-  const rest = base ? id.slice(base.length + 1) : "";
+  const found = referenceIn(id);
+  // Cards and laptops start with their reference; a handheld names its device first.
+  const base = found && (formFactor === "handheld" || id.startsWith(`${found}_`)) ? found : undefined;
+  const rest = base && id.startsWith(`${base}_`) ? id.slice(base.length + 1) : "";
   const partner = formFactor === "desktop" ? BOARD_BRANDS.find((b) => rest === b.token || rest.startsWith(`${b.token}_`))?.label.split(" /")[0] : undefined;
   const yaml = [
     `id: ${id}`,
@@ -241,6 +279,7 @@ export function catalogFile(id: string, name: string, formFactor: GpuFormFactor)
     `  form_factor: ${formFactor}`,
     `memory:`,
     `  capacity_gb: ${capacity}`,
+    ...(formFactor === "handheld" ? [`  shared: true`] : []),
   ].join("\n");
   return { path: `data/gpus/${formFactor}/${vendor}/${id}.yaml`, yaml: `${yaml}\n` };
 }

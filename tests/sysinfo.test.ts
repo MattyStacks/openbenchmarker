@@ -66,3 +66,11 @@ describe("system-info lookup commands", () => {
     expect(commandsFor("windows")?.shell).toBe("PowerShell");
   });
 });
+
+describe("the Windows computer type line", () => {
+  it("checks for handhelds before PCSystemType", () => {
+    const line = SYSINFO_COMMANDS.windows.commands[0].command.split("\n")[0];
+    expect(line.indexOf("'handheld'")).toBeLessThan(line.indexOf("PCSystemType"));
+    expect(line).toMatch(/ROG Ally\|/);
+  });
+});

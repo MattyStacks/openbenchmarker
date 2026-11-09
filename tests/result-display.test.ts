@@ -7,7 +7,7 @@ import {
   deviceLine,
   facetValues,
   filterRuns,
-  isHandheld,
+  isPhoneOrTablet,
   mixesMajors,
   runClass,
   sortRuns,
@@ -41,7 +41,7 @@ describe("runClass: the device that ran it", () => {
     expect(runClass(result({ mobile: false }))).toBe("desktop");
     expect(runClass(result({ device: dev({}) }))).toBe("unknown");
     expect(runClass(result())).toBe("unknown");
-    expect(["phone", "tablet", "mobile"].every((c) => isHandheld(c as never))).toBe(true);
+    expect(["phone", "tablet", "mobile"].every((c) => isPhoneOrTablet(c as never))).toBe(true);
   });
 });
 
@@ -49,7 +49,7 @@ describe("display rules table", () => {
   it("phone/tablet runs: never a submission status, Share when valid", () => {
     for (const r of [result({ device: IPHONE, mobile: true }), result({ device: IPAD, mobile: true }), result({ mobile: true }), result({ device: PIXEL, mobile: true, system: READY_SYS })]) {
       const s = submissionStatus(r);
-      expect(s.kind).toBe("handheld");
+      expect(s.kind).toBe("phone");
       expect(JSON.stringify(s)).not.toMatch(/missing|incomplete|GPU|submit/i);
       expect(canShare(r)).toBe(true);
     }

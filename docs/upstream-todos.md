@@ -14,7 +14,7 @@ Here is what a request looks like:
 Title: GPU catalog request: NVIDIA GeForce RTX 4070 SUPER
 
 **GPU to add:** <!-- the exact product: brand, model and memory, e.g. MSI GeForce RTX 5060 Ti 16 GB Ventus 2X OC -->
-**Form factor:** desktop / laptop <!-- keep one -->
+**Form factor:** desktop / laptop / handheld <!-- keep one -->
 **Product or spec page:** <!-- optional link, helps get the details right -->
 **Reported by the browser (starting point, edit as needed):** NVIDIA GeForce RTX 4070 SUPER
 ---
