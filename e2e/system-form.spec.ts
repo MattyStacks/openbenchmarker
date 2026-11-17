@@ -29,6 +29,20 @@ const STEAM = {
   system: { overclocked: "no" },
 };
 
+// A fresh Windows run whose browser names a GPU with a reference file but no listed product: the
+// guess opens the GPU helper on it, which builds the ID while the form is still being set up.
+const TI = {
+  ...STEAM, id: "e2e-2080ti",
+  device: { browser: "edge", browserMajor: 141, os: "windows", deviceType: "desktop", webkitEngine: false, gpuLabel: "NVIDIA GeForce RTX 2080 Ti" },
+  diag: { ...STEAM.diag, renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 2080 Ti (0x00001E07) Direct3D11 vs_5_0 ps_5_0, D3D11)", vendor: "Google Inc. (NVIDIA)", backend: "Direct3D11" },
+  probe: { ...STEAM.probe, platformVersion: "19.0.0" },
+};
+// The same GPU as a guess already saved, before its helper built the ID.
+const TI_SAVED = {
+  ...RESULT, id: "e2e-2080ti-saved", carriedFrom: undefined, guessed: true,
+  system: { gpuId: "__not_listed__", gpuName: "GeForce RTX 2080 Ti 11 GB", gpuFormFactor: "desktop", gpuIdRequested: "", os: "windows", overclocked: "no" },
+};
+
 test.beforeEach(async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   // Seed once per test, not on every navigation, so the page's own saves stick.
@@ -37,7 +51,7 @@ test.beforeEach(async ({ page, context }) => {
       localStorage.setItem("ogb.results.v1", JSON.stringify(r));
       sessionStorage.setItem("e2e-seeded", "1");
     }
-  }, [RESULT, STEAM]);
+  }, [RESULT, STEAM, TI, TI_SAVED]);
 });
 
 test("a Steam Machine run is filled in from the browser, marked, and ready to download", async ({ page }) => {
@@ -211,3 +225,27 @@ test("the share link carries the GPU and overclock filled in after the page open
   await expect(facts).toContainText("NVIDIA GeForce RTX 5080");
 });
 
+
+for (const r of [TI, TI_SAVED]) {
+  test(`a guessed GPU that isn't listed builds its ID without breaking the form (${r.id})`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.goto(`/#/result/${r.id}`);
+    const form = page.locator("#sys-form");
+    await expect(form.locator('[name="gpuIdRequested"]')).toHaveValue("rtx_2080_ti_11gb_reference");
+    // The rest of the form was set up after the helper's save: dropdowns, commands and handlers.
+    await expect(form.locator('[data-combo-select="osDetail"] option')).toContainText(["— Not sure —", "Windows 11 Pro 24H2"]);
+    await expect(form.locator('[data-combo-select="memoryChannels"] option', { hasText: "2 (dual channel" })).toHaveCount(1);
+    await expect(form.locator('[data-combo-select="memoryType"] option', { hasText: "DDR" }).first()).toBeAttached();
+    await form.locator("#exact-values > summary").click();
+    await expect(form.locator("[data-cmd-all]")).toContainText("Computer type:");
+    await expect(form.locator("[data-cmd-open]")).toContainText("PowerShell");
+    await form.getByText("Linux", { exact: true }).click();
+    await expect(form.locator("[data-cmd-open]")).toContainText("Terminal (bash)");
+    await form.locator('[data-combo-select="memoryChannels"]').selectOption("2");
+    const saved = await page.evaluate((id) => (JSON.parse(localStorage.getItem("ogb.results.v1")!) as { id: string; system: Record<string, string> }[]).find((x) => x.id === id)!.system, r.id);
+    expect(saved.gpuIdRequested).toBe("rtx_2080_ti_11gb_reference");
+    expect(saved.memoryChannels).toBe("2");
+    expect(errors).toEqual([]);
+  });
+}

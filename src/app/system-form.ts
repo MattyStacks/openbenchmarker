@@ -137,6 +137,15 @@ export interface SystemFormApi {
 export function bindSystemForm(form: HTMLFormElement, r: BenchResult, save: () => void): SystemFormApi {
   const q = <T extends HTMLElement>(sel: string) => form.querySelector<T>(sel)!;
   const other = new Set<string>();
+  // While the form is still being wired, `save` must not run: the caller's save refreshes the page
+  // through the API this function hasn't returned yet (results-view's `sysForm`). A save asked for
+  // during setup (the guessed GPU's helper building its ID) runs once setup is done.
+  let binding = true;
+  let saveWanted = false;
+  const commit = () => {
+    if (binding) saveWanted = true;
+    else save();
+  };
 
   /** Sets fields as the user's (or a command's) values: the form follows, and changed values lose their suggested mark. */
   const setValues = (vals: Partial<SystemInfo>, keepMarks = false) => {
@@ -166,11 +175,11 @@ export function bindSystemForm(form: HTMLFormElement, r: BenchResult, save: () =
     // The helper's built name and id: kept marked if they're the guess itself.
     apply: (vals) => {
       setValues(vals, true);
-      save();
+      commit();
     },
     pickListed: (id) => {
       setValues({ gpuId: id });
-      save();
+      commit();
     },
   });
 
@@ -421,5 +430,8 @@ export function bindSystemForm(form: HTMLFormElement, r: BenchResult, save: () =
     q<HTMLInputElement>('[name="driver"]').placeholder = r.system.os === "linux" ? "e.g. Mesa 26.1.2, or NVIDIA 580.95.05" : "e.g. 581.57 (NVIDIA), 25.10.1 (AMD)";
     q("#guess-summary").innerHTML = summaryHtml(r);
   };
+  binding = false;
+  // After the caller has its API back (renderResults finishes synchronously first).
+  if (saveWanted) queueMicrotask(save);
   return { refresh };
 }
