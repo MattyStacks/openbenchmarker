@@ -299,3 +299,78 @@ Change "Picking the ID" in `data/gpus/README.md` to match:
   for GPU comparisons, with CPU-limited runs behind a toggle.
 - Show `overclocked: true` runs with a badge, and keep them out of stock averages. Where
   `overclock:` is present, show the core/memory offsets and power limit next to the run.
+
+## 7. Shared-memory (integrated) GPU IDs: a `shared` token
+
+**Decided 2026-11-17 (Matt).** Every product ID needs exactly one `<n>gb` token equal to
+`memory.capacity_gb`. The token exists to tell apart variants of the same card that differ only in
+VRAM (an 8 GB and a 16 GB RTX 5060 Ti). An integrated GPU has no VRAM of its own, so there's no
+size to put there: Open GPU Benchmarker guessed `arc_140v_reference` for a Lunar Lake laptop and
+its own checks rejected it.
+
+- **IDs:** integrated GPUs that share system memory use the word `shared` in place of `<n>gb`, in
+  the `igpu` form factor: `<chip>_shared_<oem>_<model>`, e.g. `arc_140v_shared_lenovo_yoga_slim_7x`,
+  `radeon_780m_shared_minisforum_um790_pro`. An unknown model uses the same suffix laptops use at
+  the time (`_generic` today; `_reference` if section 5 lands): `radeon_780m_shared_generic`.
+- **No RAM in the ID.** Like laptops, the RAM can often be upgraded, and it isn't a property of the
+  GPU. Each run records it under `system:` (`memory_gb`, `memory_type`, `memory_channels`), which
+  is where speed and channels, the things that move iGPU results, are visible.
+- **Catalog file:** `classification.form_factor: igpu`, `memory.shared: true`, and no
+  `memory.capacity_gb`. `base:` points at the chip's reference (`arc_140v`, `z1_extreme`), which
+  already has no memory token.
+- **Handhelds don't change.** Their RAM is soldered and sold as separate models, so
+  `<device>_<chip>_<ram>gb` (`legion_go_s_z1_extreme_16gb`) stays.
+- **Discrete cards whose reference has no size** (`hd_7790`, `r9_290`, `r9_m280x`, `arc_a530m`, …)
+  aren't affected. They have VRAM, and upstream already accepts
+  `hd_7790_2gb_<brand>_<line>` with `base: hd_7790`. Open GPU Benchmarker's helper asks for the
+  memory size for these.
+
+### Prompt for the open-gpu-benchmarks instance
+
+```text
+Change the GPU catalog ID rules for integrated GPUs that share system memory. Branch from an
+up-to-date main (one open PR at a time; follow CLAUDE.md: CHANGELOG line, docs/TODO.md, MINOR
+version bump, preflight).
+
+Why: every product ID needs exactly one <n>gb memory token equal to memory.capacity_gb, so
+variants that differ only in VRAM stay apart. An integrated GPU (Intel Arc 130V/140V/140T/B390,
+Radeon 780M/890M, Ryzen Z1 Extreme in a laptop or mini PC) has no VRAM of its own, so there is no
+honest size to put there. Using system RAM would split one laptop model into a product per RAM
+upgrade, and data/gpus/README.md already says laptop RAM is not part of the ID.
+
+Decision:
+1. A product with classification.form_factor `igpu` uses the word `shared` in place of the <n>gb
+   token: `<chip>_shared_<oem>_<model>`, e.g. arc_140v_shared_lenovo_yoga_slim_7x,
+   radeon_780m_shared_minisforum_um790_pro. When the model is unknown it takes the same suffix
+   laptops use for that (today `generic`: radeon_780m_shared_generic, with the same warning).
+2. Such a product has memory.shared: true and no memory.capacity_gb. System RAM is recorded per
+   run (system.memory_gb, memory_type, memory_channels), not in the catalog.
+3. `base:` points at the chip's reference file (arc_140v, z1_extreme), which already has no memory
+   token; the ID must start with `<base>_shared_`.
+4. Handhelds are unchanged: `<device>_<chip>_<ram>gb`, RAM soldered, capacity_gb required.
+5. desktop, laptop and handheld are unchanged: `shared` is an error there (a discrete GPU has
+   VRAM; a handheld names its RAM).
+
+Changes:
+- scripts/checks.py, check_catalog_id: for form_factor igpu, require exactly one `shared` token
+  and no <n>gb token, at least one token before it (the chip) and one after it (oem_model or
+  generic); keep the existing rules for the other form factors and reject `shared` in them.
+  Replace the igpu entry in `shapes` ("<chip>_<ram>gb_...") with "<chip>_shared_<oem>_<model>".
+  Allow `generic` in igpu IDs with the same placement rule and warning as laptops.
+- CATALOG_REQUIRED: memory.capacity_gb is required except for igpu products with
+  memory.shared: true; for those, require memory.shared: true and error if capacity_gb is set
+  (it would be the RAM, which belongs on the run). Check base-id for igpu like desktop/laptop.
+- Anything that reads capacity_gb for every product (build.py catalog_vram_gb already returns
+  None for shared; check the dashboard, the API shape and any VRAM column or filter) must
+  handle it being absent. If an API key changes, bump SCHEMA_VERSION and update the shape.
+- data/gpus/README.md: the "Picking the ID" table row for igpu, a short "Integrated GPU memory"
+  rule next to "Laptop RAM" and "Handheld RAM", the id-memory-token section, and "Which ID do I
+  use?". Mention templates/ if a catalog template lists capacity_gb as always required.
+- scripts/test_build.py: cases that pass (arc_140v_shared_lenovo_yoga_slim_7x with base arc_140v,
+  radeon_780m_shared_generic with the generic warning) and fail (igpu with a <n>gb token, igpu
+  with capacity_gb, `shared` in a laptop or desktop ID, igpu ending at `shared`, two tokens),
+  each with a message that says why the rule exists.
+- CHANGELOG (Changed: igpu ID rule), docs/TODO.md, MINOR bump per CLAUDE.md.
+
+Don't rename or move any existing catalog file or result folder.
+```
