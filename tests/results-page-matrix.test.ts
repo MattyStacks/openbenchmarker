@@ -52,8 +52,19 @@ function gpuCases(id: string, name: string): Case[] {
     { label: `${id} · Windows laptop on battery`, renderer: angle(name, " Direct3D11 vs_5_0 ps_5_0, D3D11)"), os: "windows", probe: { platformVersion: "10.0.0", battery: { charging: false, level: 0.5 } } },
     { label: `${id} · Linux Chromium`, renderer: angle(name, " (radeonsi navi33 LLVM 19.1.7 DRM 3.61), OpenGL ES 3.2)"), os: "linux" },
     { label: `${id} · Linux Firefox`, renderer: `${name} (radeonsi, navi32, LLVM 19.1.7, DRM 3.61, 6.14.4) Mesa 25.0.4`, os: "linux" },
+    // NVIDIA's own Linux driver: GL in Chromium and Firefox, and Chromium's Vulkan backend.
+    { label: `${id} · Linux NVIDIA driver`, renderer: `ANGLE (NVIDIA Corporation, ${name}/PCIe/SSE2, OpenGL 4.5.0 NVIDIA 580.95.05)`, os: "linux" },
+    { label: `${id} · Linux Firefox NVIDIA driver`, renderer: `${name}/PCIe/SSE2`, os: "linux" },
+    { label: `${id} · Linux Vulkan`, renderer: `ANGLE (${name.split(" ")[0]}, Vulkan 1.4.312 (${name} (0x00001E07)), ${name.split(" ")[0]})`, os: "linux" },
   ];
 }
+
+/** Common GPUs the catalog doesn't know: nothing is guessed, and the form must still come up whole. */
+const NOT_IN_CATALOG = [
+  "NVIDIA GeForce GTX 970", "NVIDIA GeForce GTX 960", "NVIDIA GeForce GTX 760", "NVIDIA GeForce GTX TITAN X", "NVIDIA GeForce MX450", "NVIDIA Quadro P2000",
+  "NVIDIA RTX A2000 12GB", "NVIDIA T1000", "AMD Radeon(TM) Graphics", "AMD Radeon 780M", "AMD Radeon(TM) Vega 8 Graphics",
+  "Intel(R) UHD Graphics 620", "Intel(R) Iris(R) Xe Graphics", "Intel(R) HD Graphics 4000",
+];
 
 const OTHER_CASES: Case[] = [
   { label: "masked · Firefox", renderer: "NVIDIA GeForce GTX 980, or similar", os: "windows" },
@@ -67,6 +78,7 @@ const OTHER_CASES: Case[] = [
 const ALL_CASES: Case[] = [
   ...GPU_REFERENCES.flatMap((g) => gpuCases(g.id, vendorName(g.vendor, g.name))),
   ...GPU_CATALOG.flatMap((g) => gpuCases(g.id, vendorName(g.vendor, g.name))),
+  ...NOT_IN_CATALOG.flatMap((name) => gpuCases(name, name)),
   ...OTHER_CASES,
 ];
 
@@ -77,6 +89,7 @@ const PAGE_CASES: Case[] = [
     const g = GPU_REFERENCES.find((x) => x.id === id)!;
     return gpuCases(g.id, vendorName(g.vendor, g.name));
   }),
+  ...gpuCases("NVIDIA GeForce GTX 970", "NVIDIA GeForce GTX 970"),
   ...OTHER_CASES,
 ];
 
@@ -247,6 +260,24 @@ describe("the whole results page, one machine of each kind", () => {
       // My Results lists it.
       renderHistory();
       await flush();
+    });
+    expect(errors).toEqual([]);
+  });
+});
+
+describe("a GPU the catalog doesn't know, typed in by the user, when the result is opened again", () => {
+  const body = /<body[^>]*>([\s\S]*)<\/body>/i.exec(html)![1].replace(/<script[\s\S]*?<\/script>/gi, "");
+  it.each(gpuCases("NVIDIA GeForce GTX 970", "NVIDIA GeForce GTX 970").map((c, i) => [c.label, c, i] as const))("%s", async (_label, c, i) => {
+    document.body.innerHTML = body;
+    const r = applyGuesses(result(c, i));
+    r.system = { ...r.system, gpuId: NOT_LISTED, gpuName: "NVIDIA GeForce GTX 970", gpuFormFactor: "desktop", gpuIdRequested: "gtx_970_4gb_reference" };
+    upsertResult(r);
+    const errors = await collectErrors(async () => {
+      renderResults(r);
+      await flush();
+      expectFormSetUp(document.querySelector<HTMLFormElement>("#sys-form")!);
+      expect((document.querySelector<HTMLInputElement>('[name="gpuIdRequested"]')!).value).toBe("gtx_970_4gb_reference");
+      expect(document.querySelector("#yaml-preview")!.textContent).toContain("gtx_970_4gb_reference");
     });
     expect(errors).toEqual([]);
   });
