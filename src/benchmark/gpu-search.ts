@@ -1,5 +1,5 @@
 import { GPU_CATALOG, GPU_REFERENCES, catalogLabel, type CatalogGpu, type ReferenceGpu } from "./catalog";
-import { referenceFormFactor } from "./guess";
+import { referenceFormFactor, rendererGpuName } from "./guess";
 import type { GpuFormFactor } from "./gpu-id";
 
 // ---------------------------------------------------------------------------
@@ -58,12 +58,21 @@ export function searchWords(s: string): string[] {
 }
 
 /**
+ * A GPU's name as the browser or a driver shows it, down to the words a catalog name has:
+ * "Mesa Intel(R) Arc(TM) A770 Graphics (DG2)" or "NVIDIA GeForce RTX 2080 Ti/PCIe/SSE2" can be
+ * pasted straight into the search.
+ */
+function queryName(query: string): string {
+  return (rendererGpuName(query) || query).replace(/\((?:R|TM)\)|[®™]/gi, " ").replace(/\b(graphics|gpu|corporation)\b/gi, " ");
+}
+
+/**
  * Options matching every word typed, best first: catalog products before reference chips, then
  * the ones where the typed words start the name, then shorter (more exact) names. Empty query:
  * the catalog products.
  */
 export function searchGpus(query: string, limit = 12): GpuOption[] {
-  const words = searchWords(query);
+  const words = searchWords(queryName(query));
   const options = gpuOptions();
   if (!words.length) return options.filter((o) => o.kind === "product").slice(0, limit);
   const scored: { o: GpuOption; score: number }[] = [];

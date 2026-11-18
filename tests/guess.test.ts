@@ -100,6 +100,17 @@ describe("guessing the system", () => {
     expect(g.values).toMatchObject({ gpuId: NOT_LISTED, gpuName: "Arc 140V GPU", gpuFormFactor: "laptop", gpuIdRequested: "arc_140v_shared_reference" });
   });
 
+  it("reads Intel and NVIDIA names on Linux: Mesa's prefix and codename, NVIDIA's /PCIe/SSE2", () => {
+    expect(rendererGpuName("ANGLE (Intel, Mesa Intel(R) Arc(TM) A770 Graphics (DG2), OpenGL ES 3.2)")).toBe("Intel(R) Arc(TM) A770 Graphics");
+    expect(rendererGpuName("Mesa Intel(R) UHD Graphics 620 (KBL GT2)")).toBe("Intel(R) UHD Graphics 620");
+    expect(rendererGpuName("ANGLE (Intel, Mesa Intel(R) Graphics (ADL-S GT1), OpenGL ES 3.2)")).toBe("Intel(R) Graphics");
+    expect(rendererGpuName("ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 2080 Ti/PCIe/SSE2, OpenGL 4.5.0 NVIDIA 580.95.05)")).toBe("NVIDIA GeForce RTX 2080 Ti");
+    expect(rendererGpuName("AMD Radeon(TM) Graphics")).toBe("AMD Radeon(TM) Graphics");
+    const b580 = guessSystem(run("ANGLE (Intel, Mesa Intel(R) Arc(TM) B580 Graphics (BMG G21), OpenGL ES 3.2)", "linux"));
+    expect(b580.values).toMatchObject({ gpuId: NOT_LISTED, gpuIdRequested: "arc_b580_12gb_reference" });
+    expect(guessSystem(run("ANGLE (Intel, Mesa Intel(R) Arc(TM) A770 Graphics (DG2), OpenGL ES 3.2)", "linux")).values.gpuId).toBe(NOT_LISTED);
+  });
+
   it("takes Mesa from the renderer on Linux, and nothing from Firefox's approximate names", () => {
     expect(guessSystem(run(MESA_FF, "linux")).values).toMatchObject({ mesa: "25.0.4", driver: "Mesa 25.0.4", gpuId: NOT_LISTED });
     const ff = guessSystem(run(FIREFOX, "windows"));

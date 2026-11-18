@@ -42,3 +42,20 @@ describe("searching the GPU list", () => {
     expect(referenceLabel(GPU_REFERENCES.find((r) => r.id === "z1_extreme")!)).toBe("AMD Ryzen Z1 Extreme");
   });
 });
+
+describe("searching with a name as the browser or driver shows it", () => {
+  it("finds the GPU from the full name, pasted as is", () => {
+    const top = (q: string) => searchGpus(q, 1)[0]?.id;
+    expect(top("Mesa Intel(R) Arc(TM) B580 Graphics (BMG G21)")).toBe("arc_b580_12gb");
+    expect(top("Intel(R) Arc(TM) 140V GPU")).toBe("arc_140v");
+    expect(top("NVIDIA GeForce RTX 2080 Ti/PCIe/SSE2")).toBe("rtx_2080_ti_11gb");
+    expect(top("AMD Radeon RX 7800 XT (radeonsi, navi32, LLVM 19.1.7, DRM 3.61)")).toBe("rx_7800_xt_16gb");
+    expect(top("ANGLE (NVIDIA, NVIDIA GeForce RTX 2080 Ti (0x00001E07) Direct3D11 vs_5_0 ps_5_0, D3D11)")).toBe("rtx_2080_ti_11gb");
+    expect(searchGpus("Mesa Intel(R) Arc(TM) A770 Graphics (DG2)", 2).map((o) => o.id).sort()).toEqual(["arc_a770_16gb", "arc_a770_8gb"]);
+  });
+
+  it("still reads short names the same way", () => {
+    expect(searchGpus("r9 290", 1)[0].id).toBe("r9_290");
+    expect(searchGpus("a770", 3).map((o) => o.id)).toContain("arc_a770_8gb");
+  });
+});

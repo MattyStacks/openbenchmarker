@@ -70,10 +70,16 @@ export function rendererGpuName(renderer: string | null | undefined): string {
     if (wrapped) s = wrapped[1];
   }
   return s
+    // Mesa's names for Intel GPUs: "Mesa Intel(R) Arc(TM) A770 Graphics (DG2)".
+    .replace(/^Mesa\s+/i, "")
+    // NVIDIA's own Linux driver: "NVIDIA GeForce RTX 2080 Ti/PCIe/SSE2".
+    .replace(/\/PCIe\/SSE2\b.*$/i, "")
     .replace(/\s*\(0x[0-9a-f]+\)/gi, "")
     .replace(/\s+(?:Direct3D\d*|D3D\d+)\b.*$/i, "")
     .replace(/\s*\((?:radeonsi|RADV|LLVM|DRM|iris|crocus|zink|nouveau|llvmpipe)\b[^)]*\)/gi, "")
     .replace(/\s+Mesa \d.*$/i, "")
+    // Intel's codename at the end: (DG2), (BMG G21), (LNL), (KBL GT2), (ADL-S GT1).
+    .replace(/\s*\((?!R\)|TM\))[A-Z][A-Z0-9-]{1,5}(?: [A-Z]{0,2}\d+)?\)$/, "")
     .replace(/\s+/g, " ")
     .trim();
 }

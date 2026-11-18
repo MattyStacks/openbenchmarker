@@ -55,6 +55,8 @@ function gpuCases(id: string, name: string): Case[] {
     // NVIDIA's own Linux driver: GL in Chromium and Firefox, and Chromium's Vulkan backend.
     { label: `${id} · Linux NVIDIA driver`, renderer: `ANGLE (NVIDIA Corporation, ${name}/PCIe/SSE2, OpenGL 4.5.0 NVIDIA 580.95.05)`, os: "linux" },
     { label: `${id} · Linux Firefox NVIDIA driver`, renderer: `${name}/PCIe/SSE2`, os: "linux" },
+    // Mesa's form for Intel GPUs: a "Mesa" prefix and the chip's codename.
+    { label: `${id} · Linux Mesa (Intel style)`, renderer: `ANGLE (${name.split(" ")[0]}, Mesa ${name} (DG2), OpenGL ES 3.2)`, os: "linux" },
     { label: `${id} · Linux Vulkan`, renderer: `ANGLE (${name.split(" ")[0]}, Vulkan 1.4.312 (${name} (0x00001E07)), ${name.split(" ")[0]})`, os: "linux" },
   ];
 }
