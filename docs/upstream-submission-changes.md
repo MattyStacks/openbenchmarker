@@ -388,8 +388,8 @@ Changes:
 - scripts/test_build.py: cases that pass (arc_140v_shared_lenovo_yoga_slim_7x with base arc_140v,
   arc_130t_shared_reference with base arc_130t, radeon_780m_shared_reference and
   iris_xe_shared_reference with no base, radeon_780m_shared_generic with the generic warning) and
-  fail (igpu with a <n>gb token, igpu
-  with capacity_gb, `shared` in a laptop or desktop ID, igpu ending at `shared`, two tokens),
+  fail (igpu with a <n>gb token, igpu with capacity_gb, `shared` in a laptop or desktop ID, igpu
+  ending at `shared`, two tokens),
   each with a message that says why the rule exists.
 - CHANGELOG (Changed: igpu ID rule), docs/TODO.md, MINOR bump per CLAUDE.md.
 
