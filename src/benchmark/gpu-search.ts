@@ -1,16 +1,38 @@
 import { GPU_CATALOG, GPU_REFERENCES, catalogLabel, type CatalogGpu, type ReferenceGpu } from "./catalog";
 import { referenceFormFactor, rendererGpuName } from "./guess";
-import type { GpuFormFactor } from "./gpu-id";
+import { integratedChip, productName, type GpuFormFactor } from "./gpu-id";
 
 // ---------------------------------------------------------------------------
-// The searchable GPU list: catalog products ("in the dataset") and reference chips ("known GPU,
-// not in the dataset yet"), so almost any GPU can be found by typing a few characters of its name.
+// The searchable GPU list: catalog products ("in the dataset"), reference chips ("known GPU, not in
+// the dataset yet") and common integrated GPUs with no reference file, so almost any GPU can be
+// found by typing a few characters of its name.
 // Pure, so the ranking is unit-tested.
 // ---------------------------------------------------------------------------
 
 export type GpuOption =
   | { kind: "product"; id: string; label: string; detail: string; product: CatalogGpu }
-  | { kind: "reference"; id: string; label: string; detail: string; ref: ReferenceGpu; formFactor: GpuFormFactor };
+  | { kind: "reference"; id: string; label: string; detail: string; ref: ReferenceGpu; formFactor: GpuFormFactor }
+  /** Integrated graphics with no reference file: `id` is its chip (radeon_780m), and its ID says shared. */
+  | { kind: "integrated"; id: string; label: string; detail: string; formFactor: GpuFormFactor };
+
+/**
+ * Common integrated GPUs that have no reference file, named as the system names them. Each name
+ * gives its chip through integratedChip (radeon_780m, iris_xe, uhd_620, intel_hd_4000).
+ */
+export const INTEGRATED_GPUS: readonly string[] = [
+  ...["610M", "660M", "680M", "740M", "760M", "780M", "840M", "860M", "880M", "890M", "8050S", "8060S"].map((n) => `AMD Radeon ${n}`),
+  ...[3, 6, 7, 8, 9, 10, 11].map((n) => `AMD Radeon Vega ${n} Graphics`),
+  "Intel Iris Xe Graphics",
+  ...[640, 645, 650, 655].map((n) => `Intel Iris Plus Graphics ${n}`),
+  ...[600, 605, 610, 615, 617, 620, 630, 710, 730, 750, 770].map((n) => `Intel UHD Graphics ${n}`),
+  ...[4000, 4400, 4600, 5500, 520, 530, 620, 630].map((n) => `Intel HD Graphics ${n}`),
+];
+
+const INTEGRATED_DETAIL = "Integrated · shared memory";
+
+function integratedOption(label: string, chip = integratedChip(label)): GpuOption {
+  return { kind: "integrated", id: chip, label, detail: INTEGRATED_DETAIL, formFactor: "laptop" };
+}
 
 const VENDOR: Record<string, string> = { nvidia: "NVIDIA", amd: "AMD", intel: "Intel" };
 const FF_WORD: Record<string, string> = { desktop: "Desktop", laptop: "Laptop", handheld: "Handheld PC", igpu: "Integrated" };
@@ -42,6 +64,7 @@ export function gpuOptions(): GpuOption[] {
       const formFactor = referenceFormFactor(r);
       return { kind: "reference", id: r.id, label: referenceLabel(r), detail: [FF_WORD[formFactor], specLine(r)].filter(Boolean).join(" · "), ref: r, formFactor };
     }),
+    ...INTEGRATED_GPUS.map((name) => integratedOption(name)),
   ];
   return all;
 }
@@ -82,10 +105,16 @@ export function searchGpus(query: string, limit = 12): GpuOption[] {
     if (!words.every((w) => hay.some((h) => h.startsWith(w)))) continue;
     const exactWords = words.filter((w) => hay.includes(w)).length;
     const first = searchWords(o.label)[0]?.startsWith(words[0]) ? 1 : 0;
-    scored.push({ o, score: (o.kind === "product" ? 1000 : 0) + exactWords * 50 + first * 20 - o.label.length });
+    // The typed words together, in order ("vega 8" in Radeon Vega 8, not RX Vega 56 8 GB).
+    const inOrder = words.length > 1 && ` ${searchWords(o.label).join(" ")} `.includes(` ${words.join(" ")} `) ? 1 : 0;
+    scored.push({ o, score: (o.kind === "product" ? 1000 : 0) + exactWords * 50 + inOrder * 30 + first * 20 - o.label.length });
   }
-  return scored
+  const found = scored
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((s) => s.o);
+  // Integrated graphics the list doesn't have, typed by name ("Radeon 660M"): offered all the same.
+  const chip = integratedChip(queryName(query).replace(/\s+/g, " ").trim());
+  if (chip && !found.some((o) => o.id === chip)) found.push(integratedOption(productName(rendererGpuName(query) || query, { base: chip, formFactor: "laptop", shared: true }), chip));
+  return found.slice(0, limit);
 }

@@ -234,6 +234,23 @@ describe("integrated graphics with no reference file", () => {
     }
   });
 
+  it("are listed in the search, and picking one builds its shared ID", async () => {
+    const r = run();
+    r.guessed = true;
+    r.system.os = "windows";
+    const { form } = mount(r);
+    const search = form.querySelector<HTMLInputElement>("#gpu-search")!;
+    search.value = "780m";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    const first = form.querySelector<HTMLElement>('#gpu-results [role="option"]')!;
+    expect(first.textContent).toContain("AMD Radeon 780M");
+    expect(first.textContent).toContain("Integrated · shared memory");
+    first.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    await flush();
+    expect(r.system).toMatchObject({ gpuId: NOT_LISTED, gpuName: "AMD Radeon 780M", gpuFormFactor: "laptop", gpuIdRequested: "radeon_780m_shared_reference" });
+    expect(form.querySelector("[data-helper-vram]")).toBeNull();
+  });
+
   it("from pasted output, ignore the memory size Windows reports for them", () => {
     const r = run();
     r.guessed = true;

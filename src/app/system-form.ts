@@ -1,7 +1,7 @@
 import { GPU_CATALOG, GPU_REFERENCES, NOT_LISTED, UPSTREAM_CATALOG_README, UPSTREAM_TEMPLATES, catalogLabel, findGpu, gpuRequestUrl } from "../benchmark/catalog";
 import { OVERCLOCK_FIELDS, SYSTEM_FIELDS, UNLISTED_GPU_FIELDS, fieldFor, submittedGpuId, type SystemField } from "../benchmark/fields";
 import { buildGpuId, integratedChip, isCatalogIdShape, isSizelessReference, knownProduct, parseGpuInfo, referenceIn, referenceMatches, type GpuFormFactor } from "../benchmark/gpu-id";
-import { searchGpus, type GpuOption } from "../benchmark/gpu-search";
+import { gpuOptions, searchGpus, type GpuOption } from "../benchmark/gpu-search";
 import { referencesFor } from "../benchmark/guess";
 import { SYSINFO_COMMANDS, parseSysinfoPaste } from "../benchmark/sysinfo";
 import type { BenchResult, SystemInfo } from "../benchmark/types";
@@ -196,7 +196,7 @@ export function bindSystemForm(form: HTMLFormElement, r: BenchResult, save: () =
       (o, i) => `<li role="option" id="gpu-opt-${i}" data-i="${i}" class="${o.kind}"><span class="opt-name">${esc(o.label)}</span><span class="opt-detail">${o.kind === "product" ? "In the dataset" : "Not in the dataset yet"}${o.detail ? ` · ${esc(o.detail)}` : ""}</span></li>`,
     );
     if (typed) rows.push(`<li role="option" id="gpu-opt-typed" data-i="typed" class="typed"><span class="opt-name">Use “${esc(typed)}”</span><span class="opt-detail">Not in the list? Type its full name, e.g. “ASUS GeForce RTX 5070 Ti 16 GB”.</span></li>`);
-    else rows.push(`<li class="hint" aria-hidden="true">Type to search ${GPU_CATALOG.length + GPU_REFERENCES.length} GPUs, or type any name.</li>`);
+    else rows.push(`<li class="hint" aria-hidden="true">Type to search ${gpuOptions().length} GPUs, or type any name.</li>`);
     list.innerHTML = rows.join("");
     list.hidden = false;
     search.setAttribute("aria-expanded", "true");
@@ -222,7 +222,11 @@ export function bindSystemForm(form: HTMLFormElement, r: BenchResult, save: () =
       const o = shown[Number(key)];
       if (!o) return;
       if (o.kind === "product") setValues({ gpuId: o.id });
-      else {
+      else if (o.kind === "integrated") {
+        setValues({ gpuId: NOT_LISTED, gpuName: "", gpuIdRequested: "" });
+        helper.pick({ name: o.label, vramGb: null, board: "" }, { formFactor: o.formFactor });
+        q<HTMLDetailsElement>("#gpu-more").open = false;
+      } else {
         setValues({ gpuId: NOT_LISTED, gpuName: "", gpuIdRequested: "" });
         helper.pick({ name: o.label, vramGb: o.ref.memoryGb ?? null, board: "" }, { formFactor: o.formFactor, base: o.ref.id });
         q<HTMLDetailsElement>("#gpu-more").open = false;

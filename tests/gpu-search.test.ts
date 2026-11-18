@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { referenceLabel, searchGpus, searchWords } from "../src/benchmark/gpu-search";
+import { INTEGRATED_GPUS, referenceLabel, searchGpus, searchWords } from "../src/benchmark/gpu-search";
+import { integratedChip } from "../src/benchmark/gpu-id";
 import { GPU_REFERENCES } from "../src/benchmark/catalog";
 
 const ids = (q: string, n = 5) => searchGpus(q, n).map((o) => o.id);
@@ -57,5 +58,36 @@ describe("searching with a name as the browser or driver shows it", () => {
   it("still reads short names the same way", () => {
     expect(searchGpus("r9 290", 1)[0].id).toBe("r9_290");
     expect(searchGpus("a770", 3).map((o) => o.id)).toContain("arc_a770_8gb");
+  });
+});
+
+describe("integrated GPUs with no reference file", () => {
+  it("each has its own chip, and none has a reference", () => {
+    const chips = INTEGRATED_GPUS.map((n) => integratedChip(n));
+    expect(chips.every(Boolean)).toBe(true);
+    expect(new Set(chips).size).toBe(chips.length);
+    expect(chips.filter((c) => GPU_REFERENCES.some((r) => r.id === c))).toEqual([]);
+  });
+
+  it("are found by a few characters of their name, or as the browser shows it", () => {
+    const first = (q: string) => searchGpus(q, 3)[0];
+    for (const q of ["780m", "780M", "Radeon 780M", "AMD Radeon 780M Graphics", "ANGLE (AMD, AMD Radeon 780M Graphics (0x000015BF) Direct3D11 vs_5_0 ps_5_0, D3D11)"])
+      expect([q, first(q)]).toEqual([q, expect.objectContaining({ kind: "integrated", id: "radeon_780m", label: "AMD Radeon 780M" })]);
+    expect(first("iris xe")).toMatchObject({ kind: "integrated", id: "iris_xe" });
+    expect(first("Intel(R) Iris(R) Xe Graphics")).toMatchObject({ id: "iris_xe" });
+    expect(first("uhd 620")).toMatchObject({ id: "uhd_620" });
+    expect(first("vega 8")).toMatchObject({ id: "radeon_vega_8" });
+    expect(searchGpus("hd 4000", 3).map((o) => o.id)).toContain("intel_hd_4000");
+    expect(first("8060s")).toMatchObject({ id: "radeon_8060s" });
+  });
+
+  it("not on the list, are offered when typed by name", () => {
+    expect(searchGpus("Radeon 655M")).toEqual([expect.objectContaining({ kind: "integrated", id: "radeon_655m", label: "Radeon 655M" })]);
+    expect(searchGpus("Intel(R) UHD Graphics 655")).toEqual([expect.objectContaining({ kind: "integrated", id: "uhd_655", label: "Intel UHD Graphics 655" })]);
+    // A name that doesn't give the chip lists the chips it could be; a discrete card gets none.
+    const amd = searchGpus("AMD Radeon(TM) Graphics", 40).filter((o) => o.kind === "integrated");
+    expect(amd.map((o) => o.id)).toContain("radeon_780m");
+    expect(amd.every((o) => o.id.startsWith("radeon_"))).toBe(true);
+    expect(searchGpus("gtx 970")).toEqual([]);
   });
 });
