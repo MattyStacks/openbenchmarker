@@ -194,8 +194,11 @@ describe("what the page builds, for every GPU and browser", () => {
   it.each(ALL_CASES.map((c, i) => [c.label, c, i] as const))("%s", (_label, c, i) => {
     const r = applyGuesses(result(c, i));
     buildEverything(r);
-    // A guessed ID is always one the page accepts, or none.
-    if (r.system.gpuIdRequested && isCatalogIdShape(r.system.gpuIdRequested)) expect(validateSubmission(r).filter((e) => e.startsWith("Requested gpu_id"))).toEqual([]);
+    // A guessed ID is always one the page accepts, or none (the helper then asks for what's missing).
+    if (r.system.gpuIdRequested) {
+      expect(isCatalogIdShape(r.system.gpuIdRequested)).toBe(true);
+      expect(validateSubmission(r).filter((e) => e.startsWith("Requested gpu_id"))).toEqual([]);
+    }
   });
 });
 

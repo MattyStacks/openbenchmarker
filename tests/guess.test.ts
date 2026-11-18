@@ -89,6 +89,17 @@ describe("guessing the system", () => {
     expect(ti.values.gpuIdRequested).toBeUndefined();
   });
 
+  it("guesses no ID for a chip whose reference has no memory size: the helper asks for it", () => {
+    for (const [renderer, name] of [
+      ["ANGLE (AMD, AMD Radeon HD 7790 Direct3D11 vs_5_0 ps_5_0, D3D11)", "Radeon HD 7790"],
+      ["ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)", "Arc 140V GPU"],
+    ]) {
+      const g = guessSystem(run(renderer, "windows"));
+      expect(g.values).toMatchObject({ gpuId: NOT_LISTED, gpuName: name });
+      expect(g.values.gpuIdRequested).toBeUndefined();
+    }
+  });
+
   it("takes Mesa from the renderer on Linux, and nothing from Firefox's approximate names", () => {
     expect(guessSystem(run(MESA_FF, "linux")).values).toMatchObject({ mesa: "25.0.4", driver: "Mesa 25.0.4", gpuId: NOT_LISTED });
     const ff = guessSystem(run(FIREFOX, "windows"));

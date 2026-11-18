@@ -37,6 +37,16 @@ export function isCatalogIdShape(id: string): boolean {
   return /^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(id) && id.split("_").filter((t) => /^\d+gb$/.test(t)).length === 1;
 }
 
+/**
+ * A discrete GPU's reference with no memory size in its id, because the chip was sold with more
+ * than one (hd_7790: 1 GB and 2 GB). Its products add the size after it: hd_7790_2gb_<brand>_<line>,
+ * with `base: hd_7790`. Not shared-memory chips (z1_extreme, arc_140v): they have no VRAM to add.
+ */
+export function isSizelessReference(id: string): boolean {
+  const ref = GPU_REFERENCES.find((r) => r.id === id);
+  return !!ref && !ref.memoryShared && !id.split("_").some((t) => /^\d+gb$/.test(t));
+}
+
 export const slug = (s: string) =>
   s
     .toLowerCase()

@@ -1,6 +1,6 @@
 import { GPU_CATALOG, GPU_REFERENCES, NOT_LISTED, findGpu, type CatalogGpu, type ReferenceGpu } from "./catalog";
 import { isMaskedRenderer } from "./diagnose";
-import { buildGpuId, chipTokens, type GpuFormFactor } from "./gpu-id";
+import { buildGpuId, chipTokens, isCatalogIdShape, type GpuFormFactor } from "./gpu-id";
 import type { BenchResult, SystemInfo, SystemProbe } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -162,8 +162,10 @@ export function guessSystem(r: GuessInput): Guess {
       set("gpuId", NOT_LISTED, FROM_BROWSER);
       set("gpuName", ref ? `${ref.name}${ref.memoryGb && formFactor !== "handheld" ? ` ${ref.memoryGb} GB` : ""}` : gpuName, FROM_BROWSER);
       set("gpuFormFactor", formFactor, FROM_BROWSER);
-      // One memory size: the id is complete. Several (8 and 16 GB): the user picks it.
-      if (ref && formFactor !== "handheld") set("gpuIdRequested", buildGpuId({ base: ref.id, formFactor }), "built from the GPU your browser reports");
+      // One memory size: the id is complete. Several (8 and 16 GB), or none in the reference
+      // (hd_7790, arc_140v): the user picks it in the helper, so no id is guessed.
+      const id = ref && formFactor !== "handheld" ? buildGpuId({ base: ref.id, formFactor }) : "";
+      if (isCatalogIdShape(id)) set("gpuIdRequested", id, "built from the GPU your browser reports");
     }
   }
 

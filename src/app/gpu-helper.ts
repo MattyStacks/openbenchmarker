@@ -8,6 +8,7 @@ import {
   chipTokens,
   catalogFile,
   isCatalogIdShape,
+  isSizelessReference,
   knownProduct,
   parseGpuInfo,
   productName,
@@ -104,12 +105,15 @@ export function bindGpuHelper(root: HTMLElement, opts: { apply: (s: Partial<Syst
     }
     const refs = referenceMatches(g);
     const choices = [...new Set([...refs.options, ...(refs.fallback && !refs.options.includes(refs.fallback) ? [refs.fallback] : [])])];
+    // A reference with no memory size (hd_7790, sold as 1 GB and 2 GB): its size is chosen and added to it.
+    const sizeless = refs.options.length === 1 && isSizelessReference(refs.options[0]) ? refs.options[0] : "";
     // No reference and no memory size: ask for the size, or for a handheld, use the chip alone (the RAM gives the size).
-    const stem = chipStem(g.name);
-    const askVram = !choices.length && st.formFactor !== "handheld";
+    const stem = sizeless || chipStem(g.name);
+    const askVram = (!choices.length || !!sizeless) && st.formFactor !== "handheld";
     if (!choices.length && st.formFactor === "handheld") st.base = stem;
     const vendor = vendorOf(st.base);
-    const id = st.base ? buildGpuId(st) : "";
+    // A sizeless reference has no id until its size is chosen.
+    const id = st.base && !(askVram && st.base === sizeless) ? buildGpuId(st) : "";
     const listed = id && findGpu(id);
     result.innerHTML = `
       <p class="tiny"><b>${esc(g.name)}</b>${g.vramGb && !/\b\d+\s*GB\b/i.test(g.name) ? `, ${g.vramGb} GB` : ""} isn't in the dataset yet. Check these and its ID is built for you.</p>
@@ -168,6 +172,8 @@ export function bindGpuHelper(root: HTMLElement, opts: { apply: (s: Partial<Syst
     // No reference file but a known memory size (a typed "Mystery GPU 9000 12 GB"): its chip and size.
     const refs = referenceMatches(g);
     st.base = base ?? refs.base ?? (!refs.options.length && g.vramGb && refs.fallback ? refs.fallback : "");
+    // A sizeless reference takes the size the system reported, when it's one of the choices.
+    if (isSizelessReference(st.base) && g.vramGb && VRAM_GB.includes(g.vramGb)) st.base = `${st.base}_${g.vramGb}gb`;
     st.formFactor = formFactor ?? st.info!.formFactor ?? (/laptop|mobile|\d+m\b/i.test(g.name) ? "laptop" : "desktop");
     const maker = boardOf(g.board);
     st.maker = st.formFactor !== "desktop" || !maker ? "" : "own" in maker ? "own" : maker.brand;

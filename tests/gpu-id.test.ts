@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GPU_REFERENCES } from "../src/benchmark/catalog";
-import { boardOf, buildGpuId, catalogFile, chipTokens, isCatalogIdShape, knownProduct, parseGpuInfo, productName, referenceIn, referenceMatches, vendorOf } from "../src/benchmark/gpu-id";
+import { boardOf, buildGpuId, catalogFile, chipTokens, isCatalogIdShape, isSizelessReference, knownProduct, parseGpuInfo, productName, referenceIn, referenceMatches, vendorOf } from "../src/benchmark/gpu-id";
 
 // Real output of the Windows GPU command on an RTX 5090 laptop (Lenovo Legion Pro 7).
 const LAPTOP_WIN = "Computer type: laptop\r\nGPU: NVIDIA GeForce RTX 5090 Laptop GPU (24 GB) [board 17AA]\r\nGPU: Intel(R) Graphics (? GB) [board 17AA]\r\n";
@@ -117,6 +117,14 @@ describe("the catalog file", () => {
     expect(f.yaml).toContain("  board_partner: Gigabyte\n");
   });
 
+  it("a card whose reference has no memory size adds its own, and builds on that reference", () => {
+    const f = catalogFile("hd_7790_2gb_sapphire_dual_x", "Sapphire Radeon HD 7790 Dual-X", "desktop")!;
+    expect(f.path).toBe("data/gpus/desktop/amd/hd_7790_2gb_sapphire_dual_x.yaml");
+    expect(f.yaml).toContain("base: hd_7790\n");
+    expect(f.yaml).toContain("  capacity_gb: 2\n");
+    expect(catalogFile("r9_m280x_4gb_reference", "AMD Radeon R9 M280X", "laptop")!.yaml).toContain("base: r9_m280x\n");
+  });
+
   it("no reference yet: no base line; a bad id or unknown vendor gives nothing", () => {
     expect(catalogFile("rtx_6090_48gb_reference", "RTX 6090", "desktop")!.yaml).not.toContain("base:");
     expect(catalogFile("RTX 5080", "x", "desktop")).toBeNull();
@@ -159,5 +167,26 @@ describe("handheld PCs", () => {
     expect(knownProduct({ name: "VanGogh [AMD Custom GPU 0405]", vramGb: 1, board: "1002" })).toBe("steam_deck_lcd_16gb");
     // A Navi 33 card from anyone else is just a Radeon card.
     expect(knownProduct({ name: "Navi 33 [Radeon RX 7600/7600 XT]", vramGb: 8, board: "1da2" })).toBeNull();
+  });
+});
+
+describe("references with no memory size", () => {
+  it("are discrete cards sold with more than one size, not shared-memory chips", () => {
+    for (const id of ["hd_7730", "hd_7790", "r9_290", "r9_m280x", "arc_a530m"]) expect(isSizelessReference(id)).toBe(true);
+    // Integrated: no VRAM to add (their own ID rule is decided upstream).
+    for (const id of ["z1_extreme", "arc_140v", "arc_b390"]) expect(isSizelessReference(id)).toBe(false);
+    for (const id of ["rtx_2080_ti_11gb", "hd_7790_2gb", "mystery_9000"]) expect(isSizelessReference(id)).toBe(false);
+  });
+
+  it("every one gets a valid id once its size is added", () => {
+    const sizeless = GPU_REFERENCES.filter((r) => isSizelessReference(r.id));
+    expect(sizeless.length).toBeGreaterThan(10);
+    for (const r of sizeless) {
+      for (const formFactor of ["desktop", "laptop"] as const) {
+        const id = buildGpuId({ base: `${r.id}_2gb`, formFactor });
+        expect(isCatalogIdShape(id)).toBe(true);
+        expect(catalogFile(id, r.name, formFactor)!.yaml).toContain(`base: ${r.id}\n`);
+      }
+    }
   });
 });

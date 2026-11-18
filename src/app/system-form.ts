@@ -1,6 +1,6 @@
 import { GPU_CATALOG, GPU_REFERENCES, NOT_LISTED, UPSTREAM_CATALOG_README, UPSTREAM_TEMPLATES, catalogLabel, findGpu, gpuRequestUrl } from "../benchmark/catalog";
 import { OVERCLOCK_FIELDS, SYSTEM_FIELDS, UNLISTED_GPU_FIELDS, fieldFor, submittedGpuId, type SystemField } from "../benchmark/fields";
-import { buildGpuId, knownProduct, parseGpuInfo, referenceIn, referenceMatches, type GpuFormFactor } from "../benchmark/gpu-id";
+import { buildGpuId, isCatalogIdShape, isSizelessReference, knownProduct, parseGpuInfo, referenceIn, referenceMatches, type GpuFormFactor } from "../benchmark/gpu-id";
 import { searchGpus, type GpuOption } from "../benchmark/gpu-search";
 import { referencesFor } from "../benchmark/guess";
 import { SYSINFO_COMMANDS, parseSysinfoPaste } from "../benchmark/sysinfo";
@@ -269,10 +269,20 @@ export function bindSystemForm(form: HTMLFormElement, r: BenchResult, save: () =
   if (r.system.gpuId === NOT_LISTED && r.system.gpuName.trim()) {
     const base = referenceIn(r.system.gpuIdRequested) ?? (referencesFor(r.system.gpuName).length === 1 ? referencesFor(r.system.gpuName)[0].id : undefined);
     const ff = (r.system.gpuFormFactor || null) as GpuFormFactor | null;
-    const untouched = !r.system.gpuIdRequested.trim() || (base && r.system.gpuIdRequested === buildGpuId({ base, formFactor: ff ?? "desktop" }));
+    const req = r.system.gpuIdRequested.trim();
+    // A sizeless reference (hd_7790) with the size the helper added: hd_7790_2gb_reference.
+    const size = base && isSizelessReference(base) ? new RegExp(`^${base}_(\\d+)gb_`).exec(req)?.[1] : undefined;
+    const built = (b: string) => req === buildGpuId({ base: b, formFactor: ff ?? "desktop" });
+    const untouched = !req || (base && (built(base) || (size && built(`${base}_${size}gb`))));
     if (untouched) {
+      // An id guessed before sizeless references were handled (hd_7790_reference) can't be
+      // submitted: clear it, and the helper asks for the size.
+      if (req && !isCatalogIdShape(req)) {
+        setValues({ gpuIdRequested: "" });
+        commit();
+      }
       const ref = GPU_REFERENCES.find((x) => x.id === base);
-      helper.pick({ name: r.system.gpuName, vramGb: ref?.memoryGb ?? null, board: "" }, { formFactor: ff, ...(base ? { base } : {}) });
+      helper.pick({ name: r.system.gpuName, vramGb: size ? Number(size) : (ref?.memoryGb ?? null), board: "" }, { formFactor: ff, ...(base ? { base } : {}) });
     } else q<HTMLDetailsElement>("#gpu-more").open = true;
   }
 

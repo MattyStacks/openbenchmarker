@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { bindSystemForm, systemFormHtml, type SystemFormApi } from "../src/app/system-form";
 import { NOT_LISTED } from "../src/benchmark/catalog";
+import { catalogFile } from "../src/benchmark/gpu-id";
+import { validateSubmission } from "../src/benchmark/validate";
 import { applyGuesses } from "../src/benchmark/guess";
 import { emptySystem, type BenchResult, type RunDiagnostics } from "../src/benchmark/types";
 
@@ -12,11 +14,11 @@ import { emptySystem, type BenchResult, type RunDiagnostics } from "../src/bench
 
 const RTX_2080TI = "ANGLE (NVIDIA, NVIDIA GeForce RTX 2080 Ti (0x00001E07) Direct3D11 vs_5_0 ps_5_0, D3D11)";
 
-function run(): BenchResult {
+function run(renderer = RTX_2080TI): BenchResult {
   return {
     id: "ti", gameId: "x", benchmarkVersion: "4.0.0", date: "2026-11-17", time: "12:00", resolutionId: "1080p", resolution: "1080p", width: 1920, height: 1080,
     preset: "High", durationS: 60, graphicsApi: "WebGL2", avgFps: 100, p1Low: 80, p5Low: 90, worstMs: 15, frameCount: 6000, loopBusy: 1, valid: true, invalidReason: "",
-    diag: { renderer: RTX_2080TI, vendor: "" } as RunDiagnostics,
+    diag: { renderer, vendor: "" } as RunDiagnostics,
     device: { browser: "edge", browserMajor: 141, os: "windows", deviceType: "desktop", webkitEngine: false, gpuLabel: null },
     system: emptySystem(),
   };
@@ -84,5 +86,69 @@ describe("binding the system form on a guessed GPU that isn't listed", () => {
     input.value = "AMD Ryzen 7 7800X3D";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     expect(saves.length).toBe(1);
+  });
+});
+
+// A chip sold with more than one memory size has a reference with no size in its id (hd_7790: 1 GB
+// and 2 GB). Its ID needs the size added (hd_7790_2gb_reference, base hd_7790), so the guess leaves
+// the ID empty and the helper asks for the size.
+describe("a guessed GPU whose reference has no memory size", () => {
+  const HD_7790 = "ANGLE (AMD, AMD Radeon HD 7790 Direct3D11 vs_5_0 ps_5_0, D3D11)";
+  const flush = () => Promise.resolve();
+  const helperId = () => document.querySelector(".helper-id code")?.textContent ?? "";
+  const pickSize = (form: HTMLFormElement, gb: number) => {
+    const vram = form.querySelector<HTMLSelectElement>("[data-helper-vram]")!;
+    vram.value = `hd_7790_${gb}gb`;
+    vram.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+
+  it("asks for the size, then builds and saves an ID the page accepts", async () => {
+    const r = applyGuesses(run(HD_7790));
+    expect(r.system).toMatchObject({ gpuId: NOT_LISTED, gpuName: "Radeon HD 7790", gpuIdRequested: "" });
+    const { form, saves } = mount(r);
+    await flush();
+    expect(saves).toEqual([]);
+    expect(form.querySelector("[data-helper-vram]")).not.toBeNull();
+    expect(helperId()).toBe("");
+    expect(form.querySelector("[data-helper-result]")!.textContent).toContain("Choose its graphics memory above.");
+
+    pickSize(form, 2);
+    expect(r.system.gpuIdRequested).toBe("hd_7790_2gb_reference");
+    expect(saves).toEqual(["hd_7790_2gb_reference"]);
+    expect(validateSubmission(r).filter((e) => e.startsWith("Requested gpu_id"))).toEqual([]);
+    expect(catalogFile(r.system.gpuIdRequested, r.system.gpuName, "desktop")!.yaml).toContain("base: hd_7790\n");
+
+    // Opened again: the helper comes back on the chosen size.
+    const again = mount(r);
+    await flush();
+    // The option marked selected (happy-dom misreads select.value for markup set with innerHTML).
+    expect(again.form.querySelector<HTMLOptionElement>("[data-helper-vram] option[selected]")!.value).toBe("hd_7790_2gb");
+    expect(helperId()).toBe("hd_7790_2gb_reference");
+    expect(again.form.querySelector<HTMLDetailsElement>("#gpu-more")!.open).toBe(false);
+  });
+
+  it("clears an ID guessed before sizes were asked for (hd_7790_reference), once setup is done", async () => {
+    const r = applyGuesses(run(HD_7790));
+    r.system.gpuIdRequested = "hd_7790_reference";
+    r.suggested = [...(r.suggested ?? []), "gpuIdRequested"];
+    const { form, saves } = mount(r);
+    expect(r.system.gpuIdRequested).toBe("");
+    expect(r.suggested).not.toContain("gpuIdRequested");
+    expect((form.elements.namedItem("gpuIdRequested") as HTMLInputElement).value).toBe("");
+    expect(saves).toEqual([]);
+    await flush();
+    expect(saves).toEqual([""]);
+    expect(form.querySelector("[data-helper-vram]")).not.toBeNull();
+  });
+
+  it("takes the size from pasted command output", async () => {
+    const r = run(HD_7790);
+    r.guessed = true;
+    const { form } = mount(r);
+    const paste = form.querySelector<HTMLTextAreaElement>("[data-sys-paste]")!;
+    paste.value = "Computer type: desktop\nGPU: AMD Radeon HD 7790 (2 GB) [board 1da2]";
+    paste.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(r.system.gpuId).toBe(NOT_LISTED);
+    expect(r.system.gpuIdRequested).toBe("hd_7790_2gb_sapphire_reference");
   });
 });
