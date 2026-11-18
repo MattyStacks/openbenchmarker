@@ -100,6 +100,20 @@ describe("guessing the system", () => {
     expect(g.values).toMatchObject({ gpuId: NOT_LISTED, gpuName: "Arc 140V GPU", gpuFormFactor: "laptop", gpuIdRequested: "arc_140v_shared_reference" });
   });
 
+  it("gives integrated graphics the catalog has no reference for a shared ID from its chip", () => {
+    const cases: [string, DeviceContext["os"], string, string][] = [
+      ["ANGLE (AMD, AMD Radeon 780M Graphics (0x000015BF) Direct3D11 vs_5_0 ps_5_0, D3D11)", "windows", "AMD Radeon 780M Graphics", "radeon_780m_shared_reference"],
+      ["ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x00009A49) Direct3D11 vs_5_0 ps_5_0, D3D11)", "windows", "Intel Iris Xe Graphics", "iris_xe_shared_reference"],
+      ["ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL ES 3.2)", "linux", "Intel UHD Graphics 620", "uhd_620_shared_reference"],
+      ["AMD Radeon 780M (radeonsi, gfx1103_r1, LLVM 19.1.7, DRM 3.61, 6.14.4) Mesa 25.0.4", "linux", "AMD Radeon 780M", "radeon_780m_shared_reference"],
+    ];
+    for (const [renderer, os, gpuName, id] of cases)
+      expect(guessSystem(run(renderer, os)).values).toMatchObject({ gpuId: NOT_LISTED, gpuName, gpuFormFactor: "laptop", gpuIdRequested: id });
+    // Named only by family: nothing to build an ID from.
+    for (const renderer of ["ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)", "ANGLE (Intel, Intel(R) Graphics (0x00007D55) Direct3D11 vs_5_0 ps_5_0, D3D11)"])
+      expect(guessSystem(run(renderer, "windows")).values.gpuId).toBeUndefined();
+  });
+
   it("reads Intel and NVIDIA names on Linux: Mesa's prefix and codename, NVIDIA's /PCIe/SSE2", () => {
     expect(rendererGpuName("ANGLE (Intel, Mesa Intel(R) Arc(TM) A770 Graphics (DG2), OpenGL ES 3.2)")).toBe("Intel(R) Arc(TM) A770 Graphics");
     expect(rendererGpuName("Mesa Intel(R) UHD Graphics 620 (KBL GT2)")).toBe("Intel(R) UHD Graphics 620");

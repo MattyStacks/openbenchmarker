@@ -12,10 +12,13 @@ import { GPU_REFERENCES } from "./catalog";
 //   desktop, brand only           <base>_<brand>_reference     rtx_5080_16gb_gigabyte_reference
 //   desktop, brand unknown        <base>_reference             rtx_5080_16gb_reference
 //   handheld                      <device>_<chip>_<ram>gb      rog_ally_z1_extreme_16gb
-//   integrated (shared memory)    <chip>_shared_reference      arc_140v_shared_reference
+//   integrated (shared memory)    <chip>_shared_reference      arc_140v_shared_reference, radeon_780m_shared_reference
 // A handheld's memory token is its system RAM, which the GPU shares. Any other GPU that shares
 // system memory has no size of its own: `shared` takes the token's place, its catalog file is an
 // igpu file, and the RAM goes with each run (docs/upstream-submission-changes.md, section 7).
+// Integrated chips with no reference file are named as sold, without the company: iris_xe,
+// uhd_620, radeon_780m, radeon_vega_8; Intel's older HD Graphics are intel_hd_4000, since hd_ is
+// AMD's Radeon HD in the catalog.
 // ---------------------------------------------------------------------------
 
 export type GpuFormFactor = "desktop" | "laptop" | "handheld";
@@ -64,6 +67,47 @@ export const slug = (s: string) =>
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
 
+/**
+ * Integrated graphics with no reference file, from the name the system or browser gives it: its
+ * chip ("Intel(R) Iris(R) Xe Graphics" → iris_xe, "Intel(R) UHD Graphics 620" → uhd_620, "AMD
+ * Radeon 780M" → radeon_780m, "AMD Radeon(TM) Vega 8 Graphics" → radeon_vega_8, "Intel(R) HD
+ * Graphics 4000" → intel_hd_4000), "" when the name doesn't say which chip ("AMD Radeon(TM)
+ * Graphics", "Intel(R) UHD Graphics"), or null when it isn't integrated graphics.
+ */
+function integratedName(name: string): string | null {
+  const bracket = /\[([^\]]+)\][^[]*$/.exec(name);
+  const n = ` ${(bracket ? bracket[1] : name)
+    .replace(/\((?:R|TM)\)|[®™]/gi, " ")
+    .replace(/\b(intel|amd|corporation|graphics|gpu)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()} `;
+  const named =
+    /^ (uhd|iris(?: plus| pro)?) (\d{3,4}) $/.exec(n) ??
+    /^ (iris xe) $/.exec(n) ??
+    // AMD's integrated chips end in M or S (Radeon 780M, 8060S); discrete ones say RX, Pro or HD.
+    /^ (radeon) (\d{3,4}[ms]) $/.exec(n);
+  if (named) return slug(named.slice(1).join(" "));
+  // Vega 3 to 11 are integrated; the discrete ones are RX Vega 56 and 64.
+  const vega = /^ (?:radeon )?vega ([1-9]|1[01]) $/.exec(n);
+  if (vega) return `radeon_vega_${vega[1]}`;
+  const hd = /^ hd (\d{3,4}) $/.exec(n);
+  if (hd && /intel/i.test(name)) return `intel_hd_${hd[1]}`;
+  // Named only by family: Radeon Graphics (a Ryzen APU), Intel Graphics, UHD Graphics, Arc Graphics (Meteor Lake).
+  if (/^ (radeon|uhd|hd|iris|iris plus|arc)? $/.test(n) && /intel|amd|radeon|uhd|iris/i.test(name)) return "";
+  return null;
+}
+
+/** The chip of integrated graphics with no reference file (radeon_780m), or "" (see integratedName). */
+export function integratedChip(name: string): string {
+  return integratedName(name) || "";
+}
+
+/** Integrated graphics whose name doesn't say which chip it is: "AMD Radeon(TM) Graphics". */
+export function isUnnamedIntegrated(name: string): boolean {
+  return integratedName(name) === "";
+}
+
 const IGNORED = /basic (display|render)|remote|virtual|parsec|displaylink|mirror|indirect/i;
 /** Integrated GPUs, which share system memory: never preferred over a discrete one. */
 const INTEGRATED = /\b(uhd|iris|hd graphics)\b|intel\(r\) graphics|radeon\(tm\) graphics|^amd radeon graphics|arc\(tm\) 1[34]0[vt]|\barc 1[34]0[vt]\b|radeon \d{3}m\b/i;
@@ -91,7 +135,7 @@ export function parseGpuInfo(text: string): GpuInfo {
     const board = m[3] && m[3] !== "?" && m[3] !== "0000" ? m[3].toLowerCase() : "";
     if (!gpus.some((g) => g.name === m[1])) gpus.push({ name: m[1], vramGb: vramGb || null, board });
   }
-  const rank = (g: DetectedGpu) => (INTEGRATED.test(g.name) ? 0 : 1);
+  const rank = (g: DetectedGpu) => (INTEGRATED.test(g.name) || integratedName(g.name) !== null ? 0 : 1);
   gpus.sort((a, b) => rank(b) - rank(a) || (b.vramGb ?? 0) - (a.vramGb ?? 0));
   return { formFactor, gpus };
 }
@@ -214,6 +258,8 @@ export function vendorOf(id: string): GpuVendor | null {
     : GPU_REFERENCES.filter((r) => `_${id}_`.includes(`_${chipOnly(r.id)}_`)).sort((a, b) => chipOnly(b.id).length - chipOnly(a.id).length)[0];
   if (ref && (ref.vendor === "nvidia" || ref.vendor === "amd" || ref.vendor === "intel")) return ref.vendor;
   if (/^(rtx|gtx|gt|titan|quadro)_/.test(id)) return "nvidia";
+  // Intel's integrated graphics (iris_xe, uhd_620, intel_hd_4000), before AMD's hd_.
+  if (/^(uhd|iris|intel)_/.test(id)) return "intel";
   if (/^(rx|hd|r[579]|radeon|vega|w\d)/.test(id)) return "amd";
   if (/^arc_/.test(id)) return "intel";
   return null;
@@ -228,6 +274,8 @@ export interface IdChoice {
   line?: string;
   /** Handheld only: system RAM in GB, which the GPU shares (the id's memory token). */
   ramGb?: number | null;
+  /** Integrated graphics with no reference file (radeon_780m): shared memory, like a shared reference. */
+  shared?: boolean;
 }
 
 /** A handheld's id: device, chip, RAM. The chip's own memory token, if any, gives way to the RAM. */
@@ -237,10 +285,10 @@ function handheldId(base: string, line: string, ramGb: number | null | undefined
 }
 
 /** The product id, per the convention at the top of this file. */
-export function buildGpuId({ base, formFactor, maker = "", line = "", ramGb }: IdChoice): string {
+export function buildGpuId({ base, formFactor, maker = "", line = "", ramGb, shared }: IdChoice): string {
   if (formFactor === "handheld") return handheldId(base, line, ramGb);
   // Integrated, in a laptop or a desktop PC: the chip, shared, and like laptops no maker or model.
-  if (isSharedReference(base)) return `${base}_${SHARED_TOKEN}_reference`;
+  if (shared || isSharedReference(base)) return `${base}_${SHARED_TOKEN}_reference`;
   if (formFactor === "laptop") return `${base}_reference`;
   if (maker === "own") {
     const v = vendorOf(base);
@@ -252,14 +300,14 @@ export function buildGpuId({ base, formFactor, maker = "", line = "", ramGb }: I
 }
 
 /** A name for the product, e.g. "Gigabyte GeForce RTX 5080 Gaming OC", from the system's name for the GPU. */
-export function productName(gpuName: string, { base, formFactor, maker = "", line = "", ramGb }: IdChoice): string {
+export function productName(gpuName: string, { base, formFactor, maker = "", line = "", ramGb, shared }: IdChoice): string {
   const clean = gpuName
     .replace(/^.*\[([^\]]+)\].*$/, "$1")
     .replace(/\((?:R|TM)\)|[®™]/gi, "")
     .replace(/\(\s*\d+\s*GB\s*\)/gi, "")
     .replace(/\s+/g, " ")
     .trim();
-  if (formFactor === "laptop" || (formFactor !== "handheld" && isSharedReference(base))) return clean;
+  if (formFactor === "laptop" || (formFactor !== "handheld" && (shared || isSharedReference(base)))) return clean;
   if (formFactor === "handheld") return [line.trim() || clean, ramGb ? `${ramGb} GB` : ""].filter(Boolean).join(" ");
   if (maker === "own") {
     const v = vendorOf(base);

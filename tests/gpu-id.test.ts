@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GPU_REFERENCES } from "../src/benchmark/catalog";
-import { boardOf, buildGpuId, catalogFile, chipTokens, isCatalogIdShape, isSharedReference, isSizelessReference, knownProduct, parseGpuInfo, productName, referenceIn, referenceMatches, vendorOf } from "../src/benchmark/gpu-id";
+import { boardOf, buildGpuId, catalogFile, chipTokens, integratedChip, isCatalogIdShape, isSharedReference, isSizelessReference, isUnnamedIntegrated, knownProduct, parseGpuInfo, productName, referenceIn, referenceMatches, vendorOf } from "../src/benchmark/gpu-id";
 
 // Real output of the Windows GPU command on an RTX 5090 laptop (Lenovo Legion Pro 7).
 const LAPTOP_WIN = "Computer type: laptop\r\nGPU: NVIDIA GeForce RTX 5090 Laptop GPU (24 GB) [board 17AA]\r\nGPU: Intel(R) Graphics (? GB) [board 17AA]\r\n";
@@ -220,5 +220,63 @@ describe("integrated graphics (shared memory)", () => {
         expect(catalogFile(id, r.name, formFactor)!.path).toBe(`data/gpus/igpu/${r.vendor}/${id}.yaml`);
       }
     }
+  });
+});
+
+describe("integrated graphics with no reference file", () => {
+  it("are named by their chip, as sold, without the company", () => {
+    const chips: [string, string][] = [
+      ["Intel(R) Iris(R) Xe Graphics", "iris_xe"],
+      ["Intel(R) UHD Graphics 620", "uhd_620"],
+      ["Intel(R) UHD Graphics 770", "uhd_770"],
+      ["Intel(R) Iris(R) Plus Graphics 655", "iris_plus_655"],
+      ["Intel(R) HD Graphics 4000", "intel_hd_4000"],
+      ["AMD Radeon 780M", "radeon_780m"],
+      ["AMD Radeon(TM) 890M Graphics", "radeon_890m"],
+      ["AMD Radeon(TM) 8060S Graphics", "radeon_8060s"],
+      ["AMD Radeon(TM) Vega 8 Graphics", "radeon_vega_8"],
+      ["Radeon 780M", "radeon_780m"],
+      ["vega 8", "radeon_vega_8"],
+      ["iris xe", "iris_xe"],
+      ["Advanced Micro Devices, Inc. [AMD/ATI] Rembrandt [Radeon 680M]", "radeon_680m"],
+      ["Intel Corporation Alder Lake-P GT2 [Iris Xe Graphics]", "iris_xe"],
+    ];
+    for (const [name, chip] of chips) expect([name, integratedChip(name)]).toEqual([name, chip]);
+  });
+
+  it("aren't confused with discrete GPUs, or with chips the name doesn't give", () => {
+    for (const name of ["AMD Radeon HD 7790", "AMD Radeon RX 6800S", "AMD Radeon RX Vega 64", "Vega 56", "AMD Radeon Pro 5500M", "AMD Radeon 540", "Intel(R) Iris(R) Xe MAX Graphics", "Intel(R) Arc(TM) A770 Graphics", "NVIDIA GeForce GTX 970", "NVIDIA GeForce GTX 980M", "HD 4000"])
+      expect([name, integratedChip(name), isUnnamedIntegrated(name)]).toEqual([name, "", false]);
+    for (const name of ["AMD Radeon(TM) Graphics", "AMD Radeon Graphics", "Intel(R) Graphics", "Intel(R) UHD Graphics", "Intel(R) Arc(TM) Graphics"])
+      expect([name, integratedChip(name), isUnnamedIntegrated(name)]).toEqual([name, "", true]);
+  });
+
+  it("get a shared ID and an igpu file with the right vendor and no base", () => {
+    for (const [chip, vendor, name] of [
+      ["radeon_780m", "amd", "AMD Radeon 780M"],
+      ["radeon_vega_8", "amd", "AMD Radeon Vega 8 Graphics"],
+      ["iris_xe", "intel", "Intel Iris Xe Graphics"],
+      ["uhd_620", "intel", "Intel UHD Graphics 620"],
+      ["intel_hd_4000", "intel", "Intel HD Graphics 4000"],
+    ] as const) {
+      for (const formFactor of ["laptop", "desktop"] as const) {
+        const id = buildGpuId({ base: chip, formFactor, maker: "asus", shared: true });
+        expect(id).toBe(`${chip}_shared_reference`);
+        expect(productName(name, { base: chip, formFactor, maker: "asus", shared: true })).toBe(name);
+        expect(catalogFile(id, name, formFactor)).toEqual({
+          path: `data/gpus/igpu/${vendor}/${id}.yaml`,
+          yaml: `id: ${id}\nidentity:\n  name: "${name}"\n  gpu_vendor: ${vendor}\nclassification:\n  form_factor: igpu\nmemory:\n  shared: true\n`,
+        });
+      }
+    }
+    // In a handheld the RAM is the memory token, as for any handheld.
+    expect(buildGpuId({ base: "radeon_780m", formFactor: "handheld", line: "Mystery Go", ramGb: 32, shared: true })).toBe("mystery_go_radeon_780m_32gb");
+    // AMD's discrete hd_ cards keep their vendor.
+    expect(vendorOf("hd_7790_2gb_reference")).toBe("amd");
+  });
+
+  it("are listed after a discrete GPU in pasted output", () => {
+    const info = parseGpuInfo("GPU: AMD Radeon 780M (2 GB)\nGPU: NVIDIA GeForce RTX 4060 Laptop GPU (8 GB)");
+    expect(info.gpus.map((g) => g.name)).toEqual(["NVIDIA GeForce RTX 4060 Laptop GPU", "AMD Radeon 780M"]);
   });
 });

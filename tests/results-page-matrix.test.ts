@@ -61,7 +61,7 @@ function gpuCases(id: string, name: string): Case[] {
   ];
 }
 
-/** Common GPUs the catalog doesn't know: nothing is guessed, and the form must still come up whole. */
+/** Common GPUs the catalog doesn't know: integrated ones get a shared ID, the rest nothing, and the form must still come up whole. */
 const NOT_IN_CATALOG = [
   "NVIDIA GeForce GTX 970", "NVIDIA GeForce GTX 960", "NVIDIA GeForce GTX 760", "NVIDIA GeForce GTX TITAN X", "NVIDIA GeForce MX450", "NVIDIA Quadro P2000",
   "NVIDIA RTX A2000 12GB", "NVIDIA T1000", "AMD Radeon(TM) Graphics", "AMD Radeon 780M", "AMD Radeon(TM) Vega 8 Graphics",

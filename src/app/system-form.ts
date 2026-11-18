@@ -1,6 +1,6 @@
 import { GPU_CATALOG, GPU_REFERENCES, NOT_LISTED, UPSTREAM_CATALOG_README, UPSTREAM_TEMPLATES, catalogLabel, findGpu, gpuRequestUrl } from "../benchmark/catalog";
 import { OVERCLOCK_FIELDS, SYSTEM_FIELDS, UNLISTED_GPU_FIELDS, fieldFor, submittedGpuId, type SystemField } from "../benchmark/fields";
-import { buildGpuId, isCatalogIdShape, isSizelessReference, knownProduct, parseGpuInfo, referenceIn, referenceMatches, type GpuFormFactor } from "../benchmark/gpu-id";
+import { buildGpuId, integratedChip, isCatalogIdShape, isSizelessReference, knownProduct, parseGpuInfo, referenceIn, referenceMatches, type GpuFormFactor } from "../benchmark/gpu-id";
 import { searchGpus, type GpuOption } from "../benchmark/gpu-search";
 import { referencesFor } from "../benchmark/guess";
 import { SYSINFO_COMMANDS, parseSysinfoPaste } from "../benchmark/sysinfo";
@@ -275,7 +275,9 @@ export function bindSystemForm(form: HTMLFormElement, r: BenchResult, save: () =
     const built = (b: string) => req === buildGpuId({ base: b, formFactor: ff ?? "desktop" });
     // An id the previous version guessed and the page can't submit (hd_7790_reference, arc_140v_reference).
     const stale = !!base && req === `${base}_reference` && !isCatalogIdShape(req);
-    const untouched = !req || stale || (base && (built(base) || (size && built(`${base}_${size}gb`))));
+    // Integrated graphics with no reference file: the shared ID the guess built (radeon_780m_shared_reference).
+    const chip = base ? "" : integratedChip(r.system.gpuName);
+    const untouched = !req || stale || (base && (built(base) || (size && built(`${base}_${size}gb`)))) || (chip && req === buildGpuId({ base: chip, formFactor: "laptop", shared: true }));
     if (untouched) {
       // A stale id is cleared: the helper builds the new one, or asks for the memory size.
       if (stale) {

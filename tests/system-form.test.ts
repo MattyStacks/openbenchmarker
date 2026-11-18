@@ -186,3 +186,75 @@ describe("a guessed integrated GPU", () => {
     expect(saves).toEqual(["arc_130t_shared_reference"]);
   });
 });
+
+// Integrated graphics the catalog has no reference for (Iris Xe, Radeon 780M): the chip, shared.
+describe("integrated graphics with no reference file", () => {
+  const RADEON_780M = "ANGLE (AMD, AMD Radeon 780M Graphics (0x000015BF) Direct3D11 vs_5_0 ps_5_0, D3D11)";
+  const flush = () => Promise.resolve();
+  const helperId = () => document.querySelector(".helper-id code")?.textContent ?? "";
+  const type = async (form: HTMLFormElement, name: string) => {
+    const search = form.querySelector<HTMLInputElement>("#gpu-search")!;
+    search.value = name;
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+  };
+
+  it("are guessed with a shared ID, saved, and opened again on it", async () => {
+    const r = applyGuesses(run(RADEON_780M));
+    expect(r.system).toMatchObject({ gpuId: NOT_LISTED, gpuName: "AMD Radeon 780M Graphics", gpuIdRequested: "radeon_780m_shared_reference" });
+    const { form, saves } = mount(r);
+    await flush();
+    expect(saves).toEqual(["radeon_780m_shared_reference"]);
+    expect(helperId()).toBe("radeon_780m_shared_reference");
+    expect(form.querySelector("[data-helper-vram]")).toBeNull();
+    expect(form.querySelector("[data-helper-maker]")).toBeNull();
+    expect(form.querySelector<HTMLDetailsElement>("#gpu-more")!.open).toBe(false);
+    expect(validateSubmission(r).filter((e) => e.startsWith("Requested gpu_id"))).toEqual([]);
+    expect(catalogFile(r.system.gpuIdRequested, r.system.gpuName, "laptop")!.path).toBe("data/gpus/igpu/amd/radeon_780m_shared_reference.yaml");
+
+    mount(r);
+    await flush();
+    expect(helperId()).toBe("radeon_780m_shared_reference");
+  });
+
+  it("typed in, get a shared ID with no memory size to choose", async () => {
+    const r = run();
+    r.guessed = true;
+    r.system.os = "windows";
+    const { form } = mount(r);
+    for (const [name, id] of [
+      ["Radeon 780M", "radeon_780m_shared_reference"],
+      ["Intel Iris Xe Graphics", "iris_xe_shared_reference"],
+      ["vega 8", "radeon_vega_8_shared_reference"],
+    ]) {
+      await type(form, name);
+      expect([name, r.system.gpuId, r.system.gpuIdRequested]).toEqual([name, NOT_LISTED, id]);
+      expect(form.querySelector("[data-helper-vram]")).toBeNull();
+    }
+  });
+
+  it("from pasted output, ignore the memory size Windows reports for them", () => {
+    const r = run();
+    r.guessed = true;
+    const { form } = mount(r);
+    const paste = form.querySelector<HTMLTextAreaElement>("[data-sys-paste]")!;
+    paste.value = "Computer type: laptop\nGPU: Intel(R) Iris(R) Xe Graphics (2 GB) [board 1028]";
+    paste.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(r.system).toMatchObject({ gpuId: NOT_LISTED, gpuIdRequested: "iris_xe_shared_reference", gpuName: "Intel Iris Xe Graphics", gpuFormFactor: "laptop" });
+    expect(document.querySelector("[data-helper-result]")!.textContent).not.toContain("2 GB");
+  });
+
+  it("named only by family, ask for the chip instead of building an ID", async () => {
+    const r = run();
+    r.guessed = true;
+    r.system.os = "windows";
+    const { form } = mount(r);
+    await type(form, "AMD Radeon(TM) Graphics");
+    // The search lists other Radeons, none highlighted: Enter uses the typed name.
+    expect(r.system).toMatchObject({ gpuId: NOT_LISTED, gpuName: "AMD Radeon(TM) Graphics" });
+    expect(r.system.gpuIdRequested).toBe("");
+    expect(document.querySelector("[data-helper-result]")!.textContent).toContain("doesn't say which integrated GPU it is");
+    expect(form.querySelector("[data-helper-vram]")).toBeNull();
+  });
+});

@@ -7,9 +7,11 @@ import {
   buildGpuId,
   chipTokens,
   catalogFile,
+  integratedChip,
   isCatalogIdShape,
   isSharedReference,
   isSizelessReference,
+  isUnnamedIntegrated,
   knownProduct,
   parseGpuInfo,
   productName,
@@ -60,6 +62,8 @@ interface HelperState {
   maker: string;
   line: string;
   ramGb: number | null;
+  /** Integrated graphics with no reference file (radeon_780m): its ID says shared, like arc_140v's. */
+  shared: boolean;
 }
 
 const FF_LABEL: Record<GpuFormFactor, string> = { desktop: "Desktop card", laptop: "Laptop", handheld: "Handheld PC" };
@@ -85,7 +89,7 @@ export interface GpuHelper {
  * form); `pickListed` chooses a catalog product instead.
  */
 export function bindGpuHelper(root: HTMLElement, opts: { apply: (s: Partial<SystemInfo>) => void; pickListed: (id: string) => void }): GpuHelper {
-  const st: HelperState = { info: null, gpu: 0, base: "", formFactor: "desktop", maker: "", line: "", ramGb: null };
+  const st: HelperState = { info: null, gpu: 0, base: "", formFactor: "desktop", maker: "", line: "", ramGb: null, shared: false };
   const result = root.querySelector<HTMLElement>("[data-helper-result]")!;
 
   // A handheld's id needs its device name and RAM before it's worth saving.
@@ -104,27 +108,33 @@ export function bindGpuHelper(root: HTMLElement, opts: { apply: (s: Partial<Syst
       result.innerHTML = `<p class="ok tiny">That's a <b>${esc(catalogLabel(knownGpu))}</b>, already in the dataset. <button type="button" class="btn btn-sm" data-helper-listed="${esc(knownGpu.id)}">Use it</button></p>`;
       return;
     }
+    const gpuSelect =
+      st.info.gpus.length > 1
+        ? `<label class="field"><span>Which GPU ran the benchmark?</span><select data-helper-gpu>${st.info.gpus.map((x, i) => `<option value="${i}"${i === st.gpu ? " selected" : ""}>${esc(x.name)}${x.vramGb ? ` (${x.vramGb} GB)` : ""}</option>`).join("")}</select></label>`
+        : "";
     const refs = referenceMatches(g);
-    const choices = [...new Set([...refs.options, ...(refs.fallback && !refs.options.includes(refs.fallback) ? [refs.fallback] : [])])];
+    // Integrated graphics named only by family: no chip to build an ID from.
+    if (!refs.options.length && isUnnamedIntegrated(g.name)) {
+      result.innerHTML = `${gpuSelect}<p class="next-step tiny"><b>${esc(g.name)}</b> doesn't say which integrated GPU it is, so its ID can't be built from it. Search above for its name instead, such as Radeon 780M, Radeon Vega 8 or Iris Xe: the CPU's page on AMD's or Intel's site names its graphics.</p>`;
+      return;
+    }
+    // Integrated graphics share memory: no memory size to choose.
+    const choices = st.shared ? [] : [...new Set([...refs.options, ...(refs.fallback && !refs.options.includes(refs.fallback) ? [refs.fallback] : [])])];
     // A reference with no memory size (hd_7790, sold as 1 GB and 2 GB): its size is chosen and added to it.
     const sizeless = refs.options.length === 1 && isSizelessReference(refs.options[0]) ? refs.options[0] : "";
     // No reference and no memory size: ask for the size, or for a handheld, use the chip alone (the RAM gives the size).
-    const stem = sizeless || chipStem(g.name);
-    const askVram = (!choices.length || !!sizeless) && st.formFactor !== "handheld";
+    const stem = sizeless || (st.shared ? st.base : chipStem(g.name));
+    const askVram = (!choices.length || !!sizeless) && st.formFactor !== "handheld" && !st.shared;
     if (!choices.length && st.formFactor === "handheld") st.base = stem;
     const vendor = vendorOf(st.base);
     // An integrated GPU (shared memory) outside a handheld: chip_shared_reference, no maker or model.
-    const shared = st.formFactor !== "handheld" && isSharedReference(st.base);
+    const shared = st.formFactor !== "handheld" && (st.shared || isSharedReference(st.base));
     // A sizeless reference has no id until its size is chosen.
     const id = st.base && !(askVram && st.base === sizeless) ? buildGpuId(st) : "";
     const listed = id && findGpu(id);
     result.innerHTML = `
-      <p class="tiny"><b>${esc(g.name)}</b>${g.vramGb && !/\b\d+\s*GB\b/i.test(g.name) ? `, ${g.vramGb} GB` : ""} isn't in the dataset yet. Check these and its ID is built for you.</p>
-      ${
-        st.info.gpus.length > 1
-          ? `<label class="field"><span>Which GPU ran the benchmark?</span><select data-helper-gpu>${st.info.gpus.map((x, i) => `<option value="${i}"${i === st.gpu ? " selected" : ""}>${esc(x.name)}${x.vramGb ? ` (${x.vramGb} GB)` : ""}</option>`).join("")}</select></label>`
-          : ""
-      }
+      <p class="tiny"><b>${esc(g.name)}</b>${g.vramGb && !st.shared && !/\b\d+\s*GB\b/i.test(g.name) ? `, ${g.vramGb} GB` : ""} isn't in the dataset yet. Check these and its ID is built for you.</p>
+      ${gpuSelect}
       <div class="field"><span>Desktop card, laptop or handheld</span><div class="seg seg-sm" role="radiogroup" aria-label="Desktop card, laptop or handheld">${(["desktop", "laptop", "handheld"] as const)
         .map((f) => `<label><input type="radio" name="helper-ff" value="${f}"${f === st.formFactor ? " checked" : ""} /><span>${FF_LABEL[f]}</span></label>`)
         .join("")}</div></div>
@@ -176,7 +186,10 @@ export function bindGpuHelper(root: HTMLElement, opts: { apply: (s: Partial<Syst
     if (!g) return render();
     // No reference file but a known memory size (a typed "Mystery GPU 9000 12 GB"): its chip and size.
     const refs = referenceMatches(g);
-    st.base = base ?? refs.base ?? (!refs.options.length && g.vramGb && refs.fallback ? refs.fallback : "");
+    // Integrated graphics with no reference file: the chip, whatever memory size Windows reports for it.
+    const chip = !base && !refs.options.length ? integratedChip(g.name) : "";
+    st.shared = !!chip;
+    st.base = base ?? refs.base ?? (chip || (!refs.options.length && g.vramGb && refs.fallback ? refs.fallback : ""));
     // A sizeless reference takes the size the system reported, when it's one of the choices.
     if (isSizelessReference(st.base) && g.vramGb && VRAM_GB.includes(g.vramGb)) st.base = `${st.base}_${g.vramGb}gb`;
     st.formFactor = formFactor ?? st.info!.formFactor ?? (/laptop|mobile|\d+m\b/i.test(g.name) ? "laptop" : "desktop");

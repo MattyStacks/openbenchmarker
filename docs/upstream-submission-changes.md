@@ -320,9 +320,15 @@ its own checks rejected it.
   already has no memory token.
 - **What Open GPU Benchmarker builds:** `<chip>_shared_reference` (`arc_130t_shared_reference`),
   using its `_reference` suffix for an unknown model (section 5), and a file under
-  `data/gpus/igpu/<vendor>/` with `base:`, `form_factor: igpu` and `memory.shared: true`. With the
-  igpu shape in the prompt below (something after `shared`), upstream accepts it as soon as that
-  lands, the way it already accepts laptop `_reference` IDs.
+  `data/gpus/igpu/<vendor>/` with `form_factor: igpu` and `memory.shared: true`, plus `base:` when
+  the chip has a reference. With the igpu shape in the prompt below (something after `shared`),
+  upstream accepts it as soon as that lands, the way it already accepts laptop `_reference` IDs.
+- **Chips with no reference file** (most integrated GPUs: Iris Xe, UHD 620, Radeon 780M) are named
+  as sold, without the company: `iris_xe`, `uhd_620`, `iris_plus_655`, `radeon_780m`,
+  `radeon_8060s`, `radeon_vega_8`. Intel's older HD Graphics are `intel_hd_4000`, because `hd_`
+  is AMD's Radeon HD in the catalog (`hd_7790`). The product has no `base:` until someone adds the
+  reference. A name that doesn't say which chip it is ("AMD Radeon(TM) Graphics", "Intel(R)
+  Graphics") gets no ID: the page asks for the chip's name instead.
 - **Handhelds don't change.** Their RAM is soldered and sold as separate models, so
   `<device>_<chip>_<ram>gb` (`legion_go_s_z1_extreme_16gb`) stays.
 - **Discrete cards whose reference has no size** (`hd_7790`, `r9_290`, `r9_m280x`, `arc_a530m`, …)
@@ -351,7 +357,14 @@ Decision:
 2. Such a product has memory.shared: true and no memory.capacity_gb. System RAM is recorded per
    run (system.memory_gb, memory_type, memory_channels), not in the catalog.
 3. `base:` points at the chip's reference file (arc_140v, z1_extreme), which already has no memory
-   token; the ID must start with `<base>_shared_`.
+   token; the ID must start with `<base>_shared_`. Most integrated chips have no reference file
+   yet: then there's no `base:` and the chip is named as sold, without the company:
+   iris_xe, uhd_620, iris_plus_655, radeon_780m, radeon_890m, radeon_8060s, radeon_vega_8. Intel's
+   older HD Graphics are intel_hd_4000 (hd_ is AMD's Radeon HD: hd_7790). A later reference for
+   the chip uses the same name (data/gpus/reference/amd/radeon_780m.yaml, memory.shared: true).
+3a. Open GPU Benchmarker submits `<chip>_shared_reference` when the model is unknown (its
+   `_reference` suffix, the same one it uses for laptops), e.g. arc_130t_shared_reference with
+   base arc_130t, and radeon_780m_shared_reference with no base. Both must pass.
 4. Handhelds are unchanged: `<device>_<chip>_<ram>gb`, RAM soldered, capacity_gb required.
 5. desktop, laptop and handheld are unchanged: `shared` is an error there (a discrete GPU has
    VRAM; a handheld names its RAM).
@@ -371,8 +384,11 @@ Changes:
 - data/gpus/README.md: the "Picking the ID" table row for igpu, a short "Integrated GPU memory"
   rule next to "Laptop RAM" and "Handheld RAM", the id-memory-token section, and "Which ID do I
   use?". Mention templates/ if a catalog template lists capacity_gb as always required.
+- data/gpus/README.md also gets the naming rule for integrated chips (3 above), with the examples.
 - scripts/test_build.py: cases that pass (arc_140v_shared_lenovo_yoga_slim_7x with base arc_140v,
-  radeon_780m_shared_generic with the generic warning) and fail (igpu with a <n>gb token, igpu
+  arc_130t_shared_reference with base arc_130t, radeon_780m_shared_reference and
+  iris_xe_shared_reference with no base, radeon_780m_shared_generic with the generic warning) and
+  fail (igpu with a <n>gb token, igpu
   with capacity_gb, `shared` in a laptop or desktop ID, igpu ending at `shared`, two tokens),
   each with a message that says why the rule exists.
 - CHANGELOG (Changed: igpu ID rule), docs/TODO.md, MINOR bump per CLAUDE.md.

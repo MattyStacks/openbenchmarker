@@ -1,6 +1,6 @@
 import { GPU_CATALOG, GPU_REFERENCES, NOT_LISTED, findGpu, type CatalogGpu, type ReferenceGpu } from "./catalog";
 import { isMaskedRenderer } from "./diagnose";
-import { buildGpuId, chipTokens, isCatalogIdShape, type GpuFormFactor } from "./gpu-id";
+import { buildGpuId, chipTokens, integratedChip, isCatalogIdShape, productName, type GpuFormFactor } from "./gpu-id";
 import type { BenchResult, SystemInfo, SystemProbe } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -172,6 +172,13 @@ export function guessSystem(r: GuessInput): Guess {
       // (hd_7790, arc_140v): the user picks it in the helper, so no id is guessed.
       const id = ref && formFactor !== "handheld" ? buildGpuId({ base: ref.id, formFactor }) : "";
       if (isCatalogIdShape(id)) set("gpuIdRequested", id, "built from the GPU your browser reports");
+    } else if (integratedChip(gpuName)) {
+      // Integrated graphics the catalog has no reference for (Iris Xe, Radeon 780M): the chip, shared.
+      const choice = { base: integratedChip(gpuName), formFactor: "laptop" as const, shared: true };
+      set("gpuId", NOT_LISTED, FROM_BROWSER);
+      set("gpuName", productName(gpuName, choice), FROM_BROWSER);
+      set("gpuFormFactor", choice.formFactor, FROM_BROWSER);
+      set("gpuIdRequested", buildGpuId(choice), "built from the GPU your browser reports");
     }
   }
 
