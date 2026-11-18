@@ -129,7 +129,7 @@ export const SYSTEM_FIELDS: readonly SystemField[] = [
     placeholder: "e.g. rx_9070_xt_16gb",
     help: "The catalog ID you're asking for, used as gpu_id in the YAML. The helper above builds it for you.",
     validate: (v) =>
-      isCatalogIdShape(v) ? null : `Requested gpu_id: '${v}' must be lowercase letters, digits and single _, with one memory size like 16gb (e.g. rtx_5080_16gb_reference)`,
+      isCatalogIdShape(v) ? null : `Requested gpu_id: '${v}' must be lowercase letters, digits and single _, with one memory size like 16gb, or shared for integrated graphics (e.g. rtx_5080_16gb_reference, arc_140v_shared_reference)`,
     carry: true,
     gpuSpecific: true,
   },

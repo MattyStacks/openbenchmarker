@@ -318,6 +318,11 @@ its own checks rejected it.
 - **Catalog file:** `classification.form_factor: igpu`, `memory.shared: true`, and no
   `memory.capacity_gb`. `base:` points at the chip's reference (`arc_140v`, `z1_extreme`), which
   already has no memory token.
+- **What Open GPU Benchmarker builds:** `<chip>_shared_reference` (`arc_130t_shared_reference`),
+  using its `_reference` suffix for an unknown model (section 5), and a file under
+  `data/gpus/igpu/<vendor>/` with `base:`, `form_factor: igpu` and `memory.shared: true`. With the
+  igpu shape in the prompt below (something after `shared`), upstream accepts it as soon as that
+  lands, the way it already accepts laptop `_reference` IDs.
 - **Handhelds don't change.** Their RAM is soldered and sold as separate models, so
   `<device>_<chip>_<ram>gb` (`legion_go_s_z1_extreme_16gb`) stays.
 - **Discrete cards whose reference has no size** (`hd_7790`, `r9_290`, `r9_m280x`, `arc_a530m`, …)

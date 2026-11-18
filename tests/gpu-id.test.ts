@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GPU_REFERENCES } from "../src/benchmark/catalog";
-import { boardOf, buildGpuId, catalogFile, chipTokens, isCatalogIdShape, isSizelessReference, knownProduct, parseGpuInfo, productName, referenceIn, referenceMatches, vendorOf } from "../src/benchmark/gpu-id";
+import { boardOf, buildGpuId, catalogFile, chipTokens, isCatalogIdShape, isSharedReference, isSizelessReference, knownProduct, parseGpuInfo, productName, referenceIn, referenceMatches, vendorOf } from "../src/benchmark/gpu-id";
 
 // Real output of the Windows GPU command on an RTX 5090 laptop (Lenovo Legion Pro 7).
 const LAPTOP_WIN = "Computer type: laptop\r\nGPU: NVIDIA GeForce RTX 5090 Laptop GPU (24 GB) [board 17AA]\r\nGPU: Intel(R) Graphics (? GB) [board 17AA]\r\n";
@@ -186,6 +186,38 @@ describe("references with no memory size", () => {
         const id = buildGpuId({ base: `${r.id}_2gb`, formFactor });
         expect(isCatalogIdShape(id)).toBe(true);
         expect(catalogFile(id, r.name, formFactor)!.yaml).toContain(`base: ${r.id}\n`);
+      }
+    }
+  });
+});
+
+describe("integrated graphics (shared memory)", () => {
+  it("say shared in place of a memory size, in a laptop or a desktop PC, never with a maker", () => {
+    expect(isSharedReference("arc_140v")).toBe(true);
+    expect(isSharedReference("hd_7790")).toBe(false);
+    expect(buildGpuId({ base: "arc_140v", formFactor: "laptop" })).toBe("arc_140v_shared_reference");
+    expect(buildGpuId({ base: "arc_b390", formFactor: "desktop", maker: "asus", line: "nuc" })).toBe("arc_b390_shared_reference");
+    // Handhelds keep their RAM size.
+    expect(buildGpuId({ base: "z1_extreme", formFactor: "handheld", line: "ROG Ally", ramGb: 16 })).toBe("rog_ally_z1_extreme_16gb");
+    expect(productName("Intel(R) Arc(TM) 140V GPU", { base: "arc_140v", formFactor: "desktop", maker: "asus" })).toBe("Intel Arc 140V GPU");
+  });
+
+  it("shared is the one memory token: never alongside a size, never twice", () => {
+    for (const id of ["arc_140v_shared_reference", "radeon_780m_shared_generic"]) expect(isCatalogIdShape(id)).toBe(true);
+    for (const id of ["arc_140v_reference", "arc_140v_16gb_shared_reference", "arc_140v_shared_shared"]) expect(isCatalogIdShape(id)).toBe(false);
+  });
+
+  it("their catalog file is an igpu file with shared memory and no capacity, on the chip's reference", () => {
+    expect(catalogFile("arc_130t_shared_reference", "Intel Arc 130T GPU", "laptop")).toEqual({
+      path: "data/gpus/igpu/intel/arc_130t_shared_reference.yaml",
+      yaml: 'id: arc_130t_shared_reference\nbase: arc_130t\nidentity:\n  name: "Intel Arc 130T GPU"\n  gpu_vendor: intel\nclassification:\n  form_factor: igpu\nmemory:\n  shared: true\n',
+    });
+    // Every shared-memory reference gets a valid ID and file outside a handheld.
+    for (const r of GPU_REFERENCES.filter((x) => x.memoryShared)) {
+      for (const formFactor of ["laptop", "desktop"] as const) {
+        const id = buildGpuId({ base: r.id, formFactor });
+        expect(isCatalogIdShape(id)).toBe(true);
+        expect(catalogFile(id, r.name, formFactor)!.path).toBe(`data/gpus/igpu/${r.vendor}/${id}.yaml`);
       }
     }
   });

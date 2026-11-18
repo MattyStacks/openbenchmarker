@@ -89,15 +89,15 @@ describe("guessing the system", () => {
     expect(ti.values.gpuIdRequested).toBeUndefined();
   });
 
-  it("guesses no ID for a chip whose reference has no memory size: the helper asks for it", () => {
-    for (const [renderer, name] of [
-      ["ANGLE (AMD, AMD Radeon HD 7790 Direct3D11 vs_5_0 ps_5_0, D3D11)", "Radeon HD 7790"],
-      ["ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)", "Arc 140V GPU"],
-    ]) {
-      const g = guessSystem(run(renderer, "windows"));
-      expect(g.values).toMatchObject({ gpuId: NOT_LISTED, gpuName: name });
-      expect(g.values.gpuIdRequested).toBeUndefined();
-    }
+  it("guesses no ID for a card whose reference has no memory size: the helper asks for it", () => {
+    const g = guessSystem(run("ANGLE (AMD, AMD Radeon HD 7790 Direct3D11 vs_5_0 ps_5_0, D3D11)", "windows"));
+    expect(g.values).toMatchObject({ gpuId: NOT_LISTED, gpuName: "Radeon HD 7790" });
+    expect(g.values.gpuIdRequested).toBeUndefined();
+  });
+
+  it("gives integrated graphics a shared ID", () => {
+    const g = guessSystem(run("ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)", "windows"));
+    expect(g.values).toMatchObject({ gpuId: NOT_LISTED, gpuName: "Arc 140V GPU", gpuFormFactor: "laptop", gpuIdRequested: "arc_140v_shared_reference" });
   });
 
   it("takes Mesa from the renderer on Linux, and nothing from Firefox's approximate names", () => {

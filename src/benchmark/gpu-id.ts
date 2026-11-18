@@ -12,7 +12,10 @@ import { GPU_REFERENCES } from "./catalog";
 //   desktop, brand only           <base>_<brand>_reference     rtx_5080_16gb_gigabyte_reference
 //   desktop, brand unknown        <base>_reference             rtx_5080_16gb_reference
 //   handheld                      <device>_<chip>_<ram>gb      rog_ally_z1_extreme_16gb
-// A handheld's memory token is its system RAM, which the GPU shares.
+//   integrated (shared memory)    <chip>_shared_reference      arc_140v_shared_reference
+// A handheld's memory token is its system RAM, which the GPU shares. Any other GPU that shares
+// system memory has no size of its own: `shared` takes the token's place, its catalog file is an
+// igpu file, and the RAM goes with each run (docs/upstream-submission-changes.md, section 7).
 // ---------------------------------------------------------------------------
 
 export type GpuFormFactor = "desktop" | "laptop" | "handheld";
@@ -32,9 +35,17 @@ export interface GpuInfo {
   gpus: DetectedGpu[];
 }
 
-/** Upstream gpu_id rule: lowercase letters, digits and single underscores, with exactly one memory token. */
+/** The word in place of the <n>gb token for an integrated GPU, which shares system memory. */
+export const SHARED_TOKEN = "shared";
+
+/** Upstream gpu_id rule: lowercase letters, digits and single underscores, with exactly one memory token (`16gb`, or `shared`). */
 export function isCatalogIdShape(id: string): boolean {
-  return /^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(id) && id.split("_").filter((t) => /^\d+gb$/.test(t)).length === 1;
+  return /^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(id) && id.split("_").filter((t) => /^\d+gb$/.test(t) || t === SHARED_TOKEN).length === 1;
+}
+
+/** A reference for a chip that shares system memory (arc_140v, z1_extreme): outside a handheld, its ID says `shared`. */
+export function isSharedReference(id: string): boolean {
+  return !!GPU_REFERENCES.find((r) => r.id === id)?.memoryShared;
 }
 
 /**
@@ -227,8 +238,10 @@ function handheldId(base: string, line: string, ramGb: number | null | undefined
 
 /** The product id, per the convention at the top of this file. */
 export function buildGpuId({ base, formFactor, maker = "", line = "", ramGb }: IdChoice): string {
-  if (formFactor === "laptop") return `${base}_reference`;
   if (formFactor === "handheld") return handheldId(base, line, ramGb);
+  // Integrated, in a laptop or a desktop PC: the chip, shared, and like laptops no maker or model.
+  if (isSharedReference(base)) return `${base}_${SHARED_TOKEN}_reference`;
+  if (formFactor === "laptop") return `${base}_reference`;
   if (maker === "own") {
     const v = vendorOf(base);
     return `${base}_${v ? OWN_CARD[v].token : "reference"}`;
@@ -246,7 +259,7 @@ export function productName(gpuName: string, { base, formFactor, maker = "", lin
     .replace(/\(\s*\d+\s*GB\s*\)/gi, "")
     .replace(/\s+/g, " ")
     .trim();
-  if (formFactor === "laptop") return clean;
+  if (formFactor === "laptop" || (formFactor !== "handheld" && isSharedReference(base))) return clean;
   if (formFactor === "handheld") return [line.trim() || clean, ramGb ? `${ramGb} GB` : ""].filter(Boolean).join(" ");
   if (maker === "own") {
     const v = vendorOf(base);
@@ -272,12 +285,14 @@ export function catalogFile(id: string, name: string, formFactor: GpuFormFactor)
   if (!isCatalogIdShape(id)) return null;
   const vendor = vendorOf(id);
   if (!vendor) return null;
-  const capacity = Number(/(?:^|_)(\d+)gb(?:_|$)/.exec(id)![1]);
+  // An integrated GPU's file: form factor igpu, shared memory and no capacity (the RAM is on each run).
+  const shared = id.split("_").includes(SHARED_TOKEN);
+  const fileFormFactor = shared ? "igpu" : formFactor;
   const found = referenceIn(id);
-  // Cards and laptops start with their reference; a handheld names its device first.
-  const base = found && (formFactor === "handheld" || id.startsWith(`${found}_`)) ? found : undefined;
+  // Cards, laptops and integrated GPUs start with their reference; a handheld names its device first.
+  const base = found && (fileFormFactor === "handheld" || id.startsWith(`${found}_`)) ? found : undefined;
   const rest = base && id.startsWith(`${base}_`) ? id.slice(base.length + 1) : "";
-  const partner = formFactor === "desktop" ? BOARD_BRANDS.find((b) => rest === b.token || rest.startsWith(`${b.token}_`))?.label.split(" /")[0] : undefined;
+  const partner = fileFormFactor === "desktop" ? BOARD_BRANDS.find((b) => rest === b.token || rest.startsWith(`${b.token}_`))?.label.split(" /")[0] : undefined;
   const yaml = [
     `id: ${id}`,
     ...(base ? [`base: ${base}`] : []),
@@ -286,10 +301,10 @@ export function catalogFile(id: string, name: string, formFactor: GpuFormFactor)
     `  gpu_vendor: ${vendor}`,
     ...(partner ? [`  board_partner: ${partner}`] : []),
     `classification:`,
-    `  form_factor: ${formFactor}`,
+    `  form_factor: ${fileFormFactor}`,
     `memory:`,
-    `  capacity_gb: ${capacity}`,
-    ...(formFactor === "handheld" ? [`  shared: true`] : []),
+    ...(shared ? [] : [`  capacity_gb: ${Number(/(?:^|_)(\d+)gb(?:_|$)/.exec(id)![1])}`]),
+    ...(shared || fileFormFactor === "handheld" ? [`  shared: true`] : []),
   ].join("\n");
-  return { path: `data/gpus/${formFactor}/${vendor}/${id}.yaml`, yaml: `${yaml}\n` };
+  return { path: `data/gpus/${fileFormFactor}/${vendor}/${id}.yaml`, yaml: `${yaml}\n` };
 }

@@ -152,3 +152,37 @@ describe("a guessed GPU whose reference has no memory size", () => {
     expect(r.system.gpuIdRequested).toBe("hd_7790_2gb_sapphire_reference");
   });
 });
+
+// Integrated graphics share the computer's memory, so their ID says shared instead of a size
+// (arc_130t_shared_reference), with an igpu catalog file.
+describe("a guessed integrated GPU", () => {
+  const ARC_130T = "ANGLE (Intel, Intel(R) Arc(TM) 130T GPU (0x00007D51) Direct3D11 vs_5_0 ps_5_0, D3D11)";
+  const flush = () => Promise.resolve();
+
+  it("gets a shared ID, saved and accepted, with no board maker to choose", async () => {
+    const r = applyGuesses(run(ARC_130T));
+    expect(r.system).toMatchObject({ gpuId: NOT_LISTED, gpuName: "Arc 130T GPU", gpuFormFactor: "laptop", gpuIdRequested: "arc_130t_shared_reference" });
+    const { form, saves } = mount(r);
+    await flush();
+    expect(saves).toEqual(["arc_130t_shared_reference"]);
+    expect(document.querySelector(".helper-id code")!.textContent).toBe("arc_130t_shared_reference");
+    expect(form.querySelector("[data-helper-maker]")).toBeNull();
+    expect(validateSubmission(r).filter((e) => e.startsWith("Requested gpu_id"))).toEqual([]);
+    // As a desktop PC (a mini PC): still shared, still no maker.
+    const desk = form.querySelector<HTMLInputElement>('input[name="helper-ff"][value="desktop"]')!;
+    desk.checked = true;
+    desk.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(form.querySelector("[data-helper-maker]")).toBeNull();
+    expect(r.system).toMatchObject({ gpuIdRequested: "arc_130t_shared_reference", gpuFormFactor: "desktop" });
+  });
+
+  it("replaces the ID the previous version guessed (arc_130t_reference)", async () => {
+    const r = applyGuesses(run(ARC_130T));
+    r.system.gpuIdRequested = "arc_130t_reference";
+    const { form, saves } = mount(r);
+    expect(r.system.gpuIdRequested).toBe("arc_130t_shared_reference");
+    expect(form.querySelector<HTMLDetailsElement>("#gpu-more")!.open).toBe(false);
+    await flush();
+    expect(saves).toEqual(["arc_130t_shared_reference"]);
+  });
+});

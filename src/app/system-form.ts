@@ -273,11 +273,12 @@ export function bindSystemForm(form: HTMLFormElement, r: BenchResult, save: () =
     // A sizeless reference (hd_7790) with the size the helper added: hd_7790_2gb_reference.
     const size = base && isSizelessReference(base) ? new RegExp(`^${base}_(\\d+)gb_`).exec(req)?.[1] : undefined;
     const built = (b: string) => req === buildGpuId({ base: b, formFactor: ff ?? "desktop" });
-    const untouched = !req || (base && (built(base) || (size && built(`${base}_${size}gb`))));
+    // An id the previous version guessed and the page can't submit (hd_7790_reference, arc_140v_reference).
+    const stale = !!base && req === `${base}_reference` && !isCatalogIdShape(req);
+    const untouched = !req || stale || (base && (built(base) || (size && built(`${base}_${size}gb`))));
     if (untouched) {
-      // An id guessed before sizeless references were handled (hd_7790_reference) can't be
-      // submitted: clear it, and the helper asks for the size.
-      if (req && !isCatalogIdShape(req)) {
+      // A stale id is cleared: the helper builds the new one, or asks for the memory size.
+      if (stale) {
         setValues({ gpuIdRequested: "" });
         commit();
       }

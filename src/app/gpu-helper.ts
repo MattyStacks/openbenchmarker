@@ -8,6 +8,7 @@ import {
   chipTokens,
   catalogFile,
   isCatalogIdShape,
+  isSharedReference,
   isSizelessReference,
   knownProduct,
   parseGpuInfo,
@@ -112,6 +113,8 @@ export function bindGpuHelper(root: HTMLElement, opts: { apply: (s: Partial<Syst
     const askVram = (!choices.length || !!sizeless) && st.formFactor !== "handheld";
     if (!choices.length && st.formFactor === "handheld") st.base = stem;
     const vendor = vendorOf(st.base);
+    // An integrated GPU (shared memory) outside a handheld: chip_shared_reference, no maker or model.
+    const shared = st.formFactor !== "handheld" && isSharedReference(st.base);
     // A sizeless reference has no id until its size is chosen.
     const id = st.base && !(askVram && st.base === sizeless) ? buildGpuId(st) : "";
     const listed = id && findGpu(id);
@@ -139,7 +142,9 @@ export function bindGpuHelper(root: HTMLElement, opts: { apply: (s: Partial<Syst
           : ""
       }
       ${
-        st.formFactor === "desktop"
+        shared
+          ? `<p class="muted tiny">Integrated graphics share the computer's memory, so the ID says <code>shared</code> instead of a memory size. The computer's maker and model aren't part of it, and your RAM goes with the result.</p>`
+          : st.formFactor === "desktop"
           ? `<label class="field"><span>Who made the card</span><select data-helper-maker>
               <option value="">Not sure</option>
               ${vendor ? `<option value="own"${st.maker === "own" ? " selected" : ""}>${esc(OWN_CARD[vendor].label)} (made by ${vendor === "nvidia" ? "NVIDIA" : vendor === "amd" ? "AMD" : "Intel"})</option>` : ""}
@@ -159,7 +164,7 @@ export function bindGpuHelper(root: HTMLElement, opts: { apply: (s: Partial<Syst
           ? `<p class="helper-id">ID: <code>${esc(id)}</code></p>
              ${listed ? `<p class="ok tiny">It's already in the dataset as ${esc(listed.name)}. <button type="button" class="btn btn-sm" data-helper-listed="${esc(id)}">Use it</button></p>` : ""}
              ${st.formFactor === "handheld" && (!st.line.trim() || !st.ramGb) ? `<p class="next-step tiny">Add the device name and its RAM to finish the ID.</p>` : ""}
-             ${st.formFactor === "desktop" && !st.maker ? `<p class="muted tiny">Not sure who made it? <code>_reference</code> works until someone adds the exact card.</p>` : ""}`
+             ${st.formFactor === "desktop" && !st.maker && !shared ? `<p class="muted tiny">Not sure who made it? <code>_reference</code> works until someone adds the exact card.</p>` : ""}`
           : `<p class="next-step tiny">Choose its graphics memory above.</p>`
       }`;
     if (id && !listed && complete(id)) opts.apply({ gpuName: productName(g.name, st), gpuIdRequested: id, gpuFormFactor: st.formFactor });
